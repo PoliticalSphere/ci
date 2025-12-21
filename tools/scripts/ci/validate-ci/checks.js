@@ -114,10 +114,16 @@ function checkUsesReference({
     const result = validateRemoteAction(action, ref);
     const ok = typeof result === 'boolean' ? result : Boolean(result?.ok);
     if (!ok) {
-      const reason =
-        typeof result === 'object' && result?.error === 'remote_unreachable'
-          ? 'remote lookup failed'
-          : 'ref not found';
+      let reason = 'remote lookup failed';
+      if (typeof result === 'object') {
+        if (result.error === 'ref_not_found') {
+          reason = 'ref not found';
+        } else if (result.error === 'remote_unreachable') {
+          reason = 'remote unreachable';
+        } else if (result.error === 'invalid_action_ref') {
+          reason = 'invalid action reference';
+        }
+      }
       violations.push(
         makeViolation(
           rel,

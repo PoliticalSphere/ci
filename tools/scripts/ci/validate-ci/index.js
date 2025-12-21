@@ -13,7 +13,6 @@
 //   - Exit codes are meaningful (0 pass, 1 fail)
 // ==============================================================================
 
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -21,7 +20,7 @@ import yaml from 'yaml';
 
 import { scanActions, scanWorkflows } from './checks.js';
 import { bullet, detail, fatal, section } from './console.js';
-import { getRepoRoot, isCI } from './env.js';
+import { getRepoRoot } from './env.js';
 import { listActionMetadata, listWorkflows, loadText } from './fs.js';
 import {
   loadAllowlist,
@@ -33,6 +32,7 @@ import {
   loadUnsafeAllowlist,
   loadUnsafePatterns,
 } from './policies.js';
+import { createRemoteVerifier } from './remote-verify.js';
 
 const workspaceRoot = getRepoRoot();
 const platformRoot = process.env.PS_PLATFORM_ROOT || workspaceRoot;
@@ -87,45 +87,18 @@ const scoreFailThreshold =
     : null;
 const verifyRemoteShas =
   String(process.env.PS_VALIDATE_CI_VERIFY_REMOTE || '0') === '1';
+detail(
+  `Remote SHA verification: ${
+    verifyRemoteShas ? 'ENABLED' : 'DISABLED'
+  } (PS_VALIDATE_CI_VERIFY_REMOTE=${
+    process.env.PS_VALIDATE_CI_VERIFY_REMOTE || '<unset>'
+  })`,
+);
 const quiet =
   String(process.env.PS_VALIDATE_CI_QUIET || '0') === '1' ||
   String(process.env.PS_VALIDATE_CI_QUIET || '0') === 'true';
 
-const remoteShaCache = new Map();
-
-function validateRemoteAction(action, ref) {
-  if (!verifyRemoteShas) return true;
-  if (!action || !ref) return true;
-  if (!/^[a-f0-9]{40}$/.test(ref)) return true;
-
-  const parts = action.split('/');
-  const repo = parts.length >= 2 ? `${parts[0]}/${parts[1]}` : action;
-  const key = `${repo}@${ref}`;
-
-  if (remoteShaCache.has(key)) {
-    return remoteShaCache.get(key);
-  }
-
-  let ok = false;
-  let error = null;
-  try {
-    const out = execSync(`git ls-remote https://github.com/${repo}.git`, {
-      stdio: ['ignore', 'pipe', 'ignore'],
-      encoding: 'utf8',
-      timeout: 10000,
-    });
-    ok = out
-      .split(/\r?\n/)
-      .some((line) => line.startsWith(`${ref}\t`));
-  } catch {
-    ok = false;
-    error = 'remote_unreachable';
-  }
-
-  const result = { ok, error };
-  remoteShaCache.set(key, result);
-  return result;
-}
+const validateRemoteAction = createRemoteVerifier({ verifyRemoteShas });
 
 function assertConfigFile(filePath, label, checks) {
   const text = loadText(filePath);
