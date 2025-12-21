@@ -163,10 +163,13 @@ jobs:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
     steps:
-      - name: Hardened checkout (PS)
-        uses: ./.github/actions/ps-hardened-checkout
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
-          fetch_depth: ${{ inputs.fetch_depth }}
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -225,10 +228,13 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Hardened checkout (PS)
-        uses: ./.github/actions/ps-hardened-checkout
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
-          fetch_depth: ${{ inputs.fetch_depth }}
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
 
       - name: Point HOME at workspace temp
         shell: bash
