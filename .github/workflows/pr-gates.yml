@@ -259,7 +259,7 @@ jobs:
         with:
           name: pr-gates-lint
           path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
   typecheck:
@@ -320,7 +320,7 @@ jobs:
         with:
           name: pr-gates-typecheck
           path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
   test:
@@ -381,7 +381,7 @@ jobs:
         with:
           name: pr-gates-coverage
           path: ${{ inputs.coverage_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
       - name: Upload test results
@@ -390,7 +390,7 @@ jobs:
         with:
           name: pr-gates-test-results
           path: ${{ inputs.test_results_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
       - name: Upload artifacts
@@ -399,7 +399,7 @@ jobs:
         with:
           name: pr-gates-tests
           path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
   jscpd:
@@ -463,7 +463,7 @@ jobs:
         with:
           name: pr-gates-jscpd
           path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
   build:
@@ -524,7 +524,7 @@ jobs:
         with:
           name: pr-gates-build
           path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
   secrets:
@@ -568,7 +568,7 @@ jobs:
         with:
           name: pr-gates-secrets
           path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
 
   dependency-review:
@@ -739,5 +739,5 @@ jobs:
           name: pr-gates-summary
           path: |
             reports/summary/pr-gates.json
-          if_no_files_found: "warn"
+          if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
