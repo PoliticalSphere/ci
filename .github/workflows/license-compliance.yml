@@ -74,6 +74,11 @@ on:
         type: string
         required: false
         default: "1"
+      install_dependencies:
+        description: "Install npm dependencies (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
 
       policy_path:
         description: "License policy path (repo-relative)"
@@ -170,7 +175,7 @@ jobs:
         with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "0"
+          install_dependencies: ${{ inputs.install_dependencies }}
 
       - name: License compliance
         uses: ./.github/actions/license-check
