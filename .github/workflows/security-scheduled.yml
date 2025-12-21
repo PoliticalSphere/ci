@@ -132,7 +132,7 @@ env:
 
 jobs:
   validate-ci:
-    uses: ./.github/workflows/validate-ci.yml
+    uses: PoliticalSphere/ci/.github/workflows/validate-ci.yml@main
     permissions:
       contents: read
     with:

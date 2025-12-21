@@ -138,7 +138,6 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
       PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
-      HOME: ${{ runner.temp }}
     timeout-minutes: 10
     steps:
       - name: Checkout repository
@@ -155,10 +154,14 @@ jobs:
           path: .ps-platform
           fetch-depth: 1
 
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
-        env:
-          HOME: ${{ runner.temp }}
         with:
           egress-policy: audit
 

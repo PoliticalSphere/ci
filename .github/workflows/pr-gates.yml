@@ -174,7 +174,7 @@ env:
 jobs:
   validate-ci:
     name: Validate CI (policy gate)
-    uses: ./.github/workflows/validate-ci.yml
+    uses: PoliticalSphere/ci/.github/workflows/validate-ci.yml@main
     permissions:
       contents: read
     with:
@@ -191,8 +191,6 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    env:
-      HOME: ${{ runner.temp }}
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -200,10 +198,14 @@ jobs:
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
-        env:
-          HOME: ${{ runner.temp }}
         with:
           egress-policy: audit
 
@@ -239,8 +241,6 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    env:
-      HOME: ${{ runner.temp }}
     timeout-minutes: 15
     steps:
       - name: Checkout repository
@@ -248,10 +248,14 @@ jobs:
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
-        env:
-          HOME: ${{ runner.temp }}
         with:
           egress-policy: audit
 
@@ -284,8 +288,6 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    env:
-      HOME: ${{ runner.temp }}
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -293,10 +295,14 @@ jobs:
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
-        env:
-          HOME: ${{ runner.temp }}
         with:
           egress-policy: audit
 
@@ -347,8 +353,6 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    env:
-      HOME: ${{ runner.temp }}
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -356,10 +360,14 @@ jobs:
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
-        env:
-          HOME: ${{ runner.temp }}
         with:
           egress-policy: audit
 
@@ -392,8 +400,6 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    env:
-      HOME: ${{ runner.temp }}
     timeout-minutes: 20
     steps:
       - name: Checkout repository
@@ -401,10 +407,14 @@ jobs:
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
-        env:
-          HOME: ${{ runner.temp }}
         with:
           egress-policy: audit
 
@@ -437,8 +447,6 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    env:
-      HOME: ${{ runner.temp }}
     timeout-minutes: 10
     steps:
       - name: Checkout repository
