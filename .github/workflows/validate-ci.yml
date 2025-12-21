@@ -124,6 +124,7 @@ defaults:
 
 env:
   CI: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
 jobs:
   validate-ci:
@@ -134,7 +135,6 @@ jobs:
     # Ensure HOME points to a writable directory for actions that rely on it.
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
       PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
     timeout-minutes: 10
     steps:

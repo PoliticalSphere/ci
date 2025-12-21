@@ -134,6 +134,7 @@ concurrency:
 
 env:
   CI: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
 jobs:
   validate-ci:
@@ -160,7 +161,6 @@ jobs:
 
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
     steps:
       - name: Harden runner (PS)

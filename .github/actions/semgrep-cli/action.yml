@@ -49,18 +49,22 @@ inputs:
   version:
     description: "Pinned Semgrep version to install (e.g. 1.461.0)"
     required: true
+
   config:
     description: "Semgrep config (e.g. p/ci or a local config path)"
     required: false
     default: "p/ci"
+
   path:
     description: "Scan path (relative to repo root)"
     required: false
     default: "."
+
   output:
     description: "SARIF output file path"
     required: false
-    default: "semgrep.sarif"
+    default: "reports/semgrep/semgrep.sarif"
+
   fail_on_findings:
     description: "If true, fail when Semgrep reports findings (exit 1)"
     required: false
@@ -73,13 +77,21 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
-        validate_sh="${PS_PLATFORM_ROOT}/tools/scripts/branding/validate-inputs.sh"
+
+        # Resolve platform root deterministically.
+        platform_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}/.ps-platform}"
+        if [[ ! -d "${platform_root}" ]]; then
+          echo "ERROR: platform_root not found: ${platform_root}" >&2
+          echo "HINT: export PS_PLATFORM_ROOT or checkout platform into .ps-platform." >&2
+          exit 1
+        fi
+
+        validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
           echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
           exit 1
         fi
-        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        # shellcheck source=/dev/null
         . "${validate_sh}"
 
         version="${{ inputs.version }}"
@@ -91,15 +103,20 @@ runs:
           "${version}" \
           '^[0-9]+\.[0-9]+\.[0-9]+$' \
           "Use a pinned SemVer like 1.461.0." || exit 1
+
         require_enum "inputs.fail_on_findings" "${fail_on_findings}" true false || exit 1
+
+        # Basic output sanity (avoid empty / weird values).
+        out="${{ inputs.output }}"
+        require_nonempty "inputs.output" "${out}" || exit 1
 
         echo "PS.SEMGREP: version=${version}"
         echo "PS.SEMGREP: config=${{ inputs.config }}"
         echo "PS.SEMGREP: path=${{ inputs.path }}"
-        echo "PS.SEMGREP: output=${{ inputs.output }}"
+        echo "PS.SEMGREP: output=${out}"
         echo "PS.SEMGREP: fail_on_findings=${fail_on_findings}"
 
-    - name: Install Semgrep (pinned)
+    - name: Install Semgrep (pinned, venv)
       shell: bash
       run: |
         set -euo pipefail
@@ -109,49 +126,59 @@ runs:
           exit 1
         fi
 
-        # Non-interactive, deterministic install.
-        python3 -m pip install \
-          --disable-pip-version-check \
-          --no-input \
-          --no-cache-dir \
+        venv_dir="${GITHUB_WORKSPACE}/.tooling/venv/semgrep"
+        mkdir -p "$(dirname "${venv_dir}")"
+        python3 -m venv "${venv_dir}"
+
+        # shellcheck source=/dev/null
+        source "${venv_dir}/bin/activate"
+
+        python3 -m pip install --disable-pip-version-check --no-input --no-cache-dir \
           "semgrep==${{ inputs.version }}"
 
-        if ! command -v semgrep >/dev/null 2>&1; then
-          echo "ERROR: semgrep not found after installation." >&2
-          exit 1
-        fi
+        semgrep --version
 
     - name: Run Semgrep (produce SARIF)
       shell: bash
       env:
-        # Disable telemetry/metrics for CI determinism and privacy.
         SEMGREP_SEND_METRICS: "off"
       run: |
         set -euo pipefail
 
-        # Semgrep exit codes:
-        # - 0: no findings
-        # - 1: findings (policy violation)
-        # - >1: error
+        # shellcheck source=/dev/null
+        source "${GITHUB_WORKSPACE}/.tooling/venv/semgrep/bin/activate"
+
+        out="${{ inputs.output }}"
+        out_dir="$(dirname "${out}")"
+        mkdir -p "${out_dir}"
+
         semgrep_exit=0
         semgrep \
           --metrics=off \
           --config="${{ inputs.config }}" \
           --sarif \
-          --output "${{ inputs.output }}" \
+          --output "${out}" \
           "${{ inputs.path }}" \
           || semgrep_exit=$?
 
-        if [[ ! -f "${{ inputs.output }}" ]]; then
-          echo "ERROR: SARIF output not found at '${{ inputs.output }}'." >&2
-          echo "HINT: Semgrep exited with code ${semgrep_exit} and did not produce SARIF." >&2
+        # Semgrep exit codes:
+        # 0 = no findings
+        # 1 = findings
+        # >1 = error
+        echo "${semgrep_exit}" > "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt"
+
+        if [[ ! -f "${out}" ]]; then
+          echo "ERROR: SARIF output not found at '${out}'." >&2
+          echo "HINT: semgrep exited with code ${semgrep_exit} and did not produce SARIF." >&2
           exit 1
         fi
 
-        echo "${semgrep_exit}" > .semgrep-exit-code.txt
+        echo "PS.SEMGREP: sarif=${out}"
+        echo "PS.SEMGREP: exit=${semgrep_exit}"
 
     - name: Upload SARIF to code scanning
-      uses: github/codeql-action/upload-sarif@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
+      # NOTE: Ensure this SHA is valid upstream; your validate-ci is correctly failing when it isn't.
+      uses: github/codeql-action/upload-sarif@7c9a7896f03bb1f3de14c5663ed46759e27443e0
       with:
         sarif_file: ${{ inputs.output }}
 
@@ -160,15 +187,13 @@ runs:
       run: |
         set -euo pipefail
 
-        semgrep_exit="$(cat .semgrep-exit-code.txt 2>/dev/null || echo 2)"
+        semgrep_exit="$(cat "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt" 2>/dev/null || echo 2)"
 
-        # If Semgrep errored (>1), always fail.
         if [[ "${semgrep_exit}" -gt 1 ]]; then
           echo "ERROR: Semgrep failed with exit code ${semgrep_exit}." >&2
           exit "${semgrep_exit}"
         fi
 
-        # If findings (1), fail only if configured.
         if [[ "${semgrep_exit}" -eq 1 && "${{ inputs.fail_on_findings }}" == "true" ]]; then
           echo "ERROR: Semgrep reported findings (exit 1)." >&2
           exit 1

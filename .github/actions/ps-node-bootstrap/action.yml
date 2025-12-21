@@ -62,48 +62,63 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Resolve platform/workspace roots
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
+
+        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
+          scripts_root="${platform_root}"
+          echo "PS.NODE_BOOTSTRAP: scripts_root=PS_PLATFORM_ROOT (${scripts_root})"
+        else
+          scripts_root="${workspace_root}"
+          echo "PS.NODE_BOOTSTRAP: scripts_root=GITHUB_WORKSPACE (${scripts_root})"
+        fi
+
+        echo "PS_SCRIPTS_ROOT=${scripts_root}" >> "${GITHUB_ENV}"
+        echo "PS_WORKSPACE_ROOT=${workspace_root}" >> "${GITHUB_ENV}"
+
     - name: Validate repo state
       shell: bash
       run: |
         set -euo pipefail
-        workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
-        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
-        platform_root="${PS_PLATFORM_ROOT:-}"
-        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
-          echo "PS.NODE_BOOTSTRAP: using PS_PLATFORM_ROOT=${platform_root}"
-        else
-          platform_root="${action_root}"
-        fi
-        validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
+
+        scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
+        workspace_root="${PS_WORKSPACE_ROOT:?PS_WORKSPACE_ROOT not set}"
+
+        validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
           echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          echo "HINT: ensure PS_PLATFORM_ROOT points at the platform checkout, or vendor scripts into the repo." >&2
           exit 1
         fi
-        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        # shellcheck source=/dev/null
         . "${validate_sh}"
+
+        # Validate inputs early
+        if ! require_number "inputs.node_version" "${{ inputs.node_version }}"; then
+          echo "ERROR: inputs.node_version must be a number (major version). Got '${{ inputs.node_version }}'." >&2
+          exit 1
+        fi
+        require_enum "inputs.cache" "${{ inputs.cache }}" "1" "0" || exit 1
+        require_enum "inputs.install_dependencies" "${{ inputs.install_dependencies }}" "1" "0" || exit 1
 
         if [[ "${{ inputs.install_dependencies }}" == "1" ]]; then
           if [[ ! -f "${workspace_root}/package.json" ]]; then
-            echo "ERROR: package.json not found in workspace root." >&2
-            echo "HINT: ensure actions/checkout ran and repo root is the workspace." >&2
+            echo "ERROR: package.json not found at ${workspace_root}/package.json" >&2
+            echo "HINT: ensure actions/checkout ran and the repo root is the workspace." >&2
             exit 1
           fi
 
           if [[ ! -f "${workspace_root}/package-lock.json" ]]; then
-            echo "ERROR: package-lock.json not found (npm ci requires a lockfile" >&2
-            echo "for determinism)." >&2
-            echo "HINT: commit package-lock.json or adjust the platform policy explicitly." >&2
+            echo "ERROR: package-lock.json not found (npm ci requires a lockfile for determinism)." >&2
+            echo "HINT: commit package-lock.json or set install_dependencies=0 (and handle installs elsewhere)." >&2
             exit 1
           fi
         fi
-
-        # Basic sanity: node_version should be digits only (major version).
-        if ! require_number "node_version" "${{ inputs.node_version }}"; then
-          echo "Got: '${{ inputs.node_version }}'." >&2
-          exit 1
-        fi
-        require_enum "cache" "${{ inputs.cache }}" "1" "0"
-        require_enum "install_dependencies" "${{ inputs.install_dependencies }}" "1" "0"
 
         echo "PS.NODE_BOOTSTRAP: node_version=${{ inputs.node_version }}"
         echo "PS.NODE_BOOTSTRAP: cache=${{ inputs.cache }}"
@@ -111,14 +126,14 @@ runs:
 
     - name: Setup Node (cached)
       if: ${{ inputs.cache == '1' }}
-      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f  # v6.1.0
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
       with:
         node-version: ${{ inputs.node_version }}
         cache: npm
 
     - name: Setup Node (no cache)
       if: ${{ inputs.cache != '1' }}
-      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f  # v6.1.0
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
       with:
         node-version: ${{ inputs.node_version }}
 
@@ -127,7 +142,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        cd "${GITHUB_WORKSPACE:-$(pwd)}"
+        cd "${PS_WORKSPACE_ROOT}"
         npm ci --no-audit --no-fund
         echo "PS.NODE_BOOTSTRAP: OK"
 

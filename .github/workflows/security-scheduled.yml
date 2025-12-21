@@ -139,6 +139,7 @@ defaults:
 env:
   CI: "1"
   PS_FULL_SCAN: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
 jobs:
   validate-ci:
@@ -179,8 +180,6 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -239,8 +238,6 @@ jobs:
       contents: read
       security-events: write
     timeout-minutes: 30
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -301,8 +298,6 @@ jobs:
       contents: read
       security-events: write
     timeout-minutes: 20
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -356,8 +351,6 @@ jobs:
       security-events: write
       # id-token is only required when publish_results: true in v2+.
     timeout-minutes: 20
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -414,8 +407,6 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -476,8 +467,6 @@ jobs:
       contents: read
       security-events: write
     timeout-minutes: 20
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -537,8 +526,6 @@ jobs:
     if: ${{ always() }}
     permissions:
       contents: read
-    env:
-      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4

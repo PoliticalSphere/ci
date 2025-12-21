@@ -69,49 +69,69 @@ runs:
     - name: Print banner
       uses: ./.github/actions/ps-banner
 
-    - name: Validate inputs
+    - name: Resolve scripts root
       shell: bash
       run: |
         set -euo pipefail
-        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
-        validate_sh="${PS_PLATFORM_ROOT}/tools/scripts/branding/validate-inputs.sh"
+        workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
+        platform_root="${PS_PLATFORM_ROOT:-}"
+
+        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
+          scripts_root="${platform_root}"
+          echo "PS.PR_COMMENT: scripts_root=PS_PLATFORM_ROOT (${scripts_root})"
+        else
+          scripts_root="${workspace_root}"
+          echo "PS.PR_COMMENT: scripts_root=GITHUB_WORKSPACE (${scripts_root})"
+        fi
+
+        echo "PS_SCRIPTS_ROOT=${scripts_root}" >> "${GITHUB_ENV}"
+
+    - name: Validate inputs
+      shell: bash
+      env:
+        PS_PR_NUMBER: ${{ inputs.pr_number }}
+        PS_BODY: ${{ inputs.body }}
+        PS_TOKEN: ${{ inputs.github_token }}
+        PS_EXPECTED_BASE: ${{ inputs.expected_base_sha }}
+        PS_EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
+      run: |
+        set -euo pipefail
+
+        scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
+
+        validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
           echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          echo "HINT: ensure PS_PLATFORM_ROOT is set to the platform checkout OR vendor scripts into the repo." >&2
           exit 1
         fi
-        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        # shellcheck source=/dev/null
         . "${validate_sh}"
 
-        pr_number="${{ inputs.pr_number }}"
-        body="${{ inputs.body }}"
-        token="${{ inputs.github_token }}"
-        expected_base="${{ inputs.expected_base_sha }}"
-        expected_head="${{ inputs.expected_head_sha }}"
-
-        require_nonempty "inputs.pr_number" "${pr_number}" || exit 1
-        require_nonempty "inputs.body" "${body}" || exit 1
-        require_nonempty "inputs.github_token" "${token}" || exit 1
-        require_number "inputs.pr_number" "${pr_number}" || exit 1
+        require_nonempty "inputs.pr_number" "${PS_PR_NUMBER}" || exit 1
+        require_number "inputs.pr_number" "${PS_PR_NUMBER}" || exit 1
+        require_nonempty "inputs.body" "${PS_BODY}" || exit 1
+        require_nonempty "inputs.github_token" "${PS_TOKEN}" || exit 1
         require_command "gh" || exit 1
 
-        if [[ -n "${expected_base}" ]]; then
+        if [[ -n "${PS_EXPECTED_BASE}" ]]; then
           require_regex \
             "inputs.expected_base_sha" \
-            "${expected_base}" \
+            "${PS_EXPECTED_BASE}" \
             '^[A-Fa-f0-9]{40}$' \
             "Expected a full-length 40-char commit SHA." || exit 1
         fi
 
-        if [[ -n "${expected_head}" ]]; then
+        if [[ -n "${PS_EXPECTED_HEAD}" ]]; then
           require_regex \
             "inputs.expected_head_sha" \
-            "${expected_head}" \
+            "${PS_EXPECTED_HEAD}" \
             '^[A-Fa-f0-9]{40}$' \
             "Expected a full-length 40-char commit SHA." || exit 1
         fi
 
-        echo "PS.PR_COMMENT: pr_number=${pr_number}"
-        echo "PS.PR_COMMENT: body_length=${#body}"
+        echo "PS.PR_COMMENT: pr_number=${PS_PR_NUMBER}"
+        echo "PS.PR_COMMENT: body_length=${#PS_BODY}"
 
     - name: Validate PR refs
       if: ${{ inputs.expected_base_sha != '' || inputs.expected_head_sha != '' }}
@@ -146,13 +166,18 @@ runs:
       env:
         GH_TOKEN: ${{ inputs.github_token }}
         PS_PR_NUMBER: ${{ inputs.pr_number }}
-        PS_COMMENT_BODY: ${{ inputs.body }}
+        PS_BODY: ${{ inputs.body }}
       run: |
         set -euo pipefail
+
+        # Write body to a file to preserve newlines and avoid quoting issues.
+        body_file="$(mktemp)"
+        printf '%s' "${PS_BODY}" > "${body_file}"
 
         gh api \
           -X POST \
           "repos/${GITHUB_REPOSITORY}/issues/${PS_PR_NUMBER}/comments" \
-          -f body="${PS_COMMENT_BODY}"
+          -F "body=@${body_file}"
 
+        rm -f "${body_file}"
         echo "PS.PR_COMMENT: OK"
