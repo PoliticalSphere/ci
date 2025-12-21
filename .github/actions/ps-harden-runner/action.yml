@@ -97,6 +97,10 @@ runs:
 
     - name: Harden runner
       uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+      env:
+        # Some runners expose a HOME path that doesn't exist; ensure harden-runner
+        # post-step writes to a valid directory.
+        HOME: ${{ runner.temp }}
       with:
         egress-policy: ${{ env.PS_EGRESS_POLICY }}
         # Only set allowlist if provided (avoids accidental overrides)
