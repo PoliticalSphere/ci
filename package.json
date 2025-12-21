@@ -1,0 +1,48 @@
+{
+  "name": "ps-cicd-platform",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Political Sphere CI/CD platform repository",
+  "type": "module",
+  "license": "UNLICENSED",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/PoliticalSphere/ci-cd-platform"
+  },
+  "engines": {
+    "node": ">=22.0.0",
+    "npm": ">=10.9.0"
+  },
+  "packageManager": "npm@10.9.0",
+  "scripts": {
+    "lint": "npm run lint:all",
+    "lint:fix": "bash tools/scripts/lint/biome.sh --write && bash tools/scripts/lint/eslint.sh --fix",
+    "lint:biome": "bash tools/scripts/lint/biome.sh",
+    "lint:eslint": "bash tools/scripts/lint/eslint.sh",
+    "lint:markdown": "bash tools/scripts/lint/markdownlint.sh",
+    "lint:yaml": "bash tools/scripts/lint/yamllint.sh",
+    "lint:actionlint": "bash tools/scripts/lint/actionlint.sh",
+    "lint:hadolint": "bash tools/scripts/lint/hadolint.sh",
+    "lint:shellcheck": "bash tools/scripts/lint/shellcheck.sh",
+    "lint:all": "bash tools/scripts/gates/gate-pre-commit.sh",
+    "typecheck": "bash tools/scripts/tasks/typecheck.sh",
+    "test": "bash tools/scripts/tasks/test.sh",
+    "build": "node -e \"console.log('Build: no-op (platform repo)')\"",
+    "license-check": "bash tools/scripts/security/license-check.sh",
+    "consumer-contract": "bash tools/scripts/consumer/contract-check.sh",
+    "jscpd": "bash tools/scripts/tasks/jscpd.sh",
+    "validate-ci": "node tools/scripts/ci/validate-ci/index.js",
+    "preflight": "npm run lint && npm run typecheck && npm run test && npm run jscpd",
+    "ci": "npm run preflight"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "2.3.8",
+    "@eslint/js": "9.16.0",
+    "eslint": "^9.39.2",
+    "jscpd": "4.0.4",
+    "markdownlint-cli2": "^0.20.0",
+    "typescript": "5.6.3",
+    "typescript-eslint": "8.14.0",
+    "yaml": "^2.8.2"
+  }
+}
