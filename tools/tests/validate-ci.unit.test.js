@@ -49,7 +49,9 @@ const wf = [
 
 fs.writeFileSync(wfPath, wf, 'utf8');
 
-const violations = scanWorkflows({
+const alwaysOkVerifier = async () => ({ ok: true, error: null });
+
+const violations = await scanWorkflows({
   workflows: [wfPath],
   workspaceRoot: tmp,
 
@@ -75,7 +77,7 @@ const violations = scanWorkflows({
   // Artifacts: not under test here
   artifactPolicy: { allowlist: new Map(), requiredPaths: [] },
 
-  validateRemoteAction: () => true,
+  validateRemoteAction: alwaysOkVerifier,
   requireSectionHeaders: false,
 });
 
@@ -121,11 +123,11 @@ fs.writeFileSync(
   'utf8',
 );
 
-const actionViolations = scanActions({
+const actionViolations = await scanActions({
   actions: [actionYml],
   platformRoot: tmp,
   allowedActions: new Set([]),
-  validateRemoteAction: () => true,
+  validateRemoteAction: alwaysOkVerifier,
 });
 
 const amsgs = actionViolations.map((v) => v.message);

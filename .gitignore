@@ -10,6 +10,9 @@ build/
 coverage/
 reports/
 
+!.github/actions/build/
+!.github/actions/build/**
+
 # Editor
 .DS_Store
 .idea/
