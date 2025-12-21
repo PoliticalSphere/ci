@@ -42,3 +42,4 @@ jobs:
       runner: ubuntu-22.04
       node_version: '22'
       fetch_depth: '1'
+      platform_ref: 'main'

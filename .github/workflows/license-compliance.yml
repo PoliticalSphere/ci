@@ -104,6 +104,11 @@ on:
         type: number
         required: false
         default: 7
+      platform_ref:
+        description: "Platform repo ref to checkout for shared scripts/configs"
+        type: string
+        required: false
+        default: "main"
 
   pull_request:
     types: [opened, reopened, synchronize]
@@ -156,7 +161,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: ${{ github.ref_name }}
+          ref: ${{ inputs.platform_ref }}
           path: .ps-platform
           fetch-depth: 1
 
