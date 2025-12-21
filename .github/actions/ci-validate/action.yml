@@ -2,49 +2,24 @@
 # Political Sphere — Composite Action: CI Validate
 # ------------------------------------------------------------------------------
 # Purpose:
-#   Execute the Validate-CI policy checks for this repository.
+#   Run the Validate-CI policy gate using the checked-out platform repository.
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
+# Key guarantees:
+#   - Deterministic, non-interactive
+#   - Fails fast with clear diagnostics when required files/paths are missing
+#   - Does NOT attempt to infer repo roots via fragile ../../.. traversal
 #
-# Scope & Responsibilities:
-#   - Does: run the Validate-CI script with platform configs.
-#   - Does NOT: run lint/test/build or security scans.
+# Requirements (must be provided by the calling workflow/job):
+#   - PS_PLATFORM_ROOT must point to the platform repo checkout directory
+#     (e.g. ${{ github.workspace }}/.ps-platform)
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - CI-safe behavior with clear failures
-#   - Explicit configuration paths
-#
-# Dependencies:
-#   - ./.github/actions/ps-banner
-#   - tools/scripts/ci/validate-ci/index.js
-#   - configs/ci/policies/validate-ci.yml
-#
-# Dependents:
-#   - ./.github/workflows/validate-ci.yml
-#
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#   - Invoked by: Validate-CI reusable workflow
-#
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller (read-only expected)
-#   - Constraints: requires Node.js available on PATH
-#
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: produced by the Validate-CI script
-#   - CI vs local: same execution; script handles bootstrap mode
+# Notes:
+#   - This action is intentionally strict: if PS_PLATFORM_ROOT is not set, it fails.
+#   - Debug output is lightweight and safe (no secrets printed).
 # ==============================================================================
 
 name: "CI Validate"
-description: "Runs the Validate-CI policy gate"
-
-inputs: {}
+description: "Runs the Validate-CI policy gate (Political Sphere)"
 
 runs:
   using: "composite"
@@ -57,47 +32,66 @@ runs:
       run: |
         set -euo pipefail
 
+        # ----------------------------------------------------------------------
+        # Step: Preconditions
+        # ----------------------------------------------------------------------
         if ! command -v node >/dev/null 2>&1; then
           echo "ERROR: node is required but not found on PATH" >&2
           exit 1
         fi
 
-        echo "DEBUG: GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
-        echo "DEBUG: GITHUB_ACTION_PATH=${GITHUB_ACTION_PATH}"
-        echo "DEBUG: PS_PLATFORM_ROOT=${PS_PLATFORM_ROOT:-<unset>}"
-        ls -la "${GITHUB_WORKSPACE}" || true
-        if [[ -n "${PS_PLATFORM_ROOT:-}" ]]; then
-          ls -la "${PS_PLATFORM_ROOT}" || true
+        if [[ -z "${GITHUB_WORKSPACE:-}" ]]; then
+          echo "ERROR: GITHUB_WORKSPACE is not set (unexpected in GitHub Actions)" >&2
+          exit 1
         fi
-        ls -la "${GITHUB_WORKSPACE}/.ps-platform" || true
 
-        action_root="${GITHUB_ACTION_PATH}"
+        # PS_PLATFORM_ROOT MUST be set by the workflow.
+        # Example:
+        #   env:
+        #     PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
         : "${PS_PLATFORM_ROOT:?PS_PLATFORM_ROOT must be set by the workflow (path to checked-out platform repo)}"
 
         platform_root="${PS_PLATFORM_ROOT}"
-        echo "DEBUG: platform_root=${platform_root}"
 
+        # ----------------------------------------------------------------------
+        # Step: Debug (safe)
+        # ----------------------------------------------------------------------
+        echo "DEBUG: GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+        echo "DEBUG: GITHUB_ACTION_PATH=${GITHUB_ACTION_PATH:-<unset>}"
+        echo "DEBUG: PS_PLATFORM_ROOT=${platform_root}"
+
+        # Show that expected directories exist (no recursive listing to keep logs tidy)
         if [[ ! -d "${platform_root}" ]]; then
           echo "ERROR: PS_PLATFORM_ROOT directory not found: ${platform_root}" >&2
+          echo "HINT: ensure the workflow checks out the platform repo into that path." >&2
           exit 1
         fi
 
+        # ----------------------------------------------------------------------
+        # Step: Locate platform artefacts
+        # ----------------------------------------------------------------------
         validator="${platform_root}/tools/scripts/ci/validate-ci/index.js"
+        config_path="${platform_root}/configs/ci/policies/validate-ci.yml"
+
         if [[ ! -f "${validator}" ]]; then
-          echo "ERROR: validate-ci script not found at ${validator}" >&2
+          echo "ERROR: validate-ci script not found at: ${validator}" >&2
+          echo "HINT: did you checkout the platform repo correctly into PS_PLATFORM_ROOT?" >&2
           exit 1
         fi
 
-        config_path="${platform_root}/configs/ci/policies/validate-ci.yml"
         if [[ ! -f "${config_path}" ]]; then
-          echo "ERROR: validate-ci config not found at ${config_path}" >&2
+          echo "ERROR: validate-ci config not found at: ${config_path}" >&2
+          echo "HINT: ensure configs/ci/policies/validate-ci.yml exists in the platform repo." >&2
           exit 1
         fi
 
         echo "PS.CI_VALIDATE: platform_root=${platform_root}"
         echo "PS.CI_VALIDATE: config_path=${config_path}"
 
-        export PS_PLATFORM_ROOT="${platform_root}"
+        # ----------------------------------------------------------------------
+        # Step: Execute
+        # ----------------------------------------------------------------------
         export PS_VALIDATE_CI_CONFIG="${config_path}"
         node "${validator}"
+
         echo "PS.CI_VALIDATE: OK"

@@ -58,20 +58,46 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Validate tools input
+    - name: Resolve platform/workspace roots
       shell: bash
       run: |
         set -euo pipefail
-        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
-        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        workspace_root="${GITHUB_WORKSPACE:-}"
+
+        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
+          scripts_root="${platform_root}"
+          echo "PS.INSTALL_TOOLS: scripts_root=PS_PLATFORM_ROOT (${scripts_root})"
+        elif [[ -n "${workspace_root}" && -d "${workspace_root}" ]]; then
+          scripts_root="${workspace_root}"
+          echo "PS.INSTALL_TOOLS: scripts_root=GITHUB_WORKSPACE (${scripts_root})"
+        else
+          echo "ERROR: neither PS_PLATFORM_ROOT nor GITHUB_WORKSPACE is available" >&2
+          exit 1
+        fi
+
+        echo "PS_SCRIPTS_ROOT=${scripts_root}" >> "${GITHUB_ENV}"
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
+
+        validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
           echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
           exit 1
         fi
-        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+
+        # shellcheck source=/dev/null
         . "${validate_sh}"
 
         tools_raw="${{ inputs.tools }}"
+        install_dir="${{ inputs.install_dir }}"
+
         require_nonempty "inputs.tools" "${tools_raw}" || exit 1
         require_regex \
           "inputs.tools" \
@@ -79,6 +105,18 @@ runs:
           '^[a-z0-9,-]+$' \
           "Allowed: lowercase letters, digits, comma, hyphen." || exit 1
 
+        # install_dir must be a safe repo-relative path (no absolute, no traversal)
+        require_nonempty "inputs.install_dir" "${install_dir}" || exit 1
+        if [[ "${install_dir}" == /* ]]; then
+          v_error "inputs.install_dir must be repo-relative (must not start with /)"
+          exit 1
+        fi
+        if [[ "${install_dir}" == *".."* ]]; then
+          v_error "inputs.install_dir must not contain '..' path traversal"
+          exit 1
+        fi
+
+        # Parse and validate tool list (trim whitespace defensively)
         IFS=',' read -r -a tools_arr <<< "${tools_raw}"
         if [[ "${#tools_arr[@]}" -eq 0 ]]; then
           v_error "inputs.tools must include at least one tool name"
@@ -97,13 +135,28 @@ runs:
             actionlint shellcheck hadolint yamllint gitleaks trivy || exit 1
         done
 
+        echo "PS.INSTALL_TOOLS: install_dir=${install_dir}"
+        echo "PS.INSTALL_TOOLS: tools=${tools_raw}"
+
     - name: Install tools (pinned)
       shell: bash
       run: |
         set -euo pipefail
 
+        scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
+
+        installer="${scripts_root}/tools/scripts/ci/install-tools.sh"
+        if [[ ! -f "${installer}" ]]; then
+          echo "ERROR: install-tools.sh not found at ${installer}" >&2
+          exit 1
+        fi
+
         tools_raw="${{ inputs.tools }}"
         IFS=',' read -r -a tools_arr <<< "${tools_raw}"
 
         export PS_INSTALL_DIR="${GITHUB_WORKSPACE}/${{ inputs.install_dir }}"
-        bash "${GITHUB_WORKSPACE}/tools/scripts/ci/install-tools.sh" "${tools_arr[@]}"
+        mkdir -p "${PS_INSTALL_DIR}"
+
+        bash "${installer}" "${tools_arr[@]}"
+
+        echo "PS.INSTALL_TOOLS: OK"

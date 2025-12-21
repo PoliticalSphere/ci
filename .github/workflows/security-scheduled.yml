@@ -182,13 +182,18 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: 0
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -237,11 +242,16 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -294,11 +304,16 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -344,11 +359,16 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -397,13 +417,18 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: 0
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -454,11 +479,16 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -510,11 +540,16 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
