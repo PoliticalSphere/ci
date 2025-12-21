@@ -61,7 +61,10 @@ async function main() {
     'actions/checkout',
     'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
   );
-  if (unreachableResult.ok || unreachableResult.error !== 'remote_unreachable') {
+  if (
+    unreachableResult.ok ||
+    unreachableResult.error !== 'remote_unreachable'
+  ) {
     fail('expected remote_unreachable failure in CI on network error');
   }
   info('OK: remote unreachable fails under CI');

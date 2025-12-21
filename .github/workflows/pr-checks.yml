@@ -22,7 +22,7 @@ jobs:
     uses: ./.github/workflows/pr-gates.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
-      pr_is_fork: ${{ github.event.pull_request.head.repo.fork }}
+      pr_is_fork: ${{ github.event.pull_request.head.repo.fork && 'true' || 'false' }}
       pr_base_ref: ${{ github.event.pull_request.base.sha }}
       pr_head_ref: ${{ github.event.pull_request.head.sha }}
       # default node version can be overridden by callers

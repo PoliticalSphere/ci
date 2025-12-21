@@ -44,9 +44,6 @@ if [[ "$#" -gt 0 ]]; then
 fi
 
 full_scan="${PS_FULL_SCAN:-0}"
-if [[ "${CI:-0}" == "1" ]]; then
-  full_scan="1"
-fi
 
 # If this environment is not a git repository, do a full scan — staged checks rely on Git.
 # This avoids printing Git help text (e.g. when running in CI or in a workspace without .git).
@@ -57,7 +54,42 @@ fi
 
 targets=()
 
-if [[ "${full_scan}" == "1" ]]; then
+if [[ "${CI:-0}" == "1" && -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" ]]; then
+  if ! git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null; then
+    git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
+  fi
+  if ! git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+    git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
+  fi
+
+  if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \
+     git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+    mapfile -t diff_files < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
+  else
+    detail "JSCPD: unable to resolve PR base/head; falling back to HEAD~1."
+    if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+      mapfile -t diff_files < <(git diff --name-only HEAD~1 HEAD)
+    else
+      detail "JSCPD: no prior commit available for diff."
+      exit 0
+    fi
+  fi
+
+  for f in ${diff_files[@]+"${diff_files[@]}"}; do
+    case "${f}" in
+      *.js|*.mjs|*.cjs|*.jsx|*.ts|*.mts|*.cts|*.tsx|*.json|*.yml|*.yaml|*.md|*.sh)
+        targets+=("${repo_root}/${f}")
+        ;;
+      *)
+        ;;
+    esac
+  done
+
+  if [[ "${#targets[@]}" -eq 0 ]]; then
+    detail "JSCPD: no PR files eligible for duplication scan."
+    exit 0
+  fi
+elif [[ "${full_scan}" == "1" ]]; then
   # Full scan: run against repo root (jscpd will respect ignore patterns).
   targets=("${repo_root}")
 else

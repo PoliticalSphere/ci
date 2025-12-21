@@ -5,7 +5,8 @@ const defaultFetch =
   typeof globalThis.fetch === 'function'
     ? globalThis.fetch.bind(globalThis)
     : null;
-const defaultTokenProvider = () => process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
+const defaultTokenProvider = () =>
+  process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
 
 export function createRemoteVerifier({
   verifyRemoteShas = false,
@@ -47,8 +48,7 @@ export function createRemoteVerifier({
       Accept: 'application/vnd.github+json',
       'User-Agent': 'political-sphere-validate-ci',
     };
-    const token =
-      verifyRemoteShas && isCIImpl() ? tokenProvider() || '' : '';
+    const token = verifyRemoteShas && isCIImpl() ? tokenProvider() || '' : '';
     if (token) {
       headers.Authorization = `Bearer ${token}`;
     }
@@ -70,10 +70,10 @@ export function createRemoteVerifier({
           response.status === 401
             ? 'authentication failed'
             : response.status === 403
-            ? 'permission/rate limited'
-            : response.status === 429
-            ? 'rate limited'
-            : 'unexpected status';
+              ? 'permission/rate limited'
+              : response.status === 429
+                ? 'rate limited'
+                : 'unexpected status';
         detailImpl(
           `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(
             0,

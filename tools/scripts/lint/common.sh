@@ -38,7 +38,11 @@ set_repo_root_and_git() {
 set_full_scan_flag() {
   full_scan="${PS_FULL_SCAN:-0}"
   if [[ "${CI:-0}" == "1" ]]; then
-    full_scan="1"
+    if [[ -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" ]]; then
+      : # allow affected-only linting in PR workflows
+    else
+      full_scan="1"
+    fi
   fi
   if [[ "${has_git:-0}" == "0" ]]; then
     full_scan="1"
@@ -63,11 +67,57 @@ collect_targets_find() {
   done < <(find "${repo_root}" -type f "${expr_arr[@]}" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*" -not -path "*/coverage/*" -not -path "*/reports/*" -print0)
 }
 
+# collect_targets_pr <shell-glob>
+# Uses PS_PR_BASE_SHA/PS_PR_HEAD_SHA to get affected files.
+collect_targets_pr() {
+  local pattern="$1"
+  local -a diff_files=()
+
+  targets=()
+
+  if [[ -z "${PS_PR_BASE_SHA:-}" || -z "${PS_PR_HEAD_SHA:-}" ]]; then
+    return 1
+  fi
+
+  if ! git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null; then
+    git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
+  fi
+  if ! git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+    git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
+  fi
+
+  if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \
+     git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
+    mapfile -t diff_files < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
+  elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
+    mapfile -t diff_files < <(git diff --name-only HEAD~1 HEAD)
+  else
+    return 1
+  fi
+
+  for f in "${diff_files[@]}"; do
+    # shellcheck disable=SC2254
+    case "${f}" in
+      ${pattern})
+        targets+=("${repo_root}/${f}")
+        ;;
+      *)
+        ;;
+    esac
+  done
+  return 0
+}
+
 # collect_targets_staged <shell-glob>
 # Example: collect_targets_staged "*.md" or collect_targets_staged "*.yml|*.yaml"
 collect_targets_staged() {
   local pattern="$1"
   targets=()
+  if [[ "${CI:-0}" == "1" && -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" ]]; then
+    if collect_targets_pr "${pattern}"; then
+      return 0
+    fi
+  fi
   mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
   for f in "${staged[@]}"; do
     # shellcheck disable=SC2254
