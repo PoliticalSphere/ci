@@ -98,9 +98,20 @@ runs:
           exit 1
         fi
 
-        section_script="${platform_root}/tools/scripts/branding/print-section.sh"
-        if [[ ! -f "${section_script}" ]]; then
-          echo "ERROR: print-section script not found at ${section_script}" >&2
+        section_script=""
+        for candidate in \
+          "${platform_root}/tools/scripts/branding/print-section.sh" \
+          "${workspace_root}/tools/scripts/branding/print-section.sh"; do
+          if [[ -f "${candidate}" ]]; then
+            section_script="${candidate}"
+            break
+          fi
+        done
+
+        if [[ -z "${section_script}" ]]; then
+          echo "ERROR: print-section script not found in action or workspace." >&2
+          echo "Tried: ${platform_root}/tools/scripts/branding/print-section.sh" >&2
+          echo "Tried: ${workspace_root}/tools/scripts/branding/print-section.sh" >&2
           exit 1
         fi
 

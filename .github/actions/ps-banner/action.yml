@@ -54,20 +54,48 @@ runs:
       run: |
         set -euo pipefail
 
-        BANNER_SCRIPT="${GITHUB_ACTION_PATH}/../../../tools/scripts/branding/print-banner.sh"
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        workspace_root="${GITHUB_WORKSPACE:-}"
 
-        if [[ ! -f "${BANNER_SCRIPT}" ]]; then
-          echo "ERROR: banner script not found at ${BANNER_SCRIPT}" >&2
+        banner_script=""
+        for candidate in \
+          "${action_root}/tools/scripts/branding/print-banner.sh" \
+          "${workspace_root}/tools/scripts/branding/print-banner.sh"; do
+          if [[ -f "${candidate}" ]]; then
+            banner_script="${candidate}"
+            break
+          fi
+        done
+
+        if [[ -z "${banner_script}" ]]; then
+          echo "ERROR: banner script not found in action or workspace." >&2
+          echo "Tried: ${action_root}/tools/scripts/branding/print-banner.sh" >&2
+          if [[ -n "${workspace_root}" ]]; then
+            echo "Tried: ${workspace_root}/tools/scripts/branding/print-banner.sh" >&2
+          fi
           exit 1
         fi
 
-        banner_file="${GITHUB_ACTION_PATH}/../../../branding/ps-banner.txt"
-        if [[ ! -f "${banner_file}" ]]; then
-          echo "ERROR: banner file not found at ${banner_file}" >&2
+        banner_file=""
+        for candidate in \
+          "${action_root}/branding/ps-banner.txt" \
+          "${workspace_root}/branding/ps-banner.txt"; do
+          if [[ -f "${candidate}" ]]; then
+            banner_file="${candidate}"
+            break
+          fi
+        done
+
+        if [[ -z "${banner_file}" ]]; then
+          echo "ERROR: banner file not found in action or workspace." >&2
+          echo "Tried: ${action_root}/branding/ps-banner.txt" >&2
+          if [[ -n "${workspace_root}" ]]; then
+            echo "Tried: ${workspace_root}/branding/ps-banner.txt" >&2
+          fi
           exit 1
         fi
 
         echo "PS.BANNER: file=${banner_file}"
 
-        bash "${BANNER_SCRIPT}"
+        bash "${banner_script}"
         echo "PS.BANNER: OK"
