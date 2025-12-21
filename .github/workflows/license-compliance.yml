@@ -108,11 +108,6 @@ on:
   pull_request:
     types: [opened, reopened, synchronize]
 
-    secrets:
-      NODE_AUTH_TOKEN:
-        description: "Optional token for private registry installs"
-        required: false
-
 concurrency:
   group: license-compliance-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
