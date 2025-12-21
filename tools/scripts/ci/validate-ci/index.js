@@ -220,7 +220,7 @@ if (quiet) {
 const violations = [];
 
 violations.push(
-  ...scanWorkflows({
+  ...(await scanWorkflows({
     workflows,
     workspaceRoot,
     allowedActions,
@@ -236,17 +236,17 @@ violations.push(
     requireSectionHeaders,
     allowedFirstSteps,
     quiet,
-  }),
+  })),
 );
 
 violations.push(
-  ...scanActions({
+  ...(await scanActions({
     actions,
     platformRoot,
     allowedActions,
     validateRemoteAction,
     quiet,
-  }),
+  })),
 );
 
 {

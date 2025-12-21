@@ -73,7 +73,7 @@ function compileRegex(reStr) {
 // Shared helper: validate a `uses:` reference (docker, remote action pinning, allowlist,
 // and optional remote verification). Returns { violations, handled } where handled is
 // true for cases (like docker) that should stop further processing of the reference.
-function checkUsesReference({
+async function checkUsesReference({
   rel,
   uses,
   line,
@@ -111,18 +111,16 @@ function checkUsesReference({
       makeViolation(rel, `action not SHA-pinned: ${uses}`, line, col),
     );
   } else if (validateRemoteAction) {
-    const result = validateRemoteAction(action, ref);
-    const ok = typeof result === 'boolean' ? result : Boolean(result?.ok);
+    const result = await validateRemoteAction(action, ref);
+    const ok = result?.ok ?? true;
     if (!ok) {
       let reason = 'remote lookup failed';
-      if (typeof result === 'object') {
-        if (result.error === 'ref_not_found') {
-          reason = 'ref not found';
-        } else if (result.error === 'remote_unreachable') {
-          reason = 'remote unreachable';
-        } else if (result.error === 'invalid_action_ref') {
-          reason = 'invalid action reference';
-        }
+      if (result?.error === 'ref_not_found') {
+        reason = 'ref not found';
+      } else if (result?.error === 'remote_unreachable') {
+        reason = 'remote unreachable';
+      } else if (result?.error === 'invalid_action_ref') {
+        reason = 'invalid action reference';
       }
       violations.push(
         makeViolation(
@@ -324,7 +322,7 @@ function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps }) {
   return violations;
 }
 
-function checkStepUses({
+async function checkStepUses({
   rel,
   jobId,
   step,
@@ -395,7 +393,7 @@ function checkStepUses({
   }
 
   // Validate `uses:` reference for remote/docker/allowlist/pinning.
-  const check = checkUsesReference({
+  const check = await checkUsesReference({
     rel,
     uses,
     line: step.startLine || 1,
@@ -681,7 +679,7 @@ function checkArtifactPolicy({
   return violations;
 }
 
-export function scanWorkflows({
+export async function scanWorkflows({
   workflows,
   workspaceRoot,
   allowedActions,
@@ -746,18 +744,17 @@ export function scanWorkflows({
       );
 
       for (const step of job.steps) {
-        violations.push(
-          ...checkStepUses({
-            rel,
-            jobId,
-            step,
-            workspaceRoot,
-            allowedActions,
-            unsafePatterns,
-            unsafeAllowlist,
-            validateRemoteAction,
-          }),
-        );
+        const stepViolations = await checkStepUses({
+          rel,
+          jobId,
+          step,
+          workspaceRoot,
+          allowedActions,
+          unsafePatterns,
+          unsafeAllowlist,
+          validateRemoteAction,
+        });
+        violations.push(...stepViolations);
         violations.push(
           ...checkInlineRun({
             rel,
@@ -812,7 +809,7 @@ export function scanWorkflows({
   return violations;
 }
 
-export function scanActions({
+export async function scanActions({
   actions,
   platformRoot,
   allowedActions,
@@ -842,7 +839,7 @@ export function scanActions({
       if (isLocalAction(uses)) continue;
       // Validate `uses:` reference for remote/docker/allowlist/pinning.
       const col = line.indexOf('uses') + 1 || null;
-      const check = checkUsesReference({
+      const check = await checkUsesReference({
         rel,
         uses,
         line: lineNumber,
