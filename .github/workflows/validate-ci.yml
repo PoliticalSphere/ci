@@ -126,6 +126,13 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
           fetch-depth: ${{ inputs.fetch_depth }}
 
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
+
       - name: Prepare runner (PS)
         uses: ./.github/actions/ps-setup
         with:
@@ -134,6 +141,7 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
+          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 

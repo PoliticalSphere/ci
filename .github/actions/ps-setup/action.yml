@@ -65,11 +65,16 @@ inputs:
     description: "Run npm ci in ps-node-bootstrap (1 = on, 0 = off)"
     required: false
     default: "1"
+  skip_harden:
+    description: "Skip the built-in runner hardening step (1 = skip, 0 = run). Use when calling step-security/harden-runner from the workflow to ensure pre/post hooks run correctly."
+    required: false
+    default: "0"
 
 runs:
   using: "composite"
   steps:
     - name: Harden runner (PS)
+      if: ${{ inputs.skip_harden != '1' }}
       uses: ./.github/actions/ps-harden-runner
 
     - name: Setup summary (PS)
