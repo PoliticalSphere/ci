@@ -109,15 +109,14 @@ function validateRemoteAction(action, ref) {
   let ok = false;
   let error = null;
   try {
-    const out = execSync(
-      `git ls-remote https://github.com/${repo}.git ${ref}`,
-      {
-        stdio: ['ignore', 'pipe', 'ignore'],
-        encoding: 'utf8',
-        timeout: 10000,
-      },
-    );
-    ok = Boolean(out.trim());
+    const out = execSync(`git ls-remote https://github.com/${repo}.git`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: 'utf8',
+      timeout: 10000,
+    });
+    ok = out
+      .split(/\r?\n/)
+      .some((line) => line.startsWith(`${ref}\t`));
   } catch {
     ok = false;
     error = 'remote_unreachable';
