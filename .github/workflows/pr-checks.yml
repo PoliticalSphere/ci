@@ -27,6 +27,7 @@ jobs:
       pr_head_ref: ${{ github.event.pull_request.head.sha }}
       # default node version can be overridden by callers
       node_version: '22'
+      allow_pr_comments: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
     permissions:
       contents: read
       pull-requests: read

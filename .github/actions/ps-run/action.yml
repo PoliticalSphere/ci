@@ -99,8 +99,8 @@ runs:
         fi
 
         section_script="${platform_root}/tools/scripts/branding/print-section.sh"
-        if [[ ! -x "${section_script}" ]]; then
-          echo "ERROR: print-section script not found or not executable at ${section_script}" >&2
+        if [[ ! -f "${section_script}" ]]; then
+          echo "ERROR: print-section script not found at ${section_script}" >&2
           exit 1
         fi
 
@@ -170,4 +170,3 @@ runs:
         fi
 
         echo "PS.RUN: OK"
-

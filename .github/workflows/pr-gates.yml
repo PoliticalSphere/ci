@@ -137,6 +137,11 @@ on:
         type: string
         required: false
         default: "false"
+      allow_pr_comments:
+        description: "Allow PR comments from the notify job (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "0"
 
       pr_base_ref:
         description: "Pull request base ref or SHA for dependency review"
@@ -448,7 +453,11 @@ jobs:
     name: PR failure comment
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci, lint, typecheck, test, jscpd, build, secrets, dependency-review]
-    if: ${{ failure() && inputs.pr_number != '' && inputs.pr_is_fork != 'true' }}
+    if: >-
+      ${{ failure() &&
+      inputs.pr_number != '' &&
+      inputs.pr_is_fork != 'true' &&
+      inputs.allow_pr_comments == '1' }}
     permissions:
       contents: read
       issues: write  # justification: post failure comment to PR (issues API)

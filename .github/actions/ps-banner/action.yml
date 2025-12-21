@@ -56,8 +56,8 @@ runs:
 
         BANNER_SCRIPT="${GITHUB_ACTION_PATH}/../../../tools/scripts/branding/print-banner.sh"
 
-        if [[ ! -x "${BANNER_SCRIPT}" ]]; then
-          echo "ERROR: banner script not found or not executable at ${BANNER_SCRIPT}" >&2
+        if [[ ! -f "${BANNER_SCRIPT}" ]]; then
+          echo "ERROR: banner script not found at ${BANNER_SCRIPT}" >&2
           exit 1
         fi
 
@@ -71,4 +71,3 @@ runs:
 
         bash "${BANNER_SCRIPT}"
         echo "PS.BANNER: OK"
-
