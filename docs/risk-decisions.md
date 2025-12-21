@@ -49,3 +49,16 @@ Copy the block below for each decision:
   mitigation: Scheduled-only use, hardened runner, artifact-only output, no PR gating.
   expires: 2026-12-19
   approval: platform-governance
+
+- id: RD-2025-003
+  date: 2025-12-21
+  owner: political-sphere
+  status: approved
+  scope: configs/security/license-policy.yml
+  policy: configs/security/license-policy.yml#allowlist
+  decision: Allow `Python-2.0` SPDX license identifier in license allowlist
+  rationale: `argparse@2.0.1` is transitively required; Python-2.0 is a permissive license acceptable for the platform
+  impact: Small increase in accepted dependency licenses; low security risk
+  mitigation: Review and monitor packages using this license; time-bounded review scheduled
+  expires: 2026-06-21
+  approval: platform-governance
