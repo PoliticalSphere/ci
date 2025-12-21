@@ -35,6 +35,7 @@ policy:
     - CC0-1.0
     - ISC
     - MIT
+    - Python-2.0
     - MPL-2.0
     - Zlib
     # Consider removing Unlicense unless you explicitly want it:
