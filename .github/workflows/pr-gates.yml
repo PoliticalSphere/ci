@@ -181,7 +181,7 @@ env:
 jobs:
   validate-ci:
     name: Validate CI (policy gate)
-    uses: PoliticalSphere/ci/.github/workflows/validate-ci.yml@main
+    uses: ./.github/workflows/validate-ci.yml
     permissions:
       contents: read
     with:
@@ -190,6 +190,9 @@ jobs:
       artifact_name: pr-gates-validate-ci
       retention_days: ${{ inputs.retention_days }}
       platform_ref: ${{ inputs.platform_ref }}
+      pr_only: "1"
+      pr_base_ref: ${{ inputs.pr_base_ref }}
+      pr_head_ref: ${{ inputs.pr_head_ref }}
     secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 

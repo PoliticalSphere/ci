@@ -139,15 +139,15 @@ env:
 jobs:
   validate-ci:
     name: Validate CI (gate)
-    uses: PoliticalSphere/ci/.github/workflows/validate-ci.yml@main
-    permissions:
-      contents: read
+    uses: ./.github/workflows/validate-ci.yml
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}
       artifact_name: build-artifacts-validate-ci
       retention_days: ${{ inputs.validate_retention_days }}
       platform_ref: ${{ inputs.platform_ref }}
+    permissions:
+      contents: read
     secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 

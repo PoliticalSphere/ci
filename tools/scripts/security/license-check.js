@@ -354,7 +354,7 @@ if (violations.length > 0) {
   summaryLines.push('', 'Violations:');
   for (const v of violations) {
     const matchInfo =
-      v.match && v.match.matched
+      v.match?.matched
         ? ` [match: ${v.match.type} ${v.match.pattern}]`
         : '';
     summaryLines.push(
@@ -392,7 +392,7 @@ if (violations.length > 0) {
   );
   for (const v of violations) {
     const matchInfo =
-      v.match && v.match.matched
+      v.match?.matched
         ? ` [match: ${v.match.type} ${v.match.pattern}]`
         : '';
     bullet(

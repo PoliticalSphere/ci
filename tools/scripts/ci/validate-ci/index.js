@@ -13,6 +13,7 @@
 //   - Exit codes are meaningful (0 pass, 1 fail)
 // ======================================================================
 
+import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -85,8 +86,9 @@ const scoreFailThreshold =
   typeof config.enforcement?.score_fail_threshold === 'number'
     ? config.enforcement.score_fail_threshold
     : null;
-const verifyRemoteShas =
-  String(process.env.PS_VALIDATE_CI_VERIFY_REMOTE || '0') === '1';
+const verifyRemoteShas = !['0', 'false'].includes(
+  String(process.env.PS_VALIDATE_CI_VERIFY_REMOTE || '1').toLowerCase(),
+);
 detail(
   `Remote SHA verification: ${
     verifyRemoteShas ? 'ENABLED' : 'DISABLED'
@@ -203,18 +205,79 @@ const highRisk = loadHighRiskTriggers(highRiskAllowlistPath);
 const permissionsBaseline = loadPermissionsBaseline(permissionsBaselinePath);
 const artifactPolicy = loadArtifactPolicy(artifactPolicyPath);
 
-const workflows = listWorkflows(workspaceRoot);
+function tryGit(args) {
+  try {
+    return execSync(`git ${args}`, {
+      cwd: workspaceRoot,
+      stdio: ['ignore', 'pipe', 'ignore'],
+      encoding: 'utf8',
+    }).trim();
+  } catch {
+    return '';
+  }
+}
+
+function ensureCommit(sha) {
+  if (!sha) return false;
+  if (tryGit(`cat-file -e ${sha}^{commit}`)) return true;
+  tryGit(`fetch --no-tags --depth=1 origin ${sha}`);
+  return Boolean(tryGit(`cat-file -e ${sha}^{commit}`));
+}
+
+let workflows = listWorkflows(workspaceRoot);
 if (workflows.length === 0) {
   if (isCI()) {
     fatal('no workflows found under .github/workflows');
   }
   detail('Bootstrap: no workflows found under .github/workflows');
 }
-const actions = listActionMetadata(platformRoot);
+let actions = listActionMetadata(platformRoot);
 if (quiet) {
   detail(
     `Scanning: ${workflows.length} workflow(s) and ${actions.length} action(s).`,
   );
+}
+
+const prOnly =
+  String(process.env.PS_VALIDATE_CI_PR_ONLY || '0') === '1' ||
+  String(process.env.PS_VALIDATE_CI_PR_ONLY || '0') === 'true';
+const prBase = process.env.PS_PR_BASE_SHA || '';
+const prHead = process.env.PS_PR_HEAD_SHA || '';
+
+// PR-only mode reduces runtime in large repos; full scan remains the default.
+if (prOnly) {
+  detail('PR-only mode: limiting validation to changed workflows/actions.');
+  if (prBase && prHead) {
+    const baseOk = ensureCommit(prBase);
+    const headOk = ensureCommit(prHead);
+    if (baseOk && headOk) {
+      const diff = tryGit(`diff --name-only ${prBase} ${prHead}`);
+      const changedRel = diff
+        .split(/\r?\n/)
+        .map((p) => p.trim())
+        .filter(Boolean)
+        .filter((p) => !path.isAbsolute(p));
+      const changedWorkspace = new Set(
+        changedRel.map((p) => path.resolve(workspaceRoot, p)),
+      );
+      const changedPlatform = new Set(
+        changedRel.map((p) => path.resolve(platformRoot, p)),
+      );
+      workflows = workflows.filter((wf) => changedWorkspace.has(wf));
+      actions = actions.filter((action) => changedPlatform.has(action));
+      detail(
+        `PR-only mode: ${workflows.length} workflow(s), ${actions.length} action(s) changed.`,
+      );
+    } else {
+      detail(
+        'PR-only mode: unable to resolve PR base/head SHAs; falling back to full scan.',
+      );
+    }
+  } else {
+    detail(
+      'PR-only mode: missing PR base/head SHAs; falling back to full scan.',
+    );
+  }
 }
 
 const violations = [];

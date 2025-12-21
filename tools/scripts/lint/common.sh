@@ -67,6 +67,25 @@ collect_targets_find() {
   done < <(find "${repo_root}" -type f "${expr_arr[@]}" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*" -not -path "*/coverage/*" -not -path "*/reports/*" -print0)
 }
 
+# retry_cmd <retries> <sleep_seconds> <command...>
+# Rationale: mitigate transient network failures in CI without masking real errors.
+retry_cmd() {
+  local retries="$1"
+  local sleep_s="$2"
+  shift 2
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    if [[ "${attempt}" -ge "${retries}" ]]; then
+      return 1
+    fi
+    sleep "${sleep_s}"
+    attempt=$((attempt + 1))
+  done
+}
+
 # collect_targets_pr <shell-glob>
 # Uses PS_PR_BASE_SHA/PS_PR_HEAD_SHA to get affected files.
 collect_targets_pr() {
@@ -80,10 +99,10 @@ collect_targets_pr() {
   fi
 
   if ! git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null; then
-    git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
+    retry_cmd 3 2 git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
   fi
   if ! git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
-    git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
+    retry_cmd 3 2 git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
   fi
 
   if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \

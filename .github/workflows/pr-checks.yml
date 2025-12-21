@@ -36,6 +36,7 @@ jobs:
   license-compliance:
     uses: ./.github/workflows/license-compliance.yml
     needs: [pr-gates]
+    if: ${{ always() }}
     permissions:
       contents: read
     with:

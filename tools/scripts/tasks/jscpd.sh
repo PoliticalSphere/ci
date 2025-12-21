@@ -56,10 +56,10 @@ targets=()
 
 if [[ "${CI:-0}" == "1" && -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" ]]; then
   if ! git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null; then
-    git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
+    retry_cmd 3 2 git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
   fi
   if ! git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
-    git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
+    retry_cmd 3 2 git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
   fi
 
   if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \

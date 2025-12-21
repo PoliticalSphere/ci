@@ -1,3 +1,15 @@
+// ==============================================================================
+// Political Sphere — Validate-CI Remote SHA Verification
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Verify that action SHAs exist upstream when remote verification is enabled.
+//
+// Notes:
+//   - Opt-out via PS_VALIDATE_CI_VERIFY_REMOTE=0/false.
+//   - CI is strict when the GitHub API is unreachable; local runs are tolerant.
+//   - Avoids logging tokens or URLs containing tokens.
+// ==============================================================================
+
 import { detail } from './console.js';
 import { isCI } from './env.js';
 
@@ -19,16 +31,51 @@ export function createRemoteVerifier({
     throw new Error('fetch is required for remote SHA verification');
   }
   const cache = new Map();
-  const remoteUnreachableLogged = new Set();
+  const apiUnreachableLogged = new Set();
+  let networkChecked = false;
+  let networkAvailable = true;
+  let networkUnavailableLogged = false;
 
-  function logRemoteUnreachable(repo, ref) {
-    if (remoteUnreachableLogged.has(`${repo}@${ref}`)) return;
+  function logApiUnreachable(repo, ref) {
+    if (apiUnreachableLogged.has(`${repo}@${ref}`)) return;
     const verb = isCIImpl()
       ? 'remote unreachable; verification failed (CI strict)'
       : 'remote unreachable; verification skipped (local tolerant)';
     // NOTE: never log `url` here; it may contain an access token in CI.
-    detailImpl(`Remote lookup unreachable for ${repo}@${ref}: ${verb}`);
-    remoteUnreachableLogged.add(`${repo}@${ref}`);
+    detailImpl(
+      `Remote SHA verification: GitHub API unreachable for ${repo}@${ref}: ${verb}`,
+    );
+    apiUnreachableLogged.add(`${repo}@${ref}`);
+  }
+
+  async function checkNetworkAvailable() {
+    if (networkChecked) return networkAvailable;
+    networkChecked = true;
+    const controller =
+      typeof AbortController === 'function' ? new AbortController() : null;
+    const timeout = setTimeout(() => controller?.abort(), 5000);
+    try {
+      await fetchImpl('https://api.github.com/', {
+        method: 'GET',
+        headers: { 'User-Agent': 'political-sphere-validate-ci' },
+        signal: controller?.signal,
+      });
+      // Any HTTP response means the API is reachable.
+      networkAvailable = true;
+      return true;
+    } catch {
+      networkAvailable = false;
+      if (!networkUnavailableLogged) {
+        const msg = isCIImpl()
+          ? 'Remote SHA verification: GitHub API unreachable; verification will fail in CI.'
+          : 'Remote SHA verification: GitHub API unreachable; skipping remote checks locally.';
+        detailImpl(msg);
+        networkUnavailableLogged = true;
+      }
+      return false;
+    } finally {
+      clearTimeout(timeout);
+    }
   }
 
   function normalizeActionToRepo(action) {
@@ -65,7 +112,6 @@ export function createRemoteVerifier({
       } else if (response.status === 404) {
         result = { ok: false, error: 'ref_not_found' };
       } else {
-        logRemoteUnreachable(repo, ref);
         const reason =
           response.status === 401
             ? 'authentication failed'
@@ -80,11 +126,19 @@ export function createRemoteVerifier({
             8,
           )}… status=${response.status} (${reason})`,
         );
-        result = { ok: !isCIImpl(), error: 'remote_unreachable' };
+        const error =
+          response.status === 401
+            ? 'unauthorized'
+            : response.status === 403
+              ? 'forbidden_or_rate_limited'
+              : response.status === 429
+                ? 'rate_limited'
+                : 'unexpected_status';
+        result = { ok: !isCIImpl(), error };
       }
     } catch {
-      logRemoteUnreachable(repo, ref);
-      result = { ok: !isCIImpl(), error: 'remote_unreachable' };
+      logApiUnreachable(repo, ref);
+      result = { ok: !isCIImpl(), error: 'api_unreachable' };
     }
 
     cache.set(key, result);
@@ -94,6 +148,11 @@ export function createRemoteVerifier({
   return async function validateRemoteAction(action, ref) {
     if (!verifyRemoteShas) {
       return { ok: true, error: 'verification_disabled' };
+    }
+    if (!(await checkNetworkAvailable())) {
+      return isCIImpl()
+        ? { ok: false, error: 'api_unreachable' }
+        : { ok: true, error: 'api_unreachable_local_skip' };
     }
     if (!action || !ref) {
       return { ok: true, error: 'missing_action_or_ref' };

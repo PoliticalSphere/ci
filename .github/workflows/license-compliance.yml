@@ -127,6 +127,7 @@ permissions:
 
 env:
   PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
+  FORCE_COLOR: "1"
 
 jobs:
   validate-ci:
@@ -193,7 +194,6 @@ jobs:
           output_path: "reports/summary/license-compliance.json"
           results: |
             license=${{ job.status == 'success' && 'success' || 'failure' }}
-
       - name: Upload report artifacts
         if: always()
         uses: ./.github/actions/ps-upload-artifacts

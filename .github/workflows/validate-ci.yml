@@ -94,7 +94,22 @@ on:
       verify_remote_shas:
         description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
         required: false
+        default: "1"
+        type: string
+      pr_only:
+        description: "Validate only workflows/actions changed in the PR (1 = on, 0 = off)"
+        required: false
         default: "0"
+        type: string
+      pr_base_ref:
+        description: "PR base SHA for diff-based validation"
+        required: false
+        default: ""
+        type: string
+      pr_head_ref:
+        description: "PR head SHA for diff-based validation"
+        required: false
+        default: ""
         type: string
       artifact_name:
         description: "Artifact name for validate-ci outputs"
@@ -136,6 +151,9 @@ jobs:
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
+      PS_VALIDATE_CI_PR_ONLY: ${{ inputs.pr_only }}
+      PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
+      PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
     timeout-minutes: 10
     steps:
       - name: Harden runner (PS)

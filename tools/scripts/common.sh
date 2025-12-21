@@ -58,3 +58,22 @@ error() {
     echo "ERROR: $*" >&2
   fi
 }
+
+# retry_cmd <retries> <sleep_seconds> <command...>
+# Rationale: mitigate transient network failures in CI without masking real errors.
+retry_cmd() {
+  local retries="$1"
+  local sleep_s="$2"
+  shift 2
+  local attempt=1
+  while true; do
+    if "$@"; then
+      return 0
+    fi
+    if [[ "${attempt}" -ge "${retries}" ]]; then
+      return 1
+    fi
+    sleep "${sleep_s}"
+    attempt=$((attempt + 1))
+  done
+}
