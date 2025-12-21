@@ -96,6 +96,11 @@ run_markdownlint() {
 output="$(run_markdownlint "$@" 2>&1)"
 status=$?
 if [[ -n "${output}" ]]; then
-  echo "${output}" | grep -Ev '^(markdownlint-cli2|Finding:|Linting:|Summary:)' || true
+  filtered="$(echo "${output}" | grep -Ev '^(markdownlint-cli2|Finding:|Linting:|Summary:)' || true)"
+  if [[ -n "${filtered}" ]]; then
+    echo "${filtered}"
+  elif [[ "${status}" -ne 0 ]]; then
+    echo "${output}"
+  fi
 fi
 exit "${status}"
