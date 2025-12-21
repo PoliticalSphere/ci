@@ -191,12 +191,21 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
+    env:
+      HOME: ${{ runner.temp }}
     timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
 
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
@@ -205,6 +214,7 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
+          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -229,12 +239,21 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
+    env:
+      HOME: ${{ runner.temp }}
     timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
 
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
@@ -243,6 +262,7 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
+          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -264,12 +284,21 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
+    env:
+      HOME: ${{ runner.temp }}
     timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
 
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
@@ -278,6 +307,7 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
+          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -317,12 +347,21 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
+    env:
+      HOME: ${{ runner.temp }}
     timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
 
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
@@ -331,6 +370,7 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
+          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -352,12 +392,21 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
+    env:
+      HOME: ${{ runner.temp }}
     timeout-minutes: 20
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
 
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
@@ -366,6 +415,7 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
+          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -387,6 +437,8 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
+    env:
+      HOME: ${{ runner.temp }}
     timeout-minutes: 10
     steps:
       - name: Checkout repository
