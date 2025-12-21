@@ -55,10 +55,7 @@ runs:
         set -euo pipefail
 
         action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
-        platform_root="${PS_PLATFORM_ROOT:-}"
-        if [[ -n "${platform_root}" && ! -d "${platform_root}" ]]; then
-          platform_root=""
-        fi
+        platform_root="${PS_PLATFORM_ROOT:?PS_PLATFORM_ROOT must be set}"
         workspace_root="${GITHUB_WORKSPACE:-}"
 
         banner_script=""
@@ -84,17 +81,12 @@ runs:
           exit 1
         fi
 
-        banner_file=""
-        for candidate in \
-          "${platform_root}/branding/ps-banner.txt" \
-          "${PS_PLATFORM_ROOT}/branding/ps-banner.txt" \
-          "${action_root}/branding/ps-banner.txt" \
-          "${workspace_root}/branding/ps-banner.txt"; do
-          if [[ -f "${candidate}" ]]; then
-            banner_file="${candidate}"
-            break
-          fi
-        done
+        banner_file="${PS_PLATFORM_ROOT}/branding/ps-banner.txt"
+
+        if [[ ! -f "${banner_file}" ]]; then
+          echo "ERROR: ps-banner.txt not found at ${banner_file}" >&2
+          exit 1
+        fi
 
         if [[ -z "${banner_file}" ]]; then
           echo "ERROR: banner file not found in action or workspace." >&2
