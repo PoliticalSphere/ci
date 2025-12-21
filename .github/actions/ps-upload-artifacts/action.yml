@@ -78,7 +78,13 @@ runs:
       run: |
         set -euo pipefail
         action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
-        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
+          echo "PS.ARTIFACTS: using PS_PLATFORM_ROOT=${platform_root}"
+        else
+          platform_root="${action_root}"
+        fi
+        validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
           echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
           exit 1

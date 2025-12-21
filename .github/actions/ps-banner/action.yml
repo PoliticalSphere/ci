@@ -55,10 +55,15 @@ runs:
         set -euo pipefail
 
         action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        if [[ -n "${platform_root}" && ! -d "${platform_root}" ]]; then
+          platform_root=""
+        fi
         workspace_root="${GITHUB_WORKSPACE:-}"
 
         banner_script=""
         for candidate in \
+          "${platform_root}/tools/scripts/branding/print-banner.sh" \
           "${action_root}/tools/scripts/branding/print-banner.sh" \
           "${workspace_root}/tools/scripts/branding/print-banner.sh"; do
           if [[ -f "${candidate}" ]]; then
@@ -69,6 +74,9 @@ runs:
 
         if [[ -z "${banner_script}" ]]; then
           echo "ERROR: banner script not found in action or workspace." >&2
+          if [[ -n "${platform_root}" ]]; then
+            echo "Tried: ${platform_root}/tools/scripts/branding/print-banner.sh" >&2
+          fi
           echo "Tried: ${action_root}/tools/scripts/branding/print-banner.sh" >&2
           if [[ -n "${workspace_root}" ]]; then
             echo "Tried: ${workspace_root}/tools/scripts/branding/print-banner.sh" >&2
@@ -78,6 +86,7 @@ runs:
 
         banner_file=""
         for candidate in \
+          "${platform_root}/branding/ps-banner.txt" \
           "${action_root}/branding/ps-banner.txt" \
           "${workspace_root}/branding/ps-banner.txt"; do
           if [[ -f "${candidate}" ]]; then
@@ -88,6 +97,9 @@ runs:
 
         if [[ -z "${banner_file}" ]]; then
           echo "ERROR: banner file not found in action or workspace." >&2
+          if [[ -n "${platform_root}" ]]; then
+            echo "Tried: ${platform_root}/branding/ps-banner.txt" >&2
+          fi
           echo "Tried: ${action_root}/branding/ps-banner.txt" >&2
           if [[ -n "${workspace_root}" ]]; then
             echo "Tried: ${workspace_root}/branding/ps-banner.txt" >&2

@@ -63,7 +63,12 @@ runs:
         fi
 
         action_root="${GITHUB_ACTION_PATH}"
-        platform_root="$(cd "${action_root}/../../.." >/dev/null 2>&1 && pwd)"
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
+          echo "PS.CI_VALIDATE: using PS_PLATFORM_ROOT=${platform_root}"
+        else
+          platform_root="$(cd "${action_root}/../../.." >/dev/null 2>&1 && pwd)"
+        fi
 
         if [[ -z "${platform_root}" ]]; then
           echo "ERROR: unable to determine platform repo root from GITHUB_ACTION_PATH" >&2

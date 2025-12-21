@@ -71,10 +71,30 @@ on:
         required: false
         default: "1"
         type: string
+      install_dependencies:
+        description: "Install dependencies in the target repo (1 = on, 0 = off)"
+        required: false
+        default: "0"
+        type: string
       checkout_ref:
         description: "Optional git ref to validate"
         required: false
         default: ""
+        type: string
+      platform_ref:
+        description: "Platform repo ref to checkout for shared scripts/configs"
+        required: false
+        default: "main"
+        type: string
+      install_platform_dependencies:
+        description: "Install dependencies in the platform repo (1 = on, 0 = off)"
+        required: false
+        default: "1"
+        type: string
+      verify_remote_shas:
+        description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
+        required: false
+        default: "0"
         type: string
       artifact_name:
         description: "Artifact name for validate-ci outputs"
@@ -116,7 +136,8 @@ jobs:
     # location (fixes harden-runner ENOENT in post step).
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      PS_VALIDATE_CI_VERIFY_REMOTE: "1"
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
+      PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
       HOME: ${{ runner.temp }}
     timeout-minutes: 10
     steps:
@@ -125,6 +146,14 @@ jobs:
         with:
           ref: ${{ inputs.checkout_ref }}
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
@@ -140,10 +169,23 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          install_dependencies: ${{ inputs.install_dependencies }}
           skip_checkout: "1"
           skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Install platform dependencies
+        if: ${{ inputs.install_platform_dependencies == '1' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! -d "${PS_PLATFORM_ROOT}" ]]; then
+            echo "ERROR: PS_PLATFORM_ROOT not found at ${PS_PLATFORM_ROOT}" >&2
+            exit 1
+          fi
+          cd "${PS_PLATFORM_ROOT}"
+          npm ci --no-audit --no-fund
 
       - name: Validate CI
         uses: ./.github/actions/ci-validate
@@ -164,5 +206,18 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/scripts/branding/print-section.sh "ci.validate" "Validate-CI complete"
+          section_script=""
+          for candidate in \
+            "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "${GITHUB_WORKSPACE}/tools/scripts/branding/print-section.sh"; do
+            if [[ -f "${candidate}" ]]; then
+              section_script="${candidate}"
+              break
+            fi
+          done
+          if [[ -z "${section_script}" ]]; then
+            echo "ERROR: print-section.sh not found in platform or workspace." >&2
+            exit 1
+          fi
+          bash "${section_script}" "ci.validate" "Validate-CI complete"
           echo "PS.VALIDATE_CI: OK"
