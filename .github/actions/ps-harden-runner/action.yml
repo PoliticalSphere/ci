@@ -71,8 +71,14 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          exit 1
+        fi
         # shellcheck source=tools/scripts/branding/validate-inputs.sh
-        . "tools/scripts/branding/validate-inputs.sh"
+        . "${validate_sh}"
 
         policy="$(echo "${{ inputs.egress_policy }}" | tr '[:upper:]' '[:lower:]' | xargs)"
         require_enum "inputs.egress_policy" "${policy}" audit block || exit 1

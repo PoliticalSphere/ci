@@ -66,21 +66,24 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
-        validate_sh="${repo_root}/tools/scripts/branding/validate-inputs.sh"
-        if [[ -f "${validate_sh}" ]]; then
-          # shellcheck source=tools/scripts/branding/validate-inputs.sh
-          . "${validate_sh}"
+        workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          exit 1
         fi
+        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        . "${validate_sh}"
 
         if [[ "${{ inputs.install_dependencies }}" == "1" ]]; then
-          if [[ ! -f "package.json" ]]; then
+          if [[ ! -f "${workspace_root}/package.json" ]]; then
             echo "ERROR: package.json not found in workspace root." >&2
             echo "HINT: ensure actions/checkout ran and repo root is the workspace." >&2
             exit 1
           fi
 
-          if [[ ! -f "package-lock.json" ]]; then
+          if [[ ! -f "${workspace_root}/package-lock.json" ]]; then
             echo "ERROR: package-lock.json not found (npm ci requires a lockfile" >&2
             echo "for determinism)." >&2
             echo "HINT: commit package-lock.json or adjust the platform policy explicitly." >&2
@@ -118,6 +121,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        cd "${GITHUB_WORKSPACE:-$(pwd)}"
         npm ci --no-audit --no-fund
         echo "PS.NODE_BOOTSTRAP: OK"
 

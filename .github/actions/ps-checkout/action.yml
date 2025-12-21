@@ -65,12 +65,14 @@ runs:
 
         depth="${{ inputs.fetch_depth }}"
         ref="${{ inputs.ref }}"
-        repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
-        validate_sh="${repo_root}/tools/scripts/branding/validate-inputs.sh"
-        if [[ -f "${validate_sh}" ]]; then
-          # shellcheck source=tools/scripts/branding/validate-inputs.sh
-          . "${validate_sh}"
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          exit 1
         fi
+        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        . "${validate_sh}"
 
         require_number "fetch_depth" "${depth}"
 
