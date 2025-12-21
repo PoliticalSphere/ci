@@ -1,0 +1,453 @@
+# ==============================================================================
+# Political Sphere — Reusable Workflow: Security Scheduled
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run scheduled deep security scans and publish SARIF/artifacts.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: full-history secret scan, CodeQL, Semgrep, Scorecard, Trivy.
+#   - Does NOT: run tests/builds or deploy artifacts.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege with explicit permissions
+#   - SHA-pinned actions only
+#   - Validate-CI gate runs first
+#
+# Dependencies:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/actions/ps-harden-runner
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+#   - ./.github/actions/ps-run
+#   - ./.github/actions/ps-security-tools
+#   - ./.github/actions/ps-upload-artifacts
+#   - ./.github/actions/ps-write-summary
+#   - ./.github/actions/semgrep-cli
+#   - github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - github/codeql-action/autobuild@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
+#   - trufflesecurity/trufflehog@ef6e76c3c4023279497fab4721ffa071a722fd05
+#   - tools/scripts/branding/print-section.sh
+#
+# Dependents:
+#   - Downstream PS application repositories
+#
+# Execution Model:
+#   - Trigger: schedule, workflow_dispatch, workflow_call
+#   - Reusable + top-level (can run on schedule in this repo)
+#
+# Security & Policy Notes:
+#   - Secrets: none expected
+#   - Permissions: security-events: write only where SARIF is uploaded
+#   - Constraints: full-history checkout required for secret scanning
+#
+# Operational Notes:
+#   - Timeouts: defined per job in this workflow
+#   - Artifacts: SARIF and reports uploaded with 14-day retention
+#   - CI vs local: scheduled runs provide no inputs; defaults are used
+# ==============================================================================
+
+name: Security Scheduled
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        required: false
+        default: "ubuntu-22.04"
+        type: string
+      node_version:
+        description: "Node.js major version"
+        required: false
+        default: "22"
+        type: string
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        required: false
+        default: "1"
+        type: string
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        required: false
+        default: "1"
+        type: string
+      codeql_languages:
+        description: "CodeQL languages (comma-separated, e.g. javascript,python)"
+        required: false
+        default: "javascript"
+        type: string
+
+  workflow_dispatch:
+    inputs:
+      runner:
+        description: "Runner label"
+        required: false
+        default: "ubuntu-22.04"
+        type: string
+      node_version:
+        description: "Node.js major version"
+        required: false
+        default: "22"
+        type: string
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        required: false
+        default: "1"
+        type: string
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        required: false
+        default: "1"
+        type: string
+      codeql_languages:
+        description: "CodeQL languages (comma-separated, e.g. javascript,python)"
+        required: false
+        default: "javascript"
+        type: string
+
+  schedule:
+    - cron: "0 3 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: security-scheduled-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: "1"
+  PS_FULL_SCAN: "1"
+
+jobs:
+  validate-ci:
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: >-
+        ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+        'ubuntu-22.04' }}
+      node_version: >-
+        ${{ (github.event_name == 'workflow_call' && inputs.node_version) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.node_version) ||
+        '22' }}
+      fetch_depth: >-
+        ${{ (github.event_name == 'workflow_call' && inputs.fetch_depth) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.fetch_depth) ||
+        '1' }}
+      cache: >-
+        ${{ (github.event_name == 'workflow_call' && inputs.cache) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.cache) ||
+        '1' }}
+      artifact_name: security-scheduled-validate-ci
+      retention_days: 7
+
+  secrets:
+    name: Secrets scan (full history)
+    runs-on: >-
+      ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+      'ubuntu-22.04' }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: "0"
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Install security tools (PS)
+        uses: ./.github/actions/ps-security-tools
+
+      - name: Secrets scan (full)
+        uses: ./.github/actions/ps-run
+        with:
+          id: "secrets.full"
+          title: "Secrets scan (full history)"
+          description: "Gitleaks full-history scan"
+          script: "tools/scripts/security/gitleaks-history.sh"
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: security-secrets
+          path: |
+            reports/**
+            logs/**
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+  codeql:
+    name: CodeQL
+    runs-on: >-
+      ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+      'ubuntu-22.04' }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+      security-events: write
+    timeout-minutes: 30
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
+        with:
+          languages: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.codeql_languages) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.codeql_languages) ||
+            'javascript' }}
+
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
+
+      - name: Analyze
+        uses: github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
+        with:
+          output: codeql-results
+
+      - name: Upload CodeQL SARIF artifact
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: codeql-sarif
+          path: |
+            codeql-results/**
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+  semgrep:
+    name: Semgrep CE
+    runs-on: >-
+      ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+      'ubuntu-22.04' }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+      security-events: write
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Run Semgrep (SARIF)
+        uses: ./.github/actions/semgrep-cli
+        with:
+          version: "1.96.0"
+          config: "p/ci"
+          path: "."
+          output: "semgrep.sarif"
+
+      - name: Upload Semgrep SARIF artifact
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: semgrep-sarif
+          path: |
+            semgrep.sarif
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: >-
+      ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+      'ubuntu-22.04' }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+      security-events: write
+      # id-token is only required when publish_results: true in v2+.
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Run Scorecard (SARIF)
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
+        with:
+          results_file: results.sarif
+          results_format: sarif
+          publish_results: false
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
+        with:
+          sarif_file: results.sarif
+
+      - name: Upload Scorecard SARIF artifact
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: scorecard-sarif
+          path: |
+            results.sarif
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+  trufflehog:
+    name: TruffleHog (full history)
+    runs-on: >-
+      ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+      'ubuntu-22.04' }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: "0"
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Prepare report directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/scripts/branding/print-section.sh "secrets.trufflehog" \
+            "Prepare report directory" "Ensure report output path exists"
+          mkdir -p reports/security
+
+      - name: Run TruffleHog (SARIF)
+        uses: trufflesecurity/trufflehog@ef6e76c3c4023279497fab4721ffa071a722fd05  # v3.92.4
+        with:
+          path: "."
+          extra_args: "--format sarif --output reports/security/trufflehog.sarif"
+
+      - name: Upload TruffleHog SARIF artifact
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: trufflehog-sarif
+          path: |
+            reports/security/trufflehog.sarif
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+  trivy:
+    name: Trivy filesystem scan
+    runs-on: >-
+      ${{ (github.event_name == 'workflow_call' && inputs.runner) ||
+      (github.event_name == 'workflow_dispatch' && github.event.inputs.runner) ||
+      'ubuntu-22.04' }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+      security-events: write
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Install security tools (PS)
+        uses: ./.github/actions/ps-security-tools
+        with:
+          install_trivy: "1"
+
+      - name: Run Trivy (SARIF)
+        uses: ./.github/actions/ps-run
+        with:
+          id: "trivy.fs"
+          title: "Trivy filesystem scan"
+          description: "IaC/config/vulnerability scan (SARIF)"
+          script: "tools/scripts/security/trivy-fs.sh"
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
+        with:
+          sarif_file: reports/security/trivy.sarif
+
+      - name: Upload Trivy SARIF artifact
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: trivy-sarif
+          path: |
+            reports/security/trivy.sarif
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+  done:
+    name: Security scheduled complete
+    runs-on: ubuntu-22.04
+    needs: [secrets, codeql, semgrep, scorecard, trufflehog, trivy]
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Write summary (PS)
+        uses: ./.github/actions/ps-write-summary
+        with:
+          workflow: "security-scheduled"
+          output_path: "reports/summary/security-scheduled.json"
+          results: |
+            secrets=${{ needs.secrets.result }}
+            codeql=${{ needs.codeql.result }}
+            semgrep=${{ needs.semgrep.result }}
+            scorecard=${{ needs.scorecard.result }}
+            trufflehog=${{ needs.trufflehog.result }}
+            trivy=${{ needs.trivy.result }}
+
+      - name: Upload summary
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: security-scheduled-summary
+          path: |
+            reports/summary/security-scheduled.json
+          if_no_files_found: "warn"
+          retention_days: "14"
+
+      - name: Summary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/scripts/branding/print-section.sh "security.scheduled" "Security scheduled complete"
+          echo "PS.SECURITY_SCHEDULED: OK"

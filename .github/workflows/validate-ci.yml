@@ -1,0 +1,156 @@
+# ==============================================================================
+# Political Sphere — Reusable Workflow: Validate CI
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run the Validate-CI policy gate and publish evidence artifacts.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: enforce CI policy rules and upload validation logs.
+#   - Does NOT: run linting, tests, builds, or deep security scans.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege with explicit permissions
+#   - SHA-pinned actions only
+#   - Hardened runner as the first step
+#
+# Dependencies:
+#   - ./.github/actions/ps-setup
+#   - ./.github/actions/ci-validate
+#   - ./.github/actions/ps-upload-artifacts
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+#   - tools/scripts/branding/print-section.sh
+#
+# Dependents:
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/build-artifacts.yml
+#   - ./.github/workflows/security-scheduled.yml
+#   - ./.github/workflows/release.yml
+#
+# Execution Model:
+#   - Trigger: workflow_call
+#   - Reusable workflow (internal platform building block)
+#
+# Security & Policy Notes:
+#   - Secrets: optional NODE_AUTH_TOKEN for npm installs only
+#   - Permissions: contents: read (workflow + job)
+#   - Constraints: must run before any other jobs in calling workflows
+#
+# Operational Notes:
+#   - Timeouts: defined here (reusable callers cannot set them)
+#   - Artifacts: reports/** and logs/** uploaded by ps-upload-artifacts
+#   - CI vs local: Validate-CI script handles bootstrap mode locally
+# ==============================================================================
+
+name: Validate CI
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        required: false
+        default: "ubuntu-22.04"
+        type: string
+      node_version:
+        description: "Node.js major version"
+        required: false
+        default: "22"
+        type: string
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        required: false
+        default: "1"
+        type: string
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        required: false
+        default: "1"
+        type: string
+      checkout_ref:
+        description: "Optional git ref to validate"
+        required: false
+        default: ""
+        type: string
+      artifact_name:
+        description: "Artifact name for validate-ci outputs"
+        required: false
+        default: "validate-ci"
+        type: string
+      retention_days:
+        description: "Artifact retention in days"
+        required: false
+        default: 7
+        type: number
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: validate-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: "1"
+
+jobs:
+  validate-ci:
+    name: Validate CI policy
+    runs-on: ${{ inputs.runner }}
+    permissions:
+      contents: read
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+      PS_VALIDATE_CI_VERIFY_REMOTE: "1"
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Prepare runner (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          ref: ${{ inputs.checkout_ref }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+          skip_checkout: "1"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Validate CI
+        uses: ./.github/actions/ci-validate
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: ${{ inputs.artifact_name }}
+          path: |
+            reports/**
+            logs/**
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+      - name: Validate CI complete
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/scripts/branding/print-section.sh "ci.validate" "Validate-CI complete"
+          echo "PS.VALIDATE_CI: OK"

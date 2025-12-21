@@ -1,0 +1,34 @@
+# ==============================================================================
+# Political Sphere — PR Checks (caller for PR Gates)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Trigger the reusable PR Gates workflow for pull requests in this repository so
+#   the full gate (lint / typecheck / tests / duplication / build) runs.
+# ==============================================================================
+
+name: PR Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited]
+
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write  # required by nested jobs in pr-gates.yml (dependency-review, notify)
+
+jobs:
+  pr-gates:
+    uses: ./.github/workflows/pr-gates.yml
+    with:
+      pr_number: ${{ github.event.pull_request.number }}
+      pr_is_fork: ${{ github.event.pull_request.head.repo.fork }}
+      pr_base_ref: ${{ github.event.pull_request.base.sha }}
+      pr_head_ref: ${{ github.event.pull_request.head.sha }}
+      # default node version can be overridden by callers
+      node_version: '22'
+      allow_pr_comments: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
+    permissions:
+      contents: read
+      pull-requests: read
+      issues: write

@@ -1,0 +1,71 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "owner": "political-sphere",
+    "classification": "internal",
+    "last_reviewed": "2025-12-19",
+    "review_interval_days": 180
+  },
+  "policy": {
+    "mode": "enforce",
+    "fail_on_unknown": true,
+    "fail_on_missing": true,
+    "package_manager": {
+      "name": "npm",
+      "lockfile": "package-lock.json"
+    },
+    "required_files": ["package.json", "package-lock.json", "tsconfig.json"],
+    "forbidden_files": ["yarn.lock", "pnpm-lock.yaml"],
+    "required_scripts": {
+      "lint": ["lint", "lint:all"],
+      "typecheck": ["typecheck"],
+      "test": ["test"],
+      "build": ["build"]
+    },
+    "tooling": {
+      "require": ["typescript", "vitest", "playwright", "eslint", "biome"],
+      "disallow": ["jest", "mocha", "ts-jest", "tslint"]
+    },
+    "workflows": {
+      "required_reusable": [
+        "PoliticalSphere/ci-cd-platform/.github/workflows/pr-gates.yml",
+        "PoliticalSphere/ci-cd-platform/.github/workflows/security-scheduled.yml"
+      ],
+      "allowed_top_level": [
+        "pr-gates.yml",
+        "security-scheduled.yml",
+        "build-artifacts.yml",
+        "release.yml",
+        "license-compliance.yml",
+        "consumer-contract.yml"
+      ]
+    },
+    "docs_claims": [
+      {
+        "path": "README.md",
+        "contains": "vitest",
+        "requires_tools": ["vitest"]
+      },
+      {
+        "path": "README.md",
+        "contains": "playwright",
+        "requires_tools": ["playwright"]
+      }
+    ],
+    "path_integrity": {
+      "enabled": true,
+      "roots": ["src", "apps", "packages", "libs"],
+      "ignore": [
+        "node_modules",
+        "dist",
+        "build",
+        "reports",
+        "logs",
+        "coverage",
+        ".next",
+        ".turbo"
+      ],
+      "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"]
+    }
+  }
+}

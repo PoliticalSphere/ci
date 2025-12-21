@@ -1,0 +1,12 @@
+[allowlist]
+description = "Political Sphere allowlist (minimal)"
+paths = [
+  "package-lock.json",
+  "dist/",
+  "build/",
+  "coverage/",
+  "reports/"
+]
+
+[extend]
+# Placeholder for future shared rules or upstream config

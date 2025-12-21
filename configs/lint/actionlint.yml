@@ -1,0 +1,24 @@
+# ==============================================================================
+# Political Sphere — Actionlint Configuration
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Baseline configuration for validating GitHub Actions workflows with actionlint.
+#
+# Policy:
+#   - Default deny for self-hosted runner labels (none allowed unless listed).
+#   - If self-hosted runners are introduced:
+#       * explicitly list labels here
+#       * document a risk decision
+# ==============================================================================
+
+meta:
+  version: 1.0.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-19
+  review_interval_days: 180
+
+# actionlint: allowlisted self-hosted runner labels
+# If empty, any workflow referencing `runs-on: [self-hosted, ...]` should be flagged.
+self-hosted-runner:
+  labels: []

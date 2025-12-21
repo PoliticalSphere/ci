@@ -1,0 +1,122 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Upload Artifacts
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Upload workflow artifacts with platform defaults and explicit, validated inputs.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: validate inputs and upload artifacts with configured retention/behaviour.
+#   - Does NOT: decide which files to include or when to run.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Explicit inputs + validation
+#   - SHA-pinned dependency
+#   - CI-safe behaviour (sane defaults, clear failures)
+#
+# Dependencies:
+#   - actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+#   - tools/scripts/branding/validate-inputs.sh
+#
+# Dependents:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/build-artifacts.yml
+#   - ./.github/workflows/security-scheduled.yml
+#   - ./.github/workflows/release.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: workflows (often with if: always())
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller
+#   - Constraints:
+#       - Artifact name must be CI-safe (validated here)
+#       - No path traversal restrictions are imposed here (caller controls path)
+#
+# Operational Notes:
+#   - Allowlist enforcement is handled by Validate-CI (configs/ci/policies/artifact-policy.yml)
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: uploads caller-specified paths only
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Upload Artifacts"
+description: "Upload workflow artifacts with platform defaults"
+
+inputs:
+  name:
+    description: "Artifact name (must be CI-safe)"
+    required: true
+
+  path:
+    description: "Paths to upload (newline-separated globs supported)"
+    required: true
+
+  retention_days:
+    description: "Retention days (positive integer)"
+    required: false
+    default: "7"
+
+  if_no_files_found:
+    description: "Behavior when no files are found: warn | error | ignore"
+    required: false
+    default: "warn"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          exit 1
+        fi
+        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        . "${validate_sh}"
+
+        name="${{ inputs.name }}"
+        retention="${{ inputs.retention_days }}"
+        nofiles="${{ inputs.if_no_files_found }}"
+
+        # Basic name safety: avoid weird characters that break tooling.
+        # Allow: letters, numbers, dot, underscore, dash.
+        require_regex \
+          "inputs.name" \
+          "${name}" \
+          '^[A-Za-z0-9._-]+$' \
+          "Allowed characters: A-Z a-z 0-9 . _ -" || exit 1
+
+        # retention_days must be a positive integer
+        require_positive_number "inputs.retention_days" "${retention}" || exit 1
+
+        # Validate if_no_files_found
+        require_enum "inputs.if_no_files_found" "${nofiles}" warn error ignore || exit 1
+
+        echo "PS.ARTIFACTS: name=${name}"
+        echo "PS.ARTIFACTS: retention_days=${retention}"
+        echo "PS.ARTIFACTS: if_no_files_found=${nofiles}"
+
+    - name: Upload artifacts
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        retention-days: ${{ inputs.retention_days }}
+        if-no-files-found: ${{ inputs.if_no_files_found }}
+
+    - name: Upload artifacts complete
+      shell: bash
+      run: |
+        echo "PS.ARTIFACTS: OK"

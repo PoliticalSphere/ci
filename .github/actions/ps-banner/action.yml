@@ -1,0 +1,101 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Banner
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Print the Political Sphere ASCII banner for consistent branding.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: print the banner from the platform repository.
+#   - Does NOT: modify files, environment variables, or permissions.
+#
+# Design Principles:
+#   - Deterministic output
+#   - Non-interactive execution
+#   - CI-safe behavior
+#
+# Dependencies:
+#   - tools/scripts/branding/print-banner.sh
+#   - branding/ps-banner.txt
+#
+# Dependents:
+#   - ./.github/actions/ps-run
+#   - ./.github/actions/ci-validate
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: workflows and other composite actions
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from caller (no writes)
+#   - Constraints: inline bash is required to resolve paths
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Banner"
+description: "Prints the Political Sphere ASCII banner"
+
+inputs: {}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Print Political Sphere banner
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        workspace_root="${GITHUB_WORKSPACE:-}"
+
+        banner_script=""
+        for candidate in \
+          "${action_root}/tools/scripts/branding/print-banner.sh" \
+          "${workspace_root}/tools/scripts/branding/print-banner.sh"; do
+          if [[ -f "${candidate}" ]]; then
+            banner_script="${candidate}"
+            break
+          fi
+        done
+
+        if [[ -z "${banner_script}" ]]; then
+          echo "ERROR: banner script not found in action or workspace." >&2
+          echo "Tried: ${action_root}/tools/scripts/branding/print-banner.sh" >&2
+          if [[ -n "${workspace_root}" ]]; then
+            echo "Tried: ${workspace_root}/tools/scripts/branding/print-banner.sh" >&2
+          fi
+          exit 1
+        fi
+
+        banner_file=""
+        for candidate in \
+          "${action_root}/branding/ps-banner.txt" \
+          "${workspace_root}/branding/ps-banner.txt"; do
+          if [[ -f "${candidate}" ]]; then
+            banner_file="${candidate}"
+            break
+          fi
+        done
+
+        if [[ -z "${banner_file}" ]]; then
+          echo "ERROR: banner file not found in action or workspace." >&2
+          echo "Tried: ${action_root}/branding/ps-banner.txt" >&2
+          if [[ -n "${workspace_root}" ]]; then
+            echo "Tried: ${workspace_root}/branding/ps-banner.txt" >&2
+          fi
+          exit 1
+        fi
+
+        echo "PS.BANNER: file=${banner_file}"
+
+        bash "${banner_script}"
+        echo "PS.BANNER: OK"

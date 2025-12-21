@@ -1,0 +1,91 @@
+# ==============================================================================
+# Political Sphere — Composite Action: CI Validate
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Execute the Validate-CI policy checks for this repository.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: run the Validate-CI script with platform configs.
+#   - Does NOT: run lint/test/build or security scans.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - CI-safe behavior with clear failures
+#   - Explicit configuration paths
+#
+# Dependencies:
+#   - ./.github/actions/ps-banner
+#   - tools/scripts/ci/validate-ci/index.js
+#   - configs/ci/policies/validate-ci.yml
+#
+# Dependents:
+#   - ./.github/workflows/validate-ci.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: Validate-CI reusable workflow
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller (read-only expected)
+#   - Constraints: requires Node.js available on PATH
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: produced by the Validate-CI script
+#   - CI vs local: same execution; script handles bootstrap mode
+# ==============================================================================
+
+name: "CI Validate"
+description: "Runs the Validate-CI policy gate"
+
+inputs: {}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Print banner
+      uses: ./.github/actions/ps-banner
+
+    - name: Run Validate-CI gate
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if ! command -v node >/dev/null 2>&1; then
+          echo "ERROR: node is required but not found on PATH" >&2
+          exit 1
+        fi
+
+        action_root="${GITHUB_ACTION_PATH}"
+        platform_root="$(cd "${action_root}/../../.." >/dev/null 2>&1 && pwd)"
+
+        if [[ -z "${platform_root}" ]]; then
+          echo "ERROR: unable to determine platform repo root from GITHUB_ACTION_PATH" >&2
+          exit 1
+        fi
+
+        validator="${platform_root}/tools/scripts/ci/validate-ci/index.js"
+        if [[ ! -f "${validator}" ]]; then
+          echo "ERROR: validate-ci script not found at ${validator}" >&2
+          exit 1
+        fi
+
+        config_path="${platform_root}/configs/ci/policies/validate-ci.yml"
+        if [[ ! -f "${config_path}" ]]; then
+          echo "ERROR: validate-ci config not found at ${config_path}" >&2
+          exit 1
+        fi
+
+        echo "PS.CI_VALIDATE: platform_root=${platform_root}"
+        echo "PS.CI_VALIDATE: config_path=${config_path}"
+
+        export PS_PLATFORM_ROOT="${platform_root}"
+        export PS_VALIDATE_CI_CONFIG="${config_path}"
+        node "${validator}"
+        echo "PS.CI_VALIDATE: OK"

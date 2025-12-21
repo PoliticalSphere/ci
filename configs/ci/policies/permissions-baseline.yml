@@ -1,0 +1,191 @@
+# ==============================================================================
+# Political Sphere — Permission Baselines (GitHub Actions)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Define MAXIMUM default permissions allowed per workflow category.
+#   Every workflow/job MUST declare permissions explicitly.
+#
+# Policy:
+#   - Default stance is DENY: any permission not listed is treated as "none".
+#   - Categories are baselines (maximums), not entitlements:
+#       Workflows/jobs may use a SUBSET of baseline permissions.
+#   - Any elevation beyond the baseline requires:
+#       (1) a documented risk decision, and
+#       (2) an inline justification comment at the workflow/job.
+#
+# Notes:
+#   - Prefer pull-requests: read by default. Use pull-requests: write only for
+#     specific commenting/labeling jobs.
+#   - Keep id-token: write OFF by default; enable only when OIDC is required.
+# ==============================================================================
+
+meta:
+  version: 1.1.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-19
+  review_interval_days: 180
+
+policy:
+  # If a permission key is not present in the baseline for a category,
+  # it is treated as "none".
+  unspecified_permission: none
+
+  # Where risk decisions are recorded for baseline changes and exceptions.
+  risk_decisions_file: docs/risk-decisions.md
+
+  # Validator requirements (what validate-ci must enforce).
+  validator_requirements:
+    - workflows_and_jobs_must_set_permissions_explicitly
+    - effective_permissions_must_not_exceed_category_baseline
+    - any_elevation_requires_risk_decision_and_inline_justification
+
+schema_notes:
+  # GitHub Actions permissions values.
+  allowed_values: [none, read, write]
+
+  # Common permissions keys seen in workflows.
+  # (Not exhaustive; validator should allow additional keys but treat them as
+  # requiring explicit baseline entries or deny-by-default per policy.)
+  common_keys:
+    - actions
+    - checks
+    - contents
+    - deployments
+    - id-token
+    - issues
+    - packages
+    - pull-requests
+    - security-events
+    - statuses
+
+workflows:
+  # ---------------------------------------------------------------------------
+  # validate-ci: supply-chain & workflow integrity checks (SHA pinning, perms,
+  # unsafe patterns). Should be read-only and safe to run on PRs.
+  # ---------------------------------------------------------------------------
+  validate-ci:
+    baseline:
+      contents: read
+      actions: read
+
+    allowed_overrides: []  # none
+
+  # ---------------------------------------------------------------------------
+  # pr-gates: fast PR checks (lint/type/test/jscpd/quick scans).
+  # Keep read-only wherever possible.
+  # ---------------------------------------------------------------------------
+  pr-gates:
+    baseline:
+      contents: read
+      actions: read
+      pull-requests: read
+
+    allowed_overrides:
+      # Allow issues:write only for PR status comments.
+      - permission: issues
+        value: write
+        requires_inline_justification: true
+        requires_risk_decision: true
+      # Allow checks:write only if producing Check Runs (rare).
+      - permission: checks
+        value: write
+        requires_inline_justification: true
+        requires_risk_decision: true
+
+  # ---------------------------------------------------------------------------
+  # security-scheduled: deeper scans; uploads SARIF to code scanning UI.
+  # ---------------------------------------------------------------------------
+  security-scheduled:
+    baseline:
+      contents: read
+      actions: read
+      security-events: write
+
+    allowed_overrides:
+      # Some scanners use OIDC for auth; keep off by default.
+      - permission: id-token
+        value: write
+        requires_inline_justification: true
+        requires_risk_decision: true
+
+  # ---------------------------------------------------------------------------
+  # build-artifacts: deterministic build + artifact upload.
+  # Artifacts do not require elevated permissions.
+  # ---------------------------------------------------------------------------
+  build-artifacts:
+    baseline:
+      contents: read
+      actions: read
+
+    allowed_overrides: []  # none
+
+  # ---------------------------------------------------------------------------
+  # license-compliance: dependency license policy checks.
+  # ---------------------------------------------------------------------------
+  license-compliance:
+    baseline:
+      contents: read
+      actions: read
+
+    allowed_overrides: []  # none
+
+  # ---------------------------------------------------------------------------
+  # consumer-contract: consumer repo contract validation.
+  # ---------------------------------------------------------------------------
+  consumer-contract:
+    baseline:
+      contents: read
+      actions: read
+
+    allowed_overrides: []  # none
+
+  # ---------------------------------------------------------------------------
+  # release: publishing a release and/or packages/containers.
+  # Prefer job-level elevation; keep baseline narrow but sufficient.
+  # ---------------------------------------------------------------------------
+  release:
+    baseline:
+      contents: write
+      actions: read
+      packages: write
+
+    allowed_overrides:
+      # OIDC signing/auth (only where required).
+      - permission: id-token
+        value: write
+        requires_inline_justification: true
+        requires_risk_decision: true
+
+elevation_guidance:
+  # These are high-risk permissions. They should remain OFF unless strictly
+  # required and explicitly justified at the job level.
+  high_risk_permissions:
+    - permission: id-token
+      value: write
+      rationale: "OIDC/cloud auth/signing can enable broader access if misused."
+
+    - permission: contents
+      value: write
+      rationale: "Allows pushing commits/tags/releases; restrict to release jobs."
+
+    - permission: pull-requests
+      value: write
+      rationale: "Allows commenting/labeling/modifying PRs; isolate to specific jobs."
+
+    - permission: issues
+      value: write
+      rationale: "Allows opening/updating issues; use only for automation jobs."
+
+    - permission: deployments
+      value: write
+      rationale: "Deployment controls; only for explicit deployment workflows."
+
+examples:
+  pr_comment_job_permissions:
+    permissions:
+      contents: read
+      pull-requests: write
+    inline_justification_example: >
+      # Justification: This job posts a status comment to the PR; requires
+      # pull-requests: write. Scope is limited to this job only.

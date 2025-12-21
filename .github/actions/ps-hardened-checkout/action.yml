@@ -1,0 +1,65 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Hardened Checkout
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Harden the runner and checkout the repository with platform defaults.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: run ps-harden-runner and ps-checkout in a single step.
+#   - Does NOT: install dependencies or configure runtimes.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege and explicit inputs
+#   - SHA-pinned actions only
+#
+# Dependencies:
+#   - ./.github/actions/ps-harden-runner
+#   - ./.github/actions/ps-checkout
+#
+# Dependents:
+#   - ./.github/workflows/security-scheduled.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller
+#   - Constraints: must remain first step in jobs that require hardening
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Hardened Checkout"
+description: "Harden runner and checkout repository with platform defaults"
+
+inputs:
+  fetch_depth:
+    description: "Git fetch depth (1 = shallow, 0 = full history)"
+    required: false
+    default: "1"
+  ref:
+    description: "Optional ref to checkout"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Harden runner (PS)
+      uses: ./.github/actions/ps-harden-runner
+
+    - name: Checkout (PS)
+      uses: ./.github/actions/ps-checkout
+      with:
+        fetch_depth: ${{ inputs.fetch_depth }}
+        ref: ${{ inputs.ref }}

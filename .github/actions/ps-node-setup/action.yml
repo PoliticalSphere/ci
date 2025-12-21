@@ -1,0 +1,98 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Node Setup
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Checkout the repository and prepare a deterministic Node.js toolchain
+#   dependencies using Political Sphere defaults.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: checkout a ref (optional), setup Node, optionally install deps.
+#   - Does NOT: run build/test scripts or alter job permissions.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution (enforced by ps-node-bootstrap)
+#   - Explicit, validated inputs (ref and fetch depth)
+#   - Platform consistency via internal composite actions
+#
+# Dependencies:
+#   - ./.github/actions/ps-checkout
+#   - ./.github/actions/ps-node-bootstrap
+#
+# Dependents:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/build-artifacts.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: workflows that require Node.js readiness
+#
+# Security & Policy Notes:
+#   - Secrets: optional NODE_AUTH_TOKEN (passed via env by caller)
+#   - Permissions: inherited from the caller
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+#   - Fetch depth defaults to 1 for speed; full history must be explicit (0)
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Node Setup"
+description: "Checkout repository and setup Node.js deterministically with platform defaults"
+
+inputs:
+  node_version:
+    description: "Node.js major version"
+    required: false
+    default: "22"
+
+  ref:
+    description: "Optional git ref to checkout"
+    required: false
+    default: ""
+
+  fetch_depth:
+    description: "Git fetch depth (1 = shallow, 0 = full history)"
+    required: false
+    default: "1"
+  skip_checkout:
+    description: "Skip checkout step when repo is already present (1 = skip, 0 = run)"
+    required: false
+    default: "0"
+
+  cache:
+    description: "Enable dependency caching in ps-node-bootstrap (if supported)"
+    required: false
+    default: "1"
+  install_dependencies:
+    description: "Run npm ci in ps-node-bootstrap (1 = on, 0 = off)"
+    required: false
+    default: "1"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Checkout (PS)
+      if: ${{ inputs.skip_checkout != '1' }}
+      uses: ./.github/actions/ps-checkout
+      with:
+        fetch_depth: ${{ inputs.fetch_depth }}
+        ref: ${{ inputs.ref }}
+
+    - name: Node bootstrap (PS)
+      uses: ./.github/actions/ps-node-bootstrap
+      with:
+        node_version: ${{ inputs.node_version }}
+        cache: ${{ inputs.cache }}
+        install_dependencies: ${{ inputs.install_dependencies }}
+
+    - name: Node setup complete
+      shell: bash
+      run: |
+        echo "PS.NODE_SETUP: OK"

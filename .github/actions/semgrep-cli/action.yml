@@ -1,0 +1,178 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Semgrep CLI (SARIF)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run Semgrep CLI and publish SARIF to GitHub code scanning.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: install Semgrep, scan, upload SARIF, enforce exit policy.
+#   - Does NOT: manage CodeQL or dependency scanning.
+#
+# Design Principles:
+#   - Deterministic version pinning
+#   - Non-interactive execution (no prompts/telemetry)
+#   - CI-safe SARIF upload
+#
+# Dependencies:
+#   - python3 + pip (runner-provided)
+#   - github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - Semgrep CLI (installed from PyPI)
+#   - tools/scripts/branding/validate-inputs.sh
+#
+# Dependents:
+#   - ./.github/workflows/security-scheduled.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: security workflows
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: requires security-events: write in the calling job
+#   - Constraints: SARIF must be uploaded even when findings exist
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: produces SARIF at inputs.output
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "Semgrep CLI (SARIF)"
+description: "Run Semgrep via CLI and upload SARIF to code scanning"
+
+inputs:
+  version:
+    description: "Pinned Semgrep version to install (e.g. 1.461.0)"
+    required: true
+  config:
+    description: "Semgrep config (e.g. p/ci or a local config path)"
+    required: false
+    default: "p/ci"
+  path:
+    description: "Scan path (relative to repo root)"
+    required: false
+    default: "."
+  output:
+    description: "SARIF output file path"
+    required: false
+    default: "semgrep.sarif"
+  fail_on_findings:
+    description: "If true, fail when Semgrep reports findings (exit 1)"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        validate_sh="${action_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          exit 1
+        fi
+        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        . "${validate_sh}"
+
+        version="${{ inputs.version }}"
+        fail_on_findings="${{ inputs.fail_on_findings }}"
+
+        require_nonempty "inputs.version" "${version}" || exit 1
+        require_regex \
+          "inputs.version" \
+          "${version}" \
+          '^[0-9]+\.[0-9]+\.[0-9]+$' \
+          "Use a pinned SemVer like 1.461.0." || exit 1
+        require_enum "inputs.fail_on_findings" "${fail_on_findings}" true false || exit 1
+
+        echo "PS.SEMGREP: version=${version}"
+        echo "PS.SEMGREP: config=${{ inputs.config }}"
+        echo "PS.SEMGREP: path=${{ inputs.path }}"
+        echo "PS.SEMGREP: output=${{ inputs.output }}"
+        echo "PS.SEMGREP: fail_on_findings=${fail_on_findings}"
+
+    - name: Install Semgrep (pinned)
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        if ! command -v python3 >/dev/null 2>&1; then
+          echo "ERROR: python3 is required to install Semgrep." >&2
+          exit 1
+        fi
+
+        # Non-interactive, deterministic install.
+        python3 -m pip install \
+          --disable-pip-version-check \
+          --no-input \
+          --no-cache-dir \
+          "semgrep==${{ inputs.version }}"
+
+        if ! command -v semgrep >/dev/null 2>&1; then
+          echo "ERROR: semgrep not found after installation." >&2
+          exit 1
+        fi
+
+    - name: Run Semgrep (produce SARIF)
+      shell: bash
+      env:
+        # Disable telemetry/metrics for CI determinism and privacy.
+        SEMGREP_SEND_METRICS: "off"
+      run: |
+        set -euo pipefail
+
+        # Semgrep exit codes:
+        # - 0: no findings
+        # - 1: findings (policy violation)
+        # - >1: error
+        semgrep_exit=0
+        semgrep \
+          --metrics=off \
+          --config="${{ inputs.config }}" \
+          --sarif \
+          --output "${{ inputs.output }}" \
+          "${{ inputs.path }}" \
+          || semgrep_exit=$?
+
+        if [[ ! -f "${{ inputs.output }}" ]]; then
+          echo "ERROR: SARIF output not found at '${{ inputs.output }}'." >&2
+          echo "HINT: Semgrep exited with code ${semgrep_exit} and did not produce SARIF." >&2
+          exit 1
+        fi
+
+        echo "${semgrep_exit}" > .semgrep-exit-code.txt
+
+    - name: Upload SARIF to code scanning
+      uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
+      with:
+        sarif_file: ${{ inputs.output }}
+
+    - name: Enforce Semgrep outcome
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        semgrep_exit="$(cat .semgrep-exit-code.txt 2>/dev/null || echo 2)"
+
+        # If Semgrep errored (>1), always fail.
+        if [[ "${semgrep_exit}" -gt 1 ]]; then
+          echo "ERROR: Semgrep failed with exit code ${semgrep_exit}." >&2
+          exit "${semgrep_exit}"
+        fi
+
+        # If findings (1), fail only if configured.
+        if [[ "${semgrep_exit}" -eq 1 && "${{ inputs.fail_on_findings }}" == "true" ]]; then
+          echo "ERROR: Semgrep reported findings (exit 1)." >&2
+          exit 1
+        fi
+
+        echo "PS.SEMGREP: completed (exit ${semgrep_exit})."
+        echo "PS.SEMGREP: OK"

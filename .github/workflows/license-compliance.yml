@@ -1,0 +1,192 @@
+# ==============================================================================
+# Political Sphere - Reusable Workflow: License Compliance
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Enforce OSS license compliance using the platform policy and lockfile data.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: validate dependency licenses and publish reports/logs artifacts.
+#   - Does NOT: deploy, release, or modify repository state.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege with explicit permissions
+#   - SHA-pinned actions only
+#   - Validate-CI gate runs first
+#
+# Dependencies:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/actions/ps-harden-runner
+#   - ./.github/actions/ps-node-bootstrap
+#   - ./.github/actions/license-check
+#   - ./.github/actions/ps-upload-artifacts
+#   - ./.github/actions/ps-write-summary
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+#
+# Dependents:
+#   - Downstream PS application repositories
+#
+# Execution Model:
+#   - Trigger: workflow_call (consumer-facing)
+#   - Reusable workflow (consumer-facing)
+#
+# Security & Policy Notes:
+#   - Secrets: optional NODE_AUTH_TOKEN for private registry access
+#   - Permissions: contents: read
+#   - Constraints: no deployments; no token writes
+#
+# Operational Notes:
+#   - Timeouts: defined per job in this workflow
+#   - Artifacts: reports/** and logs/** uploaded per policy
+#   - CI vs local: script uses lockfile data, no network calls
+#   - Node runtime: setup-node only; npm ci is intentionally skipped
+# ==============================================================================
+
+name: License Compliance
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        type: string
+        required: false
+        default: "ubuntu-22.04"
+
+      node_version:
+        description: "Node.js major version"
+        type: string
+        required: false
+        default: "22"
+
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        type: string
+        required: false
+        default: "1"
+
+      cache:
+        description: "Enable Node dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
+      policy_path:
+        description: "License policy path (repo-relative)"
+        type: string
+        required: false
+        default: "configs/security/license-policy.yml"
+
+      lock_path:
+        description: "Lockfile path (repo-relative)"
+        type: string
+        required: false
+        default: "package-lock.json"
+
+      report_dir:
+        description: "Report output directory (repo-relative)"
+        type: string
+        required: false
+        default: "reports/security"
+
+      log_dir:
+        description: "Log output directory (repo-relative)"
+        type: string
+        required: false
+        default: "logs/security"
+
+      retention_days:
+        description: "Artifact retention in days"
+        type: number
+        required: false
+        default: 7
+
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
+        required: false
+
+concurrency:
+  group: license-compliance-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  validate-ci:
+    name: Validate CI (policy gate)
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner }}
+      node_version: ${{ inputs.node_version }}
+      artifact_name: license-compliance-validate-ci
+      retention_days: ${{ inputs.retention_days }}
+    secrets:
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+  license:
+    name: License compliance
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Node runtime (PS)
+        uses: ./.github/actions/ps-node-bootstrap
+        with:
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "0"
+
+      - name: License compliance
+        uses: ./.github/actions/license-check
+        with:
+          policy_path: ${{ inputs.policy_path }}
+          lock_path: ${{ inputs.lock_path }}
+          report_dir: ${{ inputs.report_dir }}
+          log_dir: ${{ inputs.log_dir }}
+
+      - name: Write summary
+        if: always()
+        uses: ./.github/actions/ps-write-summary
+        with:
+          workflow: "license-compliance"
+          output_path: "reports/summary/license-compliance.json"
+          results: |
+            license=${{ job.status == 'success' && 'success' || 'failure' }}
+
+      - name: Upload report artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: license-compliance-report
+          path: |
+            reports/**
+            logs/**
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+      - name: Upload summary artifact
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: license-compliance-summary
+          path: reports/summary/license-compliance.json
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}

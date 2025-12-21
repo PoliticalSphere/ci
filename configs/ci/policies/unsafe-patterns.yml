@@ -1,0 +1,398 @@
+# ==============================================================================
+# Political Sphere — Unsafe Workflow Patterns (GitHub Actions)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Disallowed or high-risk patterns for GitHub Actions workflows.
+#   validate-ci blocks workflows that match these patterns unless an explicit,
+#   time-bounded exception exists in the allowlist registry.
+#
+# Design goals:
+#   - Default deny on high-risk patterns
+#   - Low false positives: match what we mean
+#   - Actionable output: every rule includes remediation guidance
+#   - AI-operable: consistent schema for parsing and reporting
+#
+# Enforcement model:
+#   - A pattern match => fail (per policy) unless allowlisted (by pattern id +
+#     selector) in the allowlist file.
+# ==============================================================================
+
+meta:
+  version: 1.2.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-19
+  review_interval_days: 180
+
+policy:
+  fail_on_match: true
+
+  allowlist:
+    file: configs/ci/exceptions/unsafe-patterns-allowlist.yml
+    # Allowlist must reference:
+    #   - pattern id (e.g., UP-011)
+    #   - selector (workflow_path + job_id + step_name/step_id where applicable)
+    require_risk_decision: true
+    risk_decisions_file: docs/risk-decisions.md
+    require_review_by: true
+
+  reporting:
+    max_findings_per_rule: 25
+    redact_secrets_in_output: true
+
+# ------------------------------------------------------------------------------
+# Patterns schema (normalised)
+# ------------------------------------------------------------------------------
+# match may contain any of:
+#   - workflow.on_events: [event,...]
+#   - step.uses: owner/name (no @ref)
+#   - step.with: { key: value, ... } (exact match on provided keys)
+#   - step.run_regex: [re2,...]
+#   - step.uses_regex: [re2,...]
+#   - job.any_run_regex: [re2,...]  (applies to any run: block in the job)
+#
+# Validators should treat *_regex as RE2-compatible.
+# ------------------------------------------------------------------------------
+
+patterns:
+  # ---------------------------------------------------------------------------
+  # Triggers / Events (injection and trust boundary issues)
+  # ---------------------------------------------------------------------------
+
+  - id: UP-001
+    enabled: true
+    category: triggers
+    title: "pull_request_target used"
+    severity: high
+    scope: workflow
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      pull_request_target runs in the context of the base repository and can
+      expose secrets and write-scoped tokens to untrusted PR code if misused.
+    match:
+      workflow:
+        on_events: [pull_request_target]
+    remediation: >
+      Prefer pull_request. If pull_request_target is unavoidable, restrict to
+      safe, read-only jobs, avoid checking out PR code, and allowlist only with
+      a documented risk decision.
+
+  - id: UP-002
+    enabled: true
+    category: triggers
+    title: "repository_dispatch used"
+    severity: high
+    scope: workflow
+    confidence: medium
+    false_positive_risk: low
+    rationale: >
+      repository_dispatch can be triggered externally; without strong controls
+      it can act as a remote execution entry point.
+    match:
+      workflow:
+        on_events: [repository_dispatch]
+    remediation: >
+      Avoid unless required. If needed, validate payload, restrict permissions,
+      and allowlist with a documented risk decision.
+
+  - id: UP-003
+    enabled: true
+    category: triggers
+    title: "workflow_run used"
+    severity: medium
+    scope: workflow
+    confidence: medium
+    false_positive_risk: low
+    rationale: >
+      workflow_run chains execution and can unintentionally elevate trust or
+      permissions across workflows.
+    match:
+      workflow:
+        on_events: [workflow_run]
+    remediation: >
+      Prefer explicit workflow_call. If workflow_run is used, restrict triggers,
+      restrict permissions, and allowlist only when necessary.
+
+  # ---------------------------------------------------------------------------
+  # Checkout & Git credentials
+  # ---------------------------------------------------------------------------
+
+  - id: UP-010
+    enabled: true
+    category: checkout
+    title: "Checkout persists credentials"
+    severity: medium
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Persisted git credentials can leak to later steps or be abused by
+      untrusted tooling in the job.
+    match:
+      step:
+        uses: actions/checkout
+        with:
+          persist-credentials: true
+    remediation: >
+      Set persist-credentials: false unless the job explicitly needs to push.
+      If pushing is required, scope permissions narrowly and isolate push steps.
+
+  - id: UP-011
+    enabled: true
+    category: checkout
+    title: "Checkout fetch-depth 0 without justification"
+    severity: low
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Full history increases runtime cost; it is sometimes needed (e.g. release
+      tags, changelogs, full-history secret scans) but should be explicit.
+    match:
+      step:
+        uses: actions/checkout
+        with:
+          fetch-depth: 0
+    remediation: >
+      Use fetch-depth: 1 by default. Allowlist only when full history is
+      required and document why.
+
+  # ---------------------------------------------------------------------------
+  # Shell execution hazards
+  # ---------------------------------------------------------------------------
+
+  - id: UP-020
+    enabled: true
+    category: shell
+    title: "curl/wget piped to shell"
+    severity: high
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Piping remote content directly into a shell is remote code execution with
+      weak integrity guarantees.
+    match:
+      step:
+        run_regex:
+          - "(?m)\\b(curl|wget)\\b[^\\n]*\\|\\s*(sh|bash)\\b"
+    remediation: >
+      Vendor scripts into the repo or download with checksum/signature
+      verification. Prefer package managers with lockfiles and pinned versions.
+
+  - id: UP-020B
+    enabled: true
+    category: shell
+    title: "PowerShell download piped to Invoke-Expression"
+    severity: high
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Piping remote content into Invoke-Expression (iex) executes untrusted
+      code with weak integrity guarantees.
+    match:
+      step:
+        run_regex:
+          - "(?mi)\\b(iwr|invoke-webrequest|curl|wget)\\b[^\\n]*\\|\\s*(iex|invoke-expression)\\b"
+    remediation: >
+      Download scripts to disk, verify checksums/signatures, and execute a
+      pinned local file. Prefer package managers with lockfiles.
+
+  - id: UP-021
+    enabled: true
+    category: shell
+    title: "Untrusted PR fields interpolated into run commands"
+    severity: high
+    scope: step
+    confidence: medium
+    false_positive_risk: medium
+    rationale: >
+      PR titles, bodies, and branch names are user-controlled and can enable
+      command injection or log spoofing when interpolated into shell commands.
+    match:
+      step:
+        run_regex:
+          - "\\${{\\s*github\\.event\\.pull_request\\.(title|body|head\\.ref)\\s*}}"
+          - "\\${{\\s*github\\.head_ref\\s*}}"
+    remediation: >
+      Do not interpolate untrusted fields into shell commands. Pass data via
+      files or JSON, validate/escape strictly, and avoid eval-like constructs.
+
+  - id: UP-022
+    enabled: true
+    category: shell
+    title: "Use of eval in run commands"
+    severity: high
+    scope: step
+    confidence: high
+    false_positive_risk: medium
+    rationale: >
+      eval executes constructed strings and magnifies injection risks.
+    match:
+      step:
+        run_regex:
+          - "(?m)\\beval\\b"
+    remediation: >
+      Remove eval. Use direct commands or well-scoped scripts with strict input
+      validation.
+
+  # ---------------------------------------------------------------------------
+  # Secrets handling / logging
+  # ---------------------------------------------------------------------------
+
+  - id: UP-030
+    enabled: true
+    category: secrets
+    title: "Secrets interpolated directly into run commands"
+    severity: high
+    scope: step
+    confidence: high
+    false_positive_risk: medium
+    rationale: >
+      Direct interpolation of secrets into command strings risks log leakage,
+      process listing exposure, and accidental artifact capture.
+    match:
+      step:
+        run_regex:
+          - "\\${{\\s*secrets\\.[A-Za-z0-9_]+\\s*}}"
+    remediation: >
+      Prefer env: for secrets. Avoid echoing, disable xtrace around sensitive
+      steps, and ensure logs/artifacts do not capture secret material.
+
+  - id: UP-031
+    enabled: true
+    category: secrets
+    title: "Debug tracing (set -x) used"
+    severity: high
+    scope: job
+    confidence: medium
+    false_positive_risk: medium
+    rationale: >
+      Shell xtrace (set -x) can print expanded variables (including secrets)
+      to logs.
+    match:
+      job:
+        any_run_regex:
+          - "(?m)\\bset\\s+-x\\b"
+    remediation: >
+      Avoid set -x. If absolutely required, ensure it is disabled (set +x)
+      before any secret is accessed, and allowlist only with a risk decision.
+
+  # ---------------------------------------------------------------------------
+  # Containers / images / determinism
+  # ---------------------------------------------------------------------------
+
+  - id: UP-040
+    enabled: true
+    category: containers
+    title: "Docker image uses :latest"
+    severity: medium
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      :latest is mutable and breaks determinism; it also increases supply-chain
+      risk.
+    match:
+      step:
+        run_regex:
+          - "(?mi)\\bdocker\\s+run\\b[^\\n]*:[Ll]atest\\b"
+          - "(?mi)\\bimage:\\s*.+:[Ll]atest\\b"
+    remediation: >
+      Pin images by digest (recommended) or at least by version tag. Prefer
+      immutable digests for CI-critical steps.
+
+  - id: UP-041
+    enabled: true
+    category: containers
+    title: "Docker image referenced without tag or digest"
+    severity: medium
+    scope: step
+    confidence: medium
+    false_positive_risk: medium
+    rationale: >
+      Untagged images default to :latest, which is mutable and non-deterministic.
+    match:
+      step:
+        run_regex:
+          - "(?m)\\bdocker\\s+run\\b\\s+[A-Za-z0-9./_-]+\\s*(\\n|$)"
+    remediation: >
+      Always specify an explicit tag or digest. Prefer digests for critical CI.
+
+  # ---------------------------------------------------------------------------
+  # Actions supply-chain integrity (overlaps with actions-allowlist policy)
+  # ---------------------------------------------------------------------------
+
+  - id: UP-050
+    enabled: true
+    category: actions
+    title: "Actions referenced without an explicit ref"
+    severity: high
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Actions must be pinned to an immutable ref (full-length commit SHA) to
+      prevent upstream changes from silently altering behaviour.
+    match:
+      step:
+        uses_regex:
+          - "^[A-Za-z0-9_.-]+\\/[A-Za-z0-9_.-]+$"   # owner/name with no @ref
+    remediation: >
+      Pin all third-party actions to a full-length commit SHA and ensure the
+      repo is allowlisted.
+
+  - id: UP-050B
+    enabled: true
+    category: actions
+    title: "Actions referenced with mutable refs (tags/branches)"
+    severity: high
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Tags and branches are mutable; they can change without warning and break
+      determinism or introduce supply-chain risk.
+    match:
+      step:
+        uses_regex:
+          - "@(main|master|head|develop|development|release|stable)$"
+          - "@v[0-9]+(\\.[0-9]+){0,2}$"
+          - "@v[0-9]+\\.[0-9]+\\.[0-9]+(-[A-Za-z0-9._-]+)?$"
+    remediation: >
+      Pin actions to a full-length commit SHA and ensure the repo is allowlisted.
+
+  - id: UP-051
+    enabled: true
+    category: actions
+    title: "Local actions must use ./ prefix"
+    severity: low
+    scope: step
+    confidence: high
+    false_positive_risk: low
+    rationale: >
+      Enforces clarity and prevents accidental remote resolution assumptions.
+    match:
+      step:
+        uses_regex:
+          - "^\\.github\\/actions\\/"               # missing leading './'
+    remediation: >
+      Use local actions via a relative path, e.g. './.github/actions/<name>'.
+
+schema_notes:
+  regex_flavor: RE2
+  enums:
+    severity: [low, medium, high, critical]
+    scope: [workflow, job, step]
+  required_fields:
+    - id
+    - enabled
+    - category
+    - title
+    - severity
+    - scope
+    - rationale
+    - match
+    - remediation

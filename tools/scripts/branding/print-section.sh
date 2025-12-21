@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Political Sphere — Section Printer
+# ------------------------------------------------------------------------------
+# Usage:
+#   print-section <id> <title> [description]
+#
+# Example:
+#   print-section "lint.biome" "Biome lint" "Formatting and correctness checks"
+# ==============================================================================
+
+id="${1:-}"
+title="${2:-}"
+description="${3:-}"
+
+if [[ -z "${id}" || -z "${title}" ]]; then
+  echo "ERROR: print-section requires <id> and <title>" >&2
+  exit 1
+fi
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+format_sh="${script_dir}/format.sh"
+# shellcheck source=tools/scripts/branding/format.sh
+. "${format_sh}"
+
+ICON="${PS_FMT_ICON}"
+SEPARATOR="${PS_FMT_SEPARATOR}"
+DETAIL_INDENT="${PS_FMT_DETAIL_INDENT}"
+ID_CASE="${PS_FMT_SECTION_ID_CASE}"
+
+# Normalise ID for machine readability.
+case "${ID_CASE}" in
+  upper)
+    section_id="$(echo "${id}" | tr '[:lower:]' '[:upper:]')"
+    ;;
+  lower)
+    section_id="$(echo "${id}" | tr '[:upper:]' '[:lower:]')"
+    ;;
+  *)
+    section_id="${id}"
+    ;;
+esac
+
+echo
+if ps_supports_color; then
+  C_RESET="\033[0m"
+  C_BOLD="\033[1m"
+  C_DIM="\033[2m"
+  C_CYAN="\033[36m"
+  C_GREEN="\033[32m"
+  printf "%b%s%b %b%s%b %s %b%s%b\n" \
+    "${C_GREEN}" "${ICON}" "${C_RESET}" \
+    "${C_BOLD}${C_CYAN}" "${section_id}" "${C_RESET}" \
+    "${SEPARATOR}" "${C_BOLD}" "${title}" "${C_RESET}"
+else
+  echo "${ICON} ${section_id} ${SEPARATOR} ${title}"
+fi
+
+if [[ -n "${description}" ]]; then
+  if ps_supports_color; then
+    printf "%b%s%s%b\n" "${C_DIM}" "${DETAIL_INDENT}" "${description}" "${C_RESET}"
+  else
+    echo "${DETAIL_INDENT}${description}"
+  fi
+fi

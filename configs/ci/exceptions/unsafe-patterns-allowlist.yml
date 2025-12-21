@@ -1,0 +1,63 @@
+# ==============================================================================
+# Political Sphere — Unsafe Patterns Exceptions Registry
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Govern narrowly-scoped exceptions to Validate-CI "unsafe pattern" rules.
+#   Validate-CI MUST fail on unsafe patterns unless an explicit, time-bounded
+#   exception is recorded here.
+#
+# Design:
+#   - Exception-driven governance (defense-in-depth)
+#   - Explicit rationale + traceable risk decision
+#   - Time-bounded approvals (review_by)
+#   - Precise selectors (minimise blast radius)
+#
+# Notes:
+#   - IDs MUST be unique.
+#   - Exceptions MUST be reviewed before review_by; expired exceptions SHOULD fail CI.
+#   - Prefer stable selectors (step_id) over step_name where possible.
+# ==============================================================================
+
+meta:
+  version: 1.1.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-19
+  review_interval_days: 180
+
+allowlist:
+  - id: UP-011
+    status: active
+    selector:
+      workflow_path: .github/workflows/security-scheduled.yml
+      job_id: secrets
+      step_name: "Hardened checkout (PS)"
+    rule: "checkout-full-history"
+    rationale: "Full history required for gitleaks full-history scan."
+    risk_decision_id: RD-2025-001
+    approved_by: security
+    review_by: 2026-12-19
+
+  - id: UP-013
+    status: active
+    selector:
+      workflow_path: .github/workflows/security-scheduled.yml
+      job_id: trufflehog
+      step_name: "Hardened checkout (PS)"
+    rule: "checkout-full-history"
+    rationale: "Full history required for TruffleHog full-history scan."
+    risk_decision_id: RD-2025-001
+    approved_by: security
+    review_by: 2026-12-19
+
+  - id: UP-012
+    status: active
+    selector:
+      workflow_path: .github/workflows/release.yml
+      job_id: release
+      step_name: "Checkout (full history, PS)"
+    rule: "checkout-full-history"
+    rationale: "Full history required for release tag generation and changelog context."
+    risk_decision_id: RD-2025-001
+    approved_by: release
+    review_by: 2026-12-19
