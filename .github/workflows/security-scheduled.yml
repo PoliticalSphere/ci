@@ -78,6 +78,11 @@ on:
         required: false
         default: "1"
         type: string
+      platform_ref:
+        description: "Platform repository ref for shared scripts/configs"
+        required: false
+        default: "main"
+        type: string
       codeql_languages:
         description: "CodeQL languages (comma-separated, e.g. javascript,python)"
         required: false
@@ -105,6 +110,11 @@ on:
         description: "Enable dependency caching (1 = on, 0 = off)"
         required: false
         default: "1"
+        type: string
+      platform_ref:
+        description: "Platform repository ref for shared scripts/configs"
+        required: false
+        default: "main"
         type: string
       codeql_languages:
         description: "CodeQL languages (comma-separated, e.g. javascript,python)"
@@ -154,6 +164,10 @@ jobs:
         '1' }}
       artifact_name: security-scheduled-validate-ci
       retention_days: 7
+      platform_ref: >-
+        ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+        (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+        'main' }}
 
   secrets:
     name: Secrets scan (full history)
@@ -165,11 +179,24 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Hardened checkout (PS)
         uses: ./.github/actions/ps-hardened-checkout
         with:
           fetch_depth: "0"
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Install security tools (PS)
         uses: ./.github/actions/ps-security-tools
@@ -204,9 +231,22 @@ jobs:
       contents: read
       security-events: write
     timeout-minutes: 30
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -248,9 +288,22 @@ jobs:
       contents: read
       security-events: write
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -285,9 +338,22 @@ jobs:
       security-events: write
       # id-token is only required when publish_results: true in v2+.
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -325,17 +391,30 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Hardened checkout (PS)
         uses: ./.github/actions/ps-hardened-checkout
         with:
           fetch_depth: "0"
 
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
+
       - name: Prepare report directory
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/scripts/branding/print-section.sh "secrets.trufflehog" \
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "secrets.trufflehog" \
             "Prepare report directory" "Ensure report output path exists"
           mkdir -p reports/security
 
@@ -366,9 +445,22 @@ jobs:
       contents: read
       security-events: write
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -409,9 +501,22 @@ jobs:
     if: ${{ always() }}
     permissions:
       contents: read
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: >-
+            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
+            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
+            'main' }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -443,5 +548,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/scripts/branding/print-section.sh "security.scheduled" "Security scheduled complete"
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "security.scheduled" "Security scheduled complete"
           echo "PS.SECURITY_SCHEDULED: OK"

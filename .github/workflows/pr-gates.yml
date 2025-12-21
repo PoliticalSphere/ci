@@ -87,6 +87,12 @@ on:
         required: false
         default: "1"
 
+      platform_ref:
+        description: "Platform repository ref for shared scripts/configs"
+        type: string
+        required: false
+        default: "main"
+
       retention_days:
         description: "Artifact retention in days"
         type: number
@@ -182,6 +188,7 @@ jobs:
       node_version: ${{ inputs.node_version }}
       artifact_name: pr-gates-validate-ci
       retention_days: ${{ inputs.retention_days }}
+      platform_ref: ${{ inputs.platform_ref }}
     secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -192,11 +199,21 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Point HOME at workspace temp
         shell: bash
@@ -242,11 +259,21 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Point HOME at workspace temp
         shell: bash
@@ -289,11 +316,21 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Point HOME at workspace temp
         shell: bash
@@ -354,11 +391,21 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Point HOME at workspace temp
         shell: bash
@@ -401,11 +448,21 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 20
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Point HOME at workspace temp
         shell: bash
@@ -448,11 +505,21 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 10
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -481,11 +548,21 @@ jobs:
       contents: read
       pull-requests: read
     timeout-minutes: 10
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -522,11 +599,21 @@ jobs:
       contents: read
       issues: write  # justification: post failure comment to PR (issues API)
     timeout-minutes: 10
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
@@ -559,7 +646,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/scripts/branding/print-section.sh "pr.gates" "PR gates complete"
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "pr.gates" "PR gates complete"
           echo "PS.PR_GATES: OK"
 
   summary:
@@ -569,11 +656,21 @@ jobs:
     if: ${{ always() }}
     permissions:
       contents: read
+    env:
+      PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
       - name: Checkout repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
 
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
