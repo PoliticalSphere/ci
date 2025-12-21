@@ -29,3 +29,5 @@ jobs:
       node_version: '22'
     permissions:
       contents: read
+      pull-requests: read
+      issues: write
