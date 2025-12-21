@@ -131,20 +131,18 @@ jobs:
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
-    # Ensure HOME points to the runner temp directory so actions that
-    # write to $HOME during post/cleanup phases have a valid, writable
-    # location (fixes harden-runner ENOENT in post step).
+    # Ensure HOME points to a writable directory for actions that rely on it.
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
       PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
     timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Hardened checkout (PS)
+        uses: ./.github/actions/ps-hardened-checkout
         with:
           ref: ${{ inputs.checkout_ref }}
-          fetch-depth: ${{ inputs.fetch_depth }}
+          fetch_depth: ${{ inputs.fetch_depth }}
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -157,13 +155,11 @@ jobs:
       - name: Point HOME at workspace temp
         shell: bash
         run: |
+          set -euo pipefail
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "runner.home" "Prepare HOME directory"
           mkdir -p "${GITHUB_WORKSPACE}/.home"
           echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
-
-      - name: Harden runner (PS)
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
-        with:
-          egress-policy: audit
 
       - name: Prepare runner (PS)
         uses: ./.github/actions/ps-setup
@@ -183,6 +179,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "ci.platform" "Install platform dependencies"
           if [[ ! -d "${PS_PLATFORM_ROOT}" ]]; then
             echo "ERROR: PS_PLATFORM_ROOT not found at ${PS_PLATFORM_ROOT}" >&2
             exit 1
@@ -209,18 +207,6 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          section_script=""
-          for candidate in \
-            "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "${GITHUB_WORKSPACE}/tools/scripts/branding/print-section.sh"; do
-            if [[ -f "${candidate}" ]]; then
-              section_script="${candidate}"
-              break
-            fi
-          done
-          if [[ -z "${section_script}" ]]; then
-            echo "ERROR: print-section.sh not found in platform or workspace." >&2
-            exit 1
-          fi
-          bash "${section_script}" "ci.validate" "Validate-CI complete"
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "ci.validate" "Validate-CI complete"
           echo "PS.VALIDATE_CI: OK"

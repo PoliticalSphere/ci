@@ -234,8 +234,8 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Hardened checkout (PS)
+        uses: ./.github/actions/ps-hardened-checkout
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -247,9 +247,6 @@ jobs:
             'main' }}
           path: .ps-platform
           fetch-depth: 1
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
@@ -291,8 +288,8 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Hardened checkout (PS)
+        uses: ./.github/actions/ps-hardened-checkout
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -304,9 +301,6 @@ jobs:
             'main' }}
           path: .ps-platform
           fetch-depth: 1
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Run Semgrep (SARIF)
         uses: ./.github/actions/semgrep-cli
@@ -341,8 +335,8 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Hardened checkout (PS)
+        uses: ./.github/actions/ps-hardened-checkout
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -354,9 +348,6 @@ jobs:
             'main' }}
           path: .ps-platform
           fetch-depth: 1
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Run Scorecard (SARIF)
         uses: ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2  # v2.4.3
@@ -448,8 +439,8 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Hardened checkout (PS)
+        uses: ./.github/actions/ps-hardened-checkout
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -461,9 +452,6 @@ jobs:
             'main' }}
           path: .ps-platform
           fetch-depth: 1
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Install security tools (PS)
         uses: ./.github/actions/ps-security-tools
@@ -504,8 +492,8 @@ jobs:
     env:
       PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Hardened checkout (PS)
+        uses: ./.github/actions/ps-hardened-checkout
 
       - name: Checkout platform repository
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
@@ -517,9 +505,6 @@ jobs:
             'main' }}
           path: .ps-platform
           fetch-depth: 1
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
