@@ -72,11 +72,13 @@ runs:
         ls -la "${GITHUB_WORKSPACE}/.ps-platform" || true
 
         action_root="${GITHUB_ACTION_PATH}"
-        platform_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}/.ps-platform}"
+        : "${PS_PLATFORM_ROOT:?PS_PLATFORM_ROOT must be set by the workflow (path to checked-out platform repo)}"
+
+        platform_root="${PS_PLATFORM_ROOT}"
         echo "DEBUG: platform_root=${platform_root}"
+
         if [[ ! -d "${platform_root}" ]]; then
-          echo "ERROR: platform_root directory not found: ${platform_root}" >&2
-          echo "HINT: ensure the workflow checks out the platform repo into .ps-platform and exports PS_PLATFORM_ROOT." >&2
+          echo "ERROR: PS_PLATFORM_ROOT directory not found: ${platform_root}" >&2
           exit 1
         fi
 
