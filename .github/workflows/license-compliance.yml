@@ -105,6 +105,9 @@ on:
         required: false
         default: 7
 
+  pull_request:
+    types: [opened, reopened, synchronize]
+
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
