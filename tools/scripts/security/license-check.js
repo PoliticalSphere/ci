@@ -12,7 +12,7 @@ import path from 'node:path';
 
 import yaml from 'yaml';
 
-import { bullet, detail, fatal, section } from '../ci/validate-ci/console.js';
+import { detail, fatal } from '../ci/validate-ci/console.js';
 import { parseArgs, readText, resolvePath, writeOutputs } from '../lib/cli.js';
 
 function normalizeLicense(raw) {
@@ -120,85 +120,33 @@ function resolvePackagePolicy(basePolicy, name) {
   };
 }
 
-function matchDetails(list, regexes, value) {
+function matches(list, regexes, value) {
   const normalized = value.toLowerCase();
-  for (const item of list) {
-    if (String(item).toLowerCase() === normalized) {
-      return { matched: true, type: 'exact', pattern: String(item) };
-    }
+  if (list.some((item) => String(item).toLowerCase() === normalized)) {
+    return true;
   }
-  for (const rx of regexes) {
-    if (rx.test(value)) {
-      return { matched: true, type: 'regex', pattern: rx.source };
-    }
-  }
-  return { matched: false, type: '', pattern: '' };
-}
-
-function evaluateSimpleLicense(policy, license) {
-  // Trim outer parentheses and whitespace
-  const tokens = String(license).trim().replace(/^\(+|\)+$/g, '').trim();
-  if (!tokens) return { ok: false, reason: 'missing-license', match: null };
-
-  if (/^SEE LICENSE IN/i.test(tokens)) {
-    return policy.allowFileReference
-      ? { ok: true, reason: 'file-reference-allowed', match: null }
-      : { ok: false, reason: 'file-reference-disallowed', match: null };
-  }
-
-  const denyMatch = matchDetails(policy.denylist, policy.denyRegex, tokens);
-  if (denyMatch.matched) {
-    return { ok: false, reason: 'denied-license', match: denyMatch };
-  }
-
-  if (policy.mode === 'denylist') {
-    return { ok: true, reason: 'allow-by-default', match: null };
-  }
-
-  const allowMatch = matchDetails(policy.allowlist, policy.allowRegex, tokens);
-  if (allowMatch.matched) {
-    return { ok: true, reason: 'allowlisted-license', match: allowMatch };
-  }
-
-  return { ok: false, reason: 'not-allowlisted', match: null };
+  return regexes.some((rx) => rx.test(value));
 }
 
 function evaluateLicense(policy, license) {
   if (!license) {
-    return { ok: false, reason: 'missing-license', match: null };
+    return { ok: false, reason: 'missing-license' };
   }
-
-  // Normalize parentheses and common separators then evaluate expressions
-  // Support simple SPDX expressions using OR / AND (case-insensitive)
-  const raw = String(license).trim();
-  // If it contains OR/AND, handle as an expression
-  if (/\bOR\b/i.test(raw) || /\bAND\b/i.test(raw)) {
-    // Remove outer parentheses if present
-    const expr = raw.replace(/^\(+|\)+$/g, '').trim();
-
-    // Handle OR expressions first: if any branch is allowed, pass
-    if (/\bOR\b/i.test(expr)) {
-      const parts = expr.split(/\s+OR\s+/i).map((p) => p.trim());
-      for (const part of parts) {
-        const res = evaluateSimpleLicense(policy, part);
-        if (res.ok) return { ok: true, reason: 'allowlisted-expression', match: res.match };
-      }
-      return { ok: false, reason: 'not-allowlisted', match: null };
-    }
-
-    // Handle AND expressions: all branches must be allowed
-    if (/\bAND\b/i.test(expr)) {
-      const parts = expr.split(/\s+AND\s+/i).map((p) => p.trim());
-      for (const part of parts) {
-        const res = evaluateSimpleLicense(policy, part);
-        if (!res.ok) return { ok: false, reason: 'not-allowlisted', match: null };
-      }
-      return { ok: true, reason: 'allowlisted-expression', match: null };
-    }
+  if (/^SEE LICENSE IN/i.test(license)) {
+    return policy.allowFileReference
+      ? { ok: true, reason: 'file-reference-allowed' }
+      : { ok: false, reason: 'file-reference-disallowed' };
   }
-
-  // Fallback: single token evaluation
-  return evaluateSimpleLicense(policy, license);
+  if (matches(policy.denylist, policy.denyRegex, license)) {
+    return { ok: false, reason: 'denied-license' };
+  }
+  if (policy.mode === 'denylist') {
+    return { ok: true, reason: 'allow-by-default' };
+  }
+  if (matches(policy.allowlist, policy.allowRegex, license)) {
+    return { ok: true, reason: 'allowlisted-license' };
+  }
+  return { ok: false, reason: 'not-allowlisted' };
 }
 
 function collectPackages(lockData) {
@@ -306,7 +254,6 @@ for (const pkg of packages) {
       version: pkg.version,
       license: pkg.license || 'UNKNOWN',
       reason: 'missing-license',
-      match: null,
     });
     unknown.push(pkg);
     continue;
@@ -324,7 +271,6 @@ for (const pkg of packages) {
         version: pkg.version,
         license: pkg.license,
         reason: evaluation.reason,
-        match: evaluation.match,
       });
     } else if (evaluation.reason === 'not-allowlisted') {
       unknown.push(pkg);
@@ -334,7 +280,6 @@ for (const pkg of packages) {
         version: pkg.version,
         license: pkg.license,
         reason: evaluation.reason,
-        match: evaluation.match,
       });
     }
   } else {
@@ -353,12 +298,8 @@ const summaryLines = [
 if (violations.length > 0) {
   summaryLines.push('', 'Violations:');
   for (const v of violations) {
-    const matchInfo =
-      v.match?.matched
-        ? ` [match: ${v.match.type} ${v.match.pattern}]`
-        : '';
     summaryLines.push(
-      `- ${v.name}@${v.version || 'unknown'}: ${v.license} (${v.reason})${matchInfo}`,
+      `- ${v.name}@${v.version || 'unknown'}: ${v.license} (${v.reason})`,
     );
   }
 }
@@ -385,20 +326,6 @@ writeOutputs({
 });
 
 if (violations.length > 0) {
-  section(
-    'security.license',
-    'License violations',
-    `Total violations: ${violations.length}`,
-  );
-  for (const v of violations) {
-    const matchInfo =
-      v.match?.matched
-        ? ` [match: ${v.match.type} ${v.match.pattern}]`
-        : '';
-    bullet(
-      `${v.name}@${v.version || 'unknown'}: ${v.license} (${v.reason})${matchInfo}`,
-    );
-  }
   fatal(`${violations.length} license violation(s) found.`);
 }
 

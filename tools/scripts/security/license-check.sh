@@ -49,10 +49,6 @@ fi
 
 mkdir -p "${report_dir}" "${log_dir}"
 
-if [[ -t 1 ]]; then
-  export FORCE_COLOR="1"
-fi
-
 node "${repo_root}/tools/scripts/security/license-check.js" \
   --policy "${policy_path}" \
   --lock "${lock_path}" \
