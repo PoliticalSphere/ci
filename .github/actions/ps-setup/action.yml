@@ -53,6 +53,10 @@ inputs:
     description: "Git fetch depth (1 = shallow, 0 = full history)"
     required: false
     default: "1"
+  skip_checkout:
+    description: "Skip checkout when repo is already present (1 = skip, 0 = run)"
+    required: false
+    default: "0"
   cache:
     description: "Enable dependency caching in ps-node-bootstrap (1 = on, 0 = off)"
     required: false
@@ -88,6 +92,7 @@ runs:
         node_version: ${{ inputs.node_version }}
         ref: ${{ inputs.ref }}
         fetch_depth: ${{ inputs.fetch_depth }}
+        skip_checkout: ${{ inputs.skip_checkout }}
         cache: ${{ inputs.cache }}
         install_dependencies: ${{ inputs.install_dependencies }}
 

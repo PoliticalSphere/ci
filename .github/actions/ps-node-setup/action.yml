@@ -61,6 +61,10 @@ inputs:
     description: "Git fetch depth (1 = shallow, 0 = full history)"
     required: false
     default: "1"
+  skip_checkout:
+    description: "Skip checkout step when repo is already present (1 = skip, 0 = run)"
+    required: false
+    default: "0"
 
   cache:
     description: "Enable dependency caching in ps-node-bootstrap (if supported)"
@@ -75,6 +79,7 @@ runs:
   using: "composite"
   steps:
     - name: Checkout (PS)
+      if: ${{ inputs.skip_checkout != '1' }}
       uses: ./.github/actions/ps-checkout
       with:
         fetch_depth: ${{ inputs.fetch_depth }}

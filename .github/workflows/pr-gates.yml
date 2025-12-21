@@ -36,6 +36,7 @@
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary
 #   - actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
 #   - tools/scripts/branding/print-section.sh
 #
 # Dependents:
@@ -187,12 +188,18 @@ jobs:
       contents: read
     timeout-minutes: 15
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
         with:
           node_version: ${{ inputs.node_version }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -219,12 +226,18 @@ jobs:
       contents: read
     timeout-minutes: 15
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
         with:
           node_version: ${{ inputs.node_version }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -248,12 +261,18 @@ jobs:
       contents: read
     timeout-minutes: 20
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
         with:
           node_version: ${{ inputs.node_version }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -295,12 +314,18 @@ jobs:
       contents: read
     timeout-minutes: 20
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
         with:
           node_version: ${{ inputs.node_version }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -324,12 +349,18 @@ jobs:
       contents: read
     timeout-minutes: 20
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
         with:
           node_version: ${{ inputs.node_version }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
@@ -353,11 +384,13 @@ jobs:
       contents: read
     timeout-minutes: 10
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
-
-      - name: Checkout (PS)
-        uses: ./.github/actions/ps-checkout
 
       - name: Install security tools (PS)
         uses: ./.github/actions/ps-security-tools
@@ -384,6 +417,11 @@ jobs:
       pull-requests: read
     timeout-minutes: 10
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
 
@@ -416,6 +454,11 @@ jobs:
       issues: write  # justification: post failure comment to PR (issues API)
     timeout-minutes: 10
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
 
@@ -458,6 +501,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
 

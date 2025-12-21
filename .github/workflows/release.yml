@@ -21,10 +21,10 @@
 # Dependencies:
 #   - ./.github/workflows/validate-ci.yml
 #   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-checkout
 #   - ./.github/actions/ps-run
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
 #   - tools/scripts/branding/print-section.sh
 #
 # Dependents:
@@ -114,14 +114,14 @@ jobs:
       contents: write  # justification: release publishing requires tag + release creation
     timeout-minutes: 15
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+          ref: ${{ inputs.release_ref }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
-
-      - name: Checkout (full history, PS)
-        uses: ./.github/actions/ps-checkout
-        with:
-          fetch_depth: ${{ inputs.fetch_depth }}
-          ref: ${{ inputs.release_ref }}
 
       - name: Publish release (PS)
         uses: ./.github/actions/ps-run
@@ -162,6 +162,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
 

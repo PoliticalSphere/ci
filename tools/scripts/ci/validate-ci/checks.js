@@ -289,11 +289,20 @@ function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps }) {
   const first = job.steps[0];
   const uses = first.uses || '';
   const allowlist = Array.isArray(allowedFirstSteps) ? allowedFirstSteps : [];
-  const hardenOk =
+  const isHardenStep = (value) =>
     allowlist.some((entry) =>
-      entry.endsWith('@') ? uses.startsWith(entry) : uses === entry,
-    ) || uses.startsWith('step-security/harden-runner@');
-  if (!hardenOk) {
+      entry.endsWith('@') ? value.startsWith(entry) : value === entry,
+    ) || value.startsWith('step-security/harden-runner@');
+
+  const isCheckoutStep = (value) => value.startsWith('actions/checkout@');
+
+  const hardenOk = isHardenStep(uses);
+  const checkoutBootstrapOk =
+    isCheckoutStep(uses) &&
+    job.steps.length > 1 &&
+    isHardenStep(job.steps[1].uses || '');
+
+  if (!hardenOk && !checkoutBootstrapOk) {
     const line = first.startLine || job.startLine || 1;
     const col = first.startColumn || job.startColumn || null;
     violations.push(

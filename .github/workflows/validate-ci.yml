@@ -22,6 +22,7 @@
 #   - ./.github/actions/ps-setup
 #   - ./.github/actions/ci-validate
 #   - ./.github/actions/ps-upload-artifacts
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
 #   - tools/scripts/branding/print-section.sh
 #
 # Dependents:
@@ -115,6 +116,12 @@ jobs:
       PS_VALIDATE_CI_VERIFY_REMOTE: "1"
     timeout-minutes: 10
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          ref: ${{ inputs.checkout_ref }}
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Prepare runner (PS)
         uses: ./.github/actions/ps-setup
         with:
@@ -122,6 +129,7 @@ jobs:
           ref: ${{ inputs.checkout_ref }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 

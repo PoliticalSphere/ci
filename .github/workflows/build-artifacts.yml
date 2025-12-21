@@ -24,6 +24,7 @@
 #   - ./.github/actions/build
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary
+#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
 #   - tools/scripts/branding/print-section.sh
 #
 # Dependents:
@@ -154,12 +155,18 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Prepare runner (PS)
         uses: ./.github/actions/ps-setup
         with:
           node_version: ${{ inputs.node_version }}
           fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
+          skip_checkout: "1"
 
       - name: Build (PS)
         uses: ./.github/actions/build
@@ -192,6 +199,11 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
       - name: Harden runner (PS)
         uses: ./.github/actions/ps-harden-runner
 
