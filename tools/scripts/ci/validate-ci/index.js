@@ -20,7 +20,7 @@ import yaml from 'yaml';
 
 import { scanActions, scanWorkflows } from './checks.js';
 import { bullet, detail, fatal, section } from './console.js';
-import { getRepoRoot } from './env.js';
+import { getRepoRoot, isCI } from './env.js';
 import { listActionMetadata, listWorkflows, loadText } from './fs.js';
 import {
   loadAllowlist,
