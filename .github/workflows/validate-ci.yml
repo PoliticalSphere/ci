@@ -111,9 +111,13 @@ jobs:
     runs-on: ${{ inputs.runner }}
     permissions:
       contents: read
+    # Ensure HOME points to the runner temp directory so actions that
+    # write to $HOME during post/cleanup phases have a valid, writable
+    # location (fixes harden-runner ENOENT in post step).
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       PS_VALIDATE_CI_VERIFY_REMOTE: "1"
+      HOME: ${{ runner.temp }}
     timeout-minutes: 10
     steps:
       - name: Checkout repository
