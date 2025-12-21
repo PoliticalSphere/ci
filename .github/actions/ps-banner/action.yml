@@ -64,7 +64,7 @@ runs:
         banner_script=""
         for candidate in \
           "${platform_root}/tools/scripts/branding/print-banner.sh" \
-          "${action_root}/tools/scripts/branding/print-banner.sh" \
+          "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-banner.sh" \
           "${workspace_root}/tools/scripts/branding/print-banner.sh"; do
           if [[ -f "${candidate}" ]]; then
             banner_script="${candidate}"
@@ -77,7 +77,7 @@ runs:
           if [[ -n "${platform_root}" ]]; then
             echo "Tried: ${platform_root}/tools/scripts/branding/print-banner.sh" >&2
           fi
-          echo "Tried: ${action_root}/tools/scripts/branding/print-banner.sh" >&2
+          echo "Tried: ${PS_PLATFORM_ROOT}/tools/scripts/branding/print-banner.sh" >&2
           if [[ -n "${workspace_root}" ]]; then
             echo "Tried: ${workspace_root}/tools/scripts/branding/print-banner.sh" >&2
           fi
@@ -87,6 +87,7 @@ runs:
         banner_file=""
         for candidate in \
           "${platform_root}/branding/ps-banner.txt" \
+          "${PS_PLATFORM_ROOT}/branding/ps-banner.txt" \
           "${action_root}/branding/ps-banner.txt" \
           "${workspace_root}/branding/ps-banner.txt"; do
           if [[ -f "${candidate}" ]]; then
@@ -100,7 +101,7 @@ runs:
           if [[ -n "${platform_root}" ]]; then
             echo "Tried: ${platform_root}/branding/ps-banner.txt" >&2
           fi
-          echo "Tried: ${action_root}/branding/ps-banner.txt" >&2
+          echo "Tried: ${PS_PLATFORM_ROOT}/branding/ps-banner.txt" >&2
           if [[ -n "${workspace_root}" ]]; then
             echo "Tried: ${workspace_root}/branding/ps-banner.txt" >&2
           fi
