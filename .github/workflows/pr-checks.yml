@@ -14,6 +14,8 @@ on:
 
 permissions:
   contents: read
+  pull-requests: read
+  issues: write  # required by nested jobs in pr-gates.yml (dependency-review, notify)
 
 jobs:
   pr-gates:
