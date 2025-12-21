@@ -1,0 +1,97 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Setup (Runner + Node)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Combine runner hardening and Node.js setup into a single step.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: harden the runner, checkout code, setup Node.js, optionally install deps.
+#   - Does NOT: run build/test scripts or change job permissions.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Explicit inputs with safe defaults
+#   - SHA-pinned actions only
+#
+# Dependencies:
+#   - ./.github/actions/ps-harden-runner
+#   - ./.github/actions/ps-node-setup
+#
+# Dependents:
+#   - (Optional) workflows that want a single setup step
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#
+# Security & Policy Notes:
+#   - Secrets: optional NODE_AUTH_TOKEN is inherited from the caller
+#   - Permissions: inherited from the caller
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+# ==============================================================================
+
+name: "PS Setup"
+description: "Harden runner and setup Node.js with platform defaults"
+
+inputs:
+  node_version:
+    description: "Node.js major version"
+    required: false
+    default: "22"
+  ref:
+    description: "Optional checkout ref forwarded to ps-node-setup"
+    required: false
+    default: ""
+  fetch_depth:
+    description: "Git fetch depth (1 = shallow, 0 = full history)"
+    required: false
+    default: "1"
+  cache:
+    description: "Enable dependency caching in ps-node-bootstrap (1 = on, 0 = off)"
+    required: false
+    default: "1"
+  install_dependencies:
+    description: "Run npm ci in ps-node-bootstrap (1 = on, 0 = off)"
+    required: false
+    default: "1"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Harden runner (PS)
+      uses: ./.github/actions/ps-harden-runner
+
+    - name: Setup summary (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "PS.SETUP: node_version=${{ inputs.node_version }}"
+        echo "PS.SETUP: fetch_depth=${{ inputs.fetch_depth }}"
+        if [[ -n "${{ inputs.ref }}" ]]; then
+          echo "PS.SETUP: ref=${{ inputs.ref }}"
+        else
+          echo "PS.SETUP: ref=<default>"
+        fi
+        echo "PS.SETUP: cache=${{ inputs.cache }}"
+        echo "PS.SETUP: install_dependencies=${{ inputs.install_dependencies }}"
+
+    - name: Node setup (PS)
+      uses: ./.github/actions/ps-node-setup
+      with:
+        node_version: ${{ inputs.node_version }}
+        ref: ${{ inputs.ref }}
+        fetch_depth: ${{ inputs.fetch_depth }}
+        cache: ${{ inputs.cache }}
+        install_dependencies: ${{ inputs.install_dependencies }}
+
+    - name: Setup complete
+      shell: bash
+      run: |
+        echo "PS.SETUP: OK"

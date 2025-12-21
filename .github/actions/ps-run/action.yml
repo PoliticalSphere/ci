@@ -1,0 +1,173 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Run
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Execute a repository script with standardized banner and section output.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: print the PS banner, emit a section header, run a target script.
+#   - Does NOT: install dependencies or manage permissions for the caller.
+#
+# Design Principles:
+#   - Deterministic, non-interactive execution
+#   - Path safety (no traversal outside allowed roots)
+#   - CI-safe, structured output
+#
+# Dependencies:
+#   - ./.github/actions/ps-banner
+#   - tools/scripts/branding/print-section.sh
+#   - Script provided via inputs.script (relative to platform repo root)
+#
+# Dependents:
+#   - ./.github/actions/lint
+#   - ./.github/actions/typecheck
+#   - ./.github/actions/test
+#   - ./.github/actions/jscpd
+#   - ./.github/actions/build
+#   - ./.github/actions/secret-scan-pr
+#   - ./.github/workflows/release.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: workflows and composite actions
+#
+# Security & Policy Notes:
+#   - Secrets: inherited from the caller; not accessed directly
+#   - Permissions: inherited from the caller
+#   - Constraints:
+#       - inputs.script must be a relative path (no traversal)
+#       - inputs.working-directory must be a relative path (no traversal)
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: produced by the invoked script (if any)
+# ==============================================================================
+name: "PS Run"
+description: "Run a repository script with a banner and section header"
+
+inputs:
+  id:
+    description: "Section ID (machine-readable)"
+    required: true
+
+  title:
+    description: "Section title"
+    required: true
+
+  description:
+    description: "Optional section description"
+    required: false
+    default: ""
+
+  script:
+    description: "Script path to execute (relative to PLATFORM repo root)"
+    required: true
+
+  working-directory:
+    description: "Working directory to run from (relative to WORKSPACE root)"
+    required: false
+    default: "."
+
+  args:
+    description: "Optional arguments to pass to the script (space-separated string)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Print banner
+      uses: ./.github/actions/ps-banner
+
+    - name: Run step (banner + section + script)
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        action_root="${GITHUB_ACTION_PATH}"
+        platform_root="$(cd "${action_root}/../../.." >/dev/null 2>&1 && pwd)"
+        workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
+
+        if [[ -z "${platform_root}" ]]; then
+          echo "ERROR: unable to determine platform repo root from GITHUB_ACTION_PATH" >&2
+          exit 1
+        fi
+
+        section_script="${platform_root}/tools/scripts/branding/print-section.sh"
+        if [[ ! -x "${section_script}" ]]; then
+          echo "ERROR: print-section script not found or not executable at ${section_script}" >&2
+          exit 1
+        fi
+
+        rel_script="${{ inputs.script }}"
+        if [[ -z "${rel_script}" ]]; then
+          echo "ERROR: inputs.script is required" >&2
+          exit 1
+        fi
+
+        # Constrain to platform repo root (no traversal surprises).
+        case "${rel_script}" in
+          /*|../*|*/../*|../../*|*"/../"*)
+            echo "ERROR: inputs.script must be a relative path within the" >&2
+            echo "platform repo root (no path traversal)." >&2
+            exit 1
+            ;;
+          *)
+            ;;
+        esac
+
+        target="${platform_root}/${rel_script}"
+        if [[ ! -f "${target}" ]]; then
+          echo "ERROR: script not found: ${target}" >&2
+          exit 1
+        fi
+
+        rel_wd="${{ inputs.working-directory }}"
+        if [[ -z "${rel_wd}" ]]; then
+          rel_wd="."
+        fi
+
+        # Constrain working directory to workspace root.
+        case "${rel_wd}" in
+          /*|../*|*/../*|../../*|*"/../"*)
+            echo "ERROR: inputs.working-directory must be a relative path within" >&2
+            echo "the workspace root (no path traversal)." >&2
+            exit 1
+            ;;
+          *)
+            ;;
+        esac
+
+        wd="${workspace_root}/${rel_wd}"
+        if [[ ! -d "${wd}" ]]; then
+          echo "ERROR: working directory does not exist: ${wd}" >&2
+          exit 1
+        fi
+
+        echo "PS.RUN: script=${rel_script}"
+        echo "PS.RUN: working_directory=${rel_wd}"
+
+        bash "${section_script}" "${{ inputs.id }}" "${{ inputs.title }}" \
+          "${{ inputs.description }}"
+
+        # Execute via bash for consistent behaviour even if executable bit is missing.
+        cd "${wd}"
+
+        args="${{ inputs.args }}"
+        if [[ -n "${args}" ]]; then
+          # Allow intentional word-splitting so that a space-separated 'args'
+          # input is passed through as multiple arguments. Caller-provided
+          # inputs are expected to be trusted by the workflow author.
+          # shellcheck disable=SC2086  # rationale: intentional word-splitting
+          bash "${target}" -- ${args}
+        else
+          bash "${target}"
+        fi
+
+        echo "PS.RUN: OK"
+

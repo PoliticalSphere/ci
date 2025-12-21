@@ -1,0 +1,488 @@
+# ==============================================================================
+# Political Sphere — Reusable Workflow: PR Gates
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Provide fast, policy-aligned PR validation with structured artifacts.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: lint, typecheck, test, duplication, build, and fast secrets scan.
+#   - Does NOT: perform deep security scans, deployments, or releases.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege with explicit permissions
+#   - SHA-pinned actions only
+#   - Validate-CI gate runs first
+#
+# Dependencies:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/actions/ps-harden-runner
+#   - ./.github/actions/ps-checkout
+#   - ./.github/actions/ps-setup
+#   - ./.github/actions/ps-lint-tools
+#   - ./.github/actions/ps-run
+#   - ./.github/actions/lint
+#   - ./.github/actions/typecheck
+#   - ./.github/actions/test
+#   - ./.github/actions/jscpd
+#   - ./.github/actions/build
+#   - ./.github/actions/secret-scan-pr
+#   - ./.github/actions/ps-pr-comment
+#   - ./.github/actions/ps-security-tools
+#   - ./.github/actions/ps-upload-artifacts
+#   - ./.github/actions/ps-write-summary
+#   - actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261
+#   - tools/scripts/branding/print-section.sh
+#
+# Dependents:
+#   - examples/consumer-workflow.yml
+#   - Downstream PS application repositories
+#
+# Execution Model:
+#   - Trigger: workflow_call (typically from pull_request workflows)
+#   - Reusable workflow (consumer-facing)
+#
+# Security & Policy Notes:
+#   - Secrets: none expected (read-only validation only)
+#   - Permissions: contents: read (workflow + jobs)
+#   - Constraints: no deployments; no token writes
+#
+# Operational Notes:
+#   - Timeouts: defined per job in this workflow
+#   - Artifacts: reports/** and logs/** uploaded per job
+#   - CI vs local: PS_FULL_SCAN=1 enforces full lint scopes
+# ==============================================================================
+
+name: PR Gates
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        type: string
+        required: false
+        default: "ubuntu-22.04"
+
+      node_version:
+        description: "Node.js major version"
+        type: string
+        required: false
+        default: "22"
+
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        type: string
+        required: false
+        default: "1"
+
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
+      retention_days:
+        description: "Artifact retention in days"
+        type: number
+        required: false
+        default: 7
+
+      artifact_paths:
+        description: "Newline-separated glob paths to upload"
+        type: string
+        required: false
+        default: |
+          reports/**
+          logs/**
+
+      coverage_paths:
+        description: "Newline-separated coverage/report paths to upload"
+        type: string
+        required: false
+        default: |
+          coverage/**
+          playwright-report/**
+          test-results/**
+          reports/coverage/**
+
+      test_results_paths:
+        description: "Newline-separated JUnit/XML test result paths to upload"
+        type: string
+        required: false
+        default: |
+          reports/**/junit*.xml
+          reports/**/junit.xml
+          test-results/**/*.xml
+
+      ps_full_scan:
+        description: "Enable strict/full scan behaviour for downstream actions"
+        type: string
+        required: false
+        default: "1"
+
+      pr_number:
+        description: "Pull request number for failure comments"
+        type: string
+        required: false
+        default: ""
+
+      pr_is_fork:
+        description: "Whether the pull request originates from a fork"
+        type: string
+        required: false
+        default: "false"
+
+      pr_base_ref:
+        description: "Pull request base ref or SHA for dependency review"
+        type: string
+        required: false
+        default: ""
+
+      pr_head_ref:
+        description: "Pull request head ref or SHA for dependency review"
+        type: string
+        required: false
+        default: ""
+
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pr-gates-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "1"
+  PS_FULL_SCAN: ${{ inputs.ps_full_scan }}
+
+jobs:
+  validate-ci:
+    name: Validate CI (policy gate)
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner }}
+      node_version: ${{ inputs.node_version }}
+      artifact_name: pr-gates-validate-ci
+      retention_days: ${{ inputs.retention_days }}
+    secrets:
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+  lint:
+    name: Lint
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Setup (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Install lint tools (PS)
+        uses: ./.github/actions/ps-lint-tools
+
+      - name: Lint gate
+        uses: ./.github/actions/lint
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-lint
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  typecheck:
+    name: Typecheck
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    steps:
+      - name: Setup (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Typecheck
+        uses: ./.github/actions/typecheck
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-typecheck
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  test:
+    name: Tests
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Setup (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Tests
+        uses: ./.github/actions/test
+
+      - name: Upload coverage artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-coverage
+          path: ${{ inputs.coverage_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+      - name: Upload test results
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-test-results
+          path: ${{ inputs.test_results_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-tests
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  jscpd:
+    name: Duplication
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Setup (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: JSCPD
+        uses: ./.github/actions/jscpd
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-jscpd
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  build:
+    name: Build
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 20
+    steps:
+      - name: Setup (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Build
+        uses: ./.github/actions/build
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-build
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  secrets:
+    name: Secrets scan (fast)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: read
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Checkout (PS)
+        uses: ./.github/actions/ps-checkout
+
+      - name: Install security tools (PS)
+        uses: ./.github/actions/ps-security-tools
+
+      - name: Secrets scan (PR)
+        uses: ./.github/actions/secret-scan-pr
+
+      - name: Upload artefacts — secrets
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-secrets
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  dependency-review:
+    name: Dependency review
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    if: ${{ inputs.pr_number != '' && inputs.pr_base_ref != '' && inputs.pr_head_ref != '' }}
+    permissions:
+      contents: read
+      pull-requests: read
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Validate PR refs (PS)
+        uses: ./.github/actions/ps-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PS_PR_NUMBER: ${{ inputs.pr_number }}
+          PS_EXPECTED_BASE_SHA: ${{ inputs.pr_base_ref }}
+          PS_EXPECTED_HEAD_SHA: ${{ inputs.pr_head_ref }}
+        with:
+          id: "deps.pr-refs"
+          title: "Validate PR refs"
+          description: "Verify PR base/head SHAs"
+          script: "tools/scripts/ci/validate-pr-refs.sh"
+
+      - name: Dependency review
+        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261  # v4.8.2
+        with:
+          base-ref: ${{ inputs.pr_base_ref }}
+          head-ref: ${{ inputs.pr_head_ref }}
+
+  notify:
+    name: PR failure comment
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci, lint, typecheck, test, jscpd, build, secrets, dependency-review]
+    if: ${{ failure() && inputs.pr_number != '' && inputs.pr_is_fork != 'true' }}
+    permissions:
+      contents: read
+      issues: write  # justification: post failure comment to PR (issues API)
+    timeout-minutes: 10
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Post failure summary (PR)
+        uses: ./.github/actions/ps-pr-comment
+        continue-on-error: true
+        with:
+          pr_number: ${{ inputs.pr_number }}
+          github_token: ${{ github.token }}
+          expected_base_sha: ${{ inputs.pr_base_ref }}
+          expected_head_sha: ${{ inputs.pr_head_ref }}
+          body: |
+            ❌ PR Gates failed.
+
+            Results:
+            - Validate-CI: ${{ needs.validate-ci.result }}
+            - Lint: ${{ needs.lint.result }}
+            - Typecheck: ${{ needs.typecheck.result }}
+            - Tests: ${{ needs.test.result }}
+            - JSCPD: ${{ needs.jscpd.result }}
+            - Build: ${{ needs.build.result }}
+            - Secrets: ${{ needs.secrets.result }}
+            - Dependency review: ${{ needs.dependency-review.result }}
+
+            Check the workflow run for detailed logs and artifacts.
+
+      - name: PR gates complete
+        if: ${{ success() }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/scripts/branding/print-section.sh "pr.gates" "PR gates complete"
+          echo "PS.PR_GATES: OK"
+
+  summary:
+    name: PR gates summary
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci, lint, typecheck, test, jscpd, build, secrets, dependency-review, notify]
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Write summary (PS)
+        uses: ./.github/actions/ps-write-summary
+        with:
+          workflow: "pr-gates"
+          output_path: "reports/summary/pr-gates.json"
+          results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            lint=${{ needs.lint.result }}
+            typecheck=${{ needs.typecheck.result }}
+            test=${{ needs.test.result }}
+            jscpd=${{ needs.jscpd.result }}
+            build=${{ needs.build.result }}
+            secrets=${{ needs.secrets.result }}
+            dependency-review=${{ needs.dependency-review.result }}
+            notify=${{ needs.notify.result }}
+
+      - name: Upload summary
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-summary
+          path: |
+            reports/summary/pr-gates.json
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}

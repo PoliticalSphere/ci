@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+  "compilerOptions": {
+    /* Language + runtime */
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+
+    /* Strictness (core policy) */
+    "strict": true,
+    "noImplicitAny": true,
+    "noImplicitReturns": true,
+    "noUncheckedIndexedAccess": true,
+    "noFallthroughCasesInSwitch": true,
+    "forceConsistentCasingInFileNames": true,
+
+    /* Additional high-signal checks */
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "useUnknownInCatchVariables": true,
+    "exactOptionalPropertyTypes": true,
+    "useDefineForClassFields": true,
+
+    /* Module interop + build ergonomics */
+    "esModuleInterop": true,
+    "resolveJsonModule": true,
+
+    /* Output discipline (base config should not emit by default) */
+    "noEmit": true,
+
+    /* CI signal trade-off (documented policy) */
+    "skipLibCheck": true
+  }
+}

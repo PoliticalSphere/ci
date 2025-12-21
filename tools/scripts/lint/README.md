@@ -1,0 +1,18 @@
+# Lint Scripts
+
+Deterministic lint scripts used by local gates and CI.
+
+## Scripts
+
+- `biome.sh`
+- `eslint.sh`
+- `yamllint.sh`
+- `actionlint.sh`
+- `hadolint.sh`
+- `shellcheck.sh`
+- `markdownlint.sh`
+
+## Notes
+
+These scripts consume configs from `configs/lint/` and should remain thin
+wrappers without embedded policy.

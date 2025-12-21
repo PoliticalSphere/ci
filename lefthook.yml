@@ -1,0 +1,54 @@
+# ==============================================================================
+# Political Sphere — Lefthook Hooks
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Local developer gates that mirror CI PR gates as closely as practical.
+#
+# Meta:
+#   Version: 1.0.0
+#   Owner: political-sphere
+#   Classification: internal
+#   Last reviewed: 2025-12-19
+#
+# Design principles (non-negotiable):
+#   - Single gate script per hook (no duplicated logic here)
+#   - Deterministic, non-interactive execution
+#   - Structured, readable output (human + AI)
+#   - Political Sphere ASCII branding printed by the gate scripts
+#
+# Governance:
+#   - DO NOT add additional commands in this file.
+#   - Extend or modify behaviour ONLY via the gate scripts:
+#       - tools/scripts/gates/gate-pre-commit.sh
+#       - tools/scripts/gates/gate-pre-push.sh
+#   - Any policy/threshold changes must live in /configs (not hard-coded here).
+#
+# Notes:
+#   - parallel:false is intentional to keep logs ordered and easy to parse.
+#   - Gate scripts must use: set -euo pipefail
+#   - Gate scripts must set non-interactive defaults (e.g. export CI=1)
+# ==============================================================================
+
+pre-commit:
+  parallel: false
+  commands:
+    gate:
+      # Single authoritative pre-commit gate.
+      #
+      # Contract (must be enforced by the script):
+      #   - Print PS ASCII banner once at start
+      #   - Fast checks only (lint/format/validate + quick secret scan)
+      #   - Structured section headers + actionable failures
+      run: bash tools/scripts/gates/gate-pre-commit.sh
+
+pre-push:
+  parallel: false
+  commands:
+    gate:
+      # Single authoritative pre-push gate.
+      #
+      # Contract (must be enforced by the script):
+      #   - Print PS ASCII banner once at start
+      #   - Heavier checks (typecheck, tests, jscpd, build)
+      #   - Mirrors CI quality gates as closely as practical
+      run: bash tools/scripts/gates/gate-pre-push.sh

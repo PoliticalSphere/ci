@@ -1,0 +1,23 @@
+# Trivy configuration for filesystem scanning.
+# Reference: https://aquasecurity.github.io/trivy/latest/docs/references/configuration/
+
+scan:
+  scanners:
+    - vuln
+    - config
+
+severity:
+  - HIGH
+  - CRITICAL
+
+ignore-unfixed: false
+
+skip-dirs:
+  - node_modules
+  - dist
+  - build
+  - reports
+  - logs
+  - .git
+
+timeout: 10m

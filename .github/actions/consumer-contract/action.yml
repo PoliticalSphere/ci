@@ -1,0 +1,95 @@
+# ==============================================================================
+# Political Sphere - Composite Action: Consumer Contract
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Validate consumer repositories against the platform contract policy.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: run contract checks and emit reports/logs.
+#   - Does NOT: install dependencies or alter permissions.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Policy-driven and AI-readable output
+#   - CI-safe with explicit inputs
+#
+# Dependencies:
+#   - ./.github/actions/ps-preflight
+#   - ./.github/actions/ps-run
+#   - tools/scripts/consumer/contract-check.sh
+#   - configs/consumer/contract.json
+#   - configs/consumer/exceptions.json
+#
+# Dependents:
+#   - ./.github/workflows/consumer-contract.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller (read-only expected)
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: reports/** and logs/** emitted by the script
+# ==============================================================================
+
+name: "Consumer Contract"
+description: "Validate consumer repositories against the platform contract policy"
+
+inputs:
+  policy_path:
+    description: "Contract policy path (repo-relative)"
+    required: false
+    default: "configs/consumer/contract.json"
+  exceptions_path:
+    description: "Exceptions policy path (repo-relative)"
+    required: false
+    default: "configs/consumer/exceptions.json"
+  report_path:
+    description: "Report output path (repo-relative)"
+    required: false
+    default: "reports/contracts/contract.json"
+  summary_path:
+    description: "Summary output path (repo-relative)"
+    required: false
+    default: "reports/contracts/contract.txt"
+  log_dir:
+    description: "Log output directory (repo-relative)"
+    required: false
+    default: "logs/contracts"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Preflight (consumer contract)
+      uses: ./.github/actions/ps-preflight
+      with:
+        require_files: |
+          tools/scripts/consumer/contract-check.sh
+          ${{ inputs.policy_path }}
+
+    - name: Contract check (PS)
+      uses: ./.github/actions/ps-run
+      with:
+        id: "contract.check"
+        title: "Consumer contract"
+        description: "Validate repo contract vs policy"
+        script: "tools/scripts/consumer/contract-check.sh"
+      env:
+        PS_CONTRACT_POLICY: ${{ inputs.policy_path }}
+        PS_CONTRACT_EXCEPTIONS: ${{ inputs.exceptions_path }}
+        PS_CONTRACT_REPORT: ${{ inputs.report_path }}
+        PS_CONTRACT_SUMMARY: ${{ inputs.summary_path }}
+        PS_LOG_DIR: ${{ inputs.log_dir }}
+
+    - name: Contract check complete
+      shell: bash
+      run: |
+        echo "PS.CONTRACT: OK"

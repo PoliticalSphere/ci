@@ -1,0 +1,19 @@
+{
+  "threshold": 0,
+  "absolute": true,
+  "minLines": 10,
+  "minTokens": 50,
+  "reporters": ["json", "html"],
+  "output": "reports/jscpd",
+  "ignore": [
+    "**/*.min.*",
+    "**/*.snap",
+    "**/node_modules/**",
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/reports/**",
+    ".github/workflows/**",
+    "**/.github/workflows/**"
+  ]
+}

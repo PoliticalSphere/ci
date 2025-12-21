@@ -1,0 +1,23 @@
+# Node and tooling
+node_modules/
+npm-debug.log
+*.log
+.npm/
+
+# Build output
+dist/
+build/
+coverage/
+reports/
+
+# Editor
+.DS_Store
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
+
+# Misc
+.env
+.env.*

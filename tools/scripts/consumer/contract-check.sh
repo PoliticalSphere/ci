@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# ==============================================================================
+# Political Sphere - Consumer Contract Check
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Validate consumer repositories against a declared contract policy.
+#
+# Policy:
+#   - In CI: contract policy must exist and violations fail the job.
+#   - Locally: runs with the same behavior for determinism.
+# ==============================================================================
+
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=tools/scripts/common.sh
+. "${script_dir}/../common.sh"
+init_repo_context
+
+policy_path="${PS_CONTRACT_POLICY:-${repo_root}/configs/consumer/contract.json}"
+exceptions_path="${PS_CONTRACT_EXCEPTIONS:-${repo_root}/configs/consumer/exceptions.json}"
+report_path="${PS_CONTRACT_REPORT:-${repo_root}/reports/contracts/contract.json}"
+summary_path="${PS_CONTRACT_SUMMARY:-${repo_root}/reports/contracts/contract.txt}"
+log_dir="${PS_LOG_DIR:-${repo_root}/logs/contracts}"
+log_path="${log_dir}/contract-check.log"
+
+if [[ "${CI:-0}" == "1" && ! -f "${policy_path}" ]]; then
+  error "contract policy missing at ${policy_path}"
+  exit 1
+fi
+
+if ! command -v node >/dev/null 2>&1; then
+  error "node is required but not found on PATH"
+  exit 1
+fi
+
+mkdir -p "${log_dir}"
+
+node "${repo_root}/tools/scripts/consumer/contract-check.js" \
+  --policy "${policy_path}" \
+  --exceptions "${exceptions_path}" \
+  --report "${report_path}" \
+  --summary "${summary_path}" \
+  2>&1 | tee "${log_path}"

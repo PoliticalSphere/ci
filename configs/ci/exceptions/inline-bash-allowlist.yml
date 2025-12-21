@@ -1,0 +1,142 @@
+# ==============================================================================
+# Political Sphere — Inline Shell Allowlist (GitHub Actions)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Govern narrowly-scoped inline shell usage in workflows where creating a
+#   composite action or script would add unnecessary complexity.
+#
+# Policy:
+#   - Inline shell is the exception, not the norm (default deny).
+#   - Any allowlist entry MUST be:
+#       - narrowly scoped (workflow + job + step)
+#       - bounded (max_lines)
+#       - justified (rationale + risk_notes)
+#       - time-bounded (review_by)
+#   - Any allowlist entry MUST NOT:
+#       - access secrets
+#       - perform network calls (curl/wget/ssh/git clone/etc.)
+#       - execute dynamic/eval-like behaviour
+#       - run in untrusted contexts with elevated permissions
+#
+# Enforcement:
+#   - validate-ci MUST fail for inline shell that:
+#       - exceeds max_lines, OR
+#       - violates global forbid rules, OR
+#       - violates entry constraints,
+#     unless a matching allowlist entry exists AND is active AND not expired.
+# ==============================================================================
+
+meta:
+  version: 1.2.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-19
+  review_interval_days: 180
+
+policy:
+  default: deny
+
+  # Allowlist entries MUST include these fields.
+  required_fields:
+    - id
+    - status
+    - selector
+    - scope
+    - allowed_shells
+    - max_lines
+    - constraints
+    - rationale
+    - risk_notes
+    - review_by
+    - owner
+
+  # Enums to keep validation deterministic.
+  enums:
+    status: [active, retired]
+    scope: [step]
+    allowed_shells: [bash, sh, pwsh]
+
+  # Inline shell detection notes (validator guidance)
+  detection:
+    # Treat any step using a shell runner as "inline shell"
+    # Examples:
+    #   - run: |
+    #   - shell: bash
+    # Note: composite actions may also contain inline shell; policy may apply
+    # to workflow YAML only unless you explicitly extend it.
+    applies_to:
+      - ".github/workflows/**/*.yml"
+      - ".github/workflows/**/*.yaml"
+
+  # Expired entries MUST be treated as non-matching (fail closed).
+  expiry:
+    fail_on_expired: true
+
+constraints:
+  # Global constraints that apply to ALL allowlisted inline shell.
+  global:
+    require:
+      run_contains_all:
+        - "set -euo pipefail"
+    forbid:
+      # Regex checks are applied to the literal run content (after YAML parse).
+      run_regex:
+        - "(?m)\\b(curl|wget)\\b"
+        - "(?m)\\|\\s*(sh|bash)\\b"
+        - "(?m)\\beval\\b"
+        - "(?m)\\bssh\\b"
+        - "(?m)\\bscp\\b"
+        - "(?m)\\bgit\\s+clone\\b"
+        - "\\${{\\s*secrets\\."
+        - "\\${{\\s*github\\.event\\.pull_request\\.(title|body|head\\.ref)\\s*}}"
+        - "\\${{\\s*github\\.head_ref\\s*}}"
+      # Coarse command blacklist (for simple token-based detectors).
+      commands:
+        - curl
+        - wget
+        - eval
+        - ssh
+        - scp
+        - git
+
+  guidance: >
+    Inline shell should only be used for short, local operations: echoing a
+    summary, setting outputs safely, or trivial file moves. Anything reusable
+    belongs in a composite action or a repo script.
+
+allowlist:
+  - id: IB-001
+    status: active
+    scope: step
+
+    selector:
+      workflow_path: ".github/workflows/pr-gates.yml"
+      job_id: "validate-ci"
+      # Prefer step_id when available; fall back to step_name if you must.
+      step_id: "summarize"
+
+    allowed_shells: [bash]
+    max_lines: 10
+
+    constraints:
+      # These flags are evaluated by validate-ci based on job context + step text.
+      network: forbidden
+      secrets: forbidden
+      permissions_write: forbidden
+      untrusted_pr_context: forbidden
+
+      # Optional: allow step-specific extra forbid patterns (tightens scope).
+      extra_forbid:
+        run_regex: []
+        commands: []
+
+    rationale: >
+      Short summary aggregation for validate-ci output. Keeping this inline
+      avoids creating a composite action for a single, non-reusable step.
+
+    risk_notes: >
+      Risk is low: the snippet is bounded (max_lines), requires strict mode,
+      and forbids secrets and network access. Runs in a read-only job context.
+
+    review_by: 2026-03-19
+    owner: political-sphere

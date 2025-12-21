@@ -1,0 +1,128 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Node Bootstrap
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Prepare a deterministic Node.js environment with optional dependency install.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: setup Node.js and (optionally) run npm ci with platform defaults.
+#   - Does NOT: checkout code or run build/test scripts.
+#
+# Design Principles:
+#   - Deterministic dependency installation when enabled
+#   - Non-interactive execution
+#   - SHA-pinned actions only
+#
+# Dependencies:
+#   - actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f
+#   - npm (runner-provided)
+#   - tools/scripts/branding/validate-inputs.sh
+#
+# Dependents:
+#   - ./.github/actions/ps-node-setup
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: ps-node-setup
+#
+# Security & Policy Notes:
+#   - Secrets: optional NODE_AUTH_TOKEN (if provided by caller)
+#   - Permissions: inherited from the caller
+#   - Constraints: requires package-lock.json for deterministic installs
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+#   - Cache: uses explicit cached vs non-cached setup-node steps for clarity
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Node Bootstrap"
+description: "Setup Node.js and optionally run npm ci with platform defaults"
+
+inputs:
+  node_version:
+    description: "Node.js major version (e.g. 22)"
+    required: false
+    default: "22"
+  cache:
+    description: "Enable dependency caching via setup-node (1 = on, 0 = off)"
+    required: false
+    default: "1"
+  install_dependencies:
+    description: "Run npm ci (1 = on, 0 = off)"
+    required: false
+    default: "1"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate repo state
+      shell: bash
+      run: |
+        set -euo pipefail
+        repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
+        validate_sh="${repo_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ -f "${validate_sh}" ]]; then
+          # shellcheck source=tools/scripts/branding/validate-inputs.sh
+          . "${validate_sh}"
+        fi
+
+        if [[ "${{ inputs.install_dependencies }}" == "1" ]]; then
+          if [[ ! -f "package.json" ]]; then
+            echo "ERROR: package.json not found in workspace root." >&2
+            echo "HINT: ensure actions/checkout ran and repo root is the workspace." >&2
+            exit 1
+          fi
+
+          if [[ ! -f "package-lock.json" ]]; then
+            echo "ERROR: package-lock.json not found (npm ci requires a lockfile" >&2
+            echo "for determinism)." >&2
+            echo "HINT: commit package-lock.json or adjust the platform policy explicitly." >&2
+            exit 1
+          fi
+        fi
+
+        # Basic sanity: node_version should be digits only (major version).
+        if ! require_number "node_version" "${{ inputs.node_version }}"; then
+          echo "Got: '${{ inputs.node_version }}'." >&2
+          exit 1
+        fi
+        require_enum "cache" "${{ inputs.cache }}" "1" "0"
+        require_enum "install_dependencies" "${{ inputs.install_dependencies }}" "1" "0"
+
+        echo "PS.NODE_BOOTSTRAP: node_version=${{ inputs.node_version }}"
+        echo "PS.NODE_BOOTSTRAP: cache=${{ inputs.cache }}"
+        echo "PS.NODE_BOOTSTRAP: install_dependencies=${{ inputs.install_dependencies }}"
+
+    - name: Setup Node (cached)
+      if: ${{ inputs.cache == '1' }}
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f  # v6.1.0
+      with:
+        node-version: ${{ inputs.node_version }}
+        cache: npm
+
+    - name: Setup Node (no cache)
+      if: ${{ inputs.cache != '1' }}
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f  # v6.1.0
+      with:
+        node-version: ${{ inputs.node_version }}
+
+    - name: Install dependencies (npm ci)
+      if: ${{ inputs.install_dependencies == '1' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        npm ci --no-audit --no-fund
+        echo "PS.NODE_BOOTSTRAP: OK"
+
+    - name: Node bootstrap complete (no install)
+      if: ${{ inputs.install_dependencies != '1' }}
+      shell: bash
+      run: |
+        echo "PS.NODE_BOOTSTRAP: OK (install skipped)"

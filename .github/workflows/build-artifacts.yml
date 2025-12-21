@@ -1,0 +1,215 @@
+# ==============================================================================
+# Political Sphere — Reusable Workflow: Build Artifacts
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Build and publish deterministic artifacts for consumer repositories.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: run Validate-CI, execute build, upload artifacts.
+#   - Does NOT: run tests, deep security scans, or releases.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege (workflow-level permissions)
+#   - Validate-CI gate runs first
+#   - Internal actions are repo-controlled; external actions (if used) must be SHA-pinned
+#
+# Dependencies:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/actions/ps-setup
+#   - ./.github/actions/build
+#   - ./.github/actions/ps-upload-artifacts
+#   - ./.github/actions/ps-write-summary
+#   - tools/scripts/branding/print-section.sh
+#
+# Dependents:
+#   - Downstream PS application repositories
+#
+# Execution Model:
+#   - Trigger: workflow_call
+#   - Reusable workflow (consumer-facing)
+#
+# Security & Policy Notes:
+#   - Secrets: optional NODE_AUTH_TOKEN for private registry installs
+#   - Permissions: contents: read
+#   - Constraints: no deployments or package publishing
+#
+# Operational Notes:
+#   - Timeouts: build timeout defined here (default 20); validate timeouts in validate-ci.yml
+#   - Artifacts: names must match artifact policy allowlist
+#   - Validation layers are intentional; use PR gates for lighter checks
+# ==============================================================================
+
+name: Build Artifacts
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        type: string
+        required: false
+        default: "ubuntu-22.04"
+
+      node_version:
+        description: "Node.js major version"
+        type: string
+        required: false
+        default: "22"
+
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        type: string
+        required: false
+        default: "1"
+
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
+      artifact_paths:
+        description: "Newline-separated glob paths to upload"
+        type: string
+        required: false
+        default: |
+          dist/**
+          build/**
+          reports/**
+          logs/**
+
+      retention_days:
+        description: "Artifact retention in days"
+        type: number
+        required: false
+        default: 7
+
+      validate_retention_days:
+        description: "Validate-CI artifact retention in days"
+        type: number
+        required: false
+        default: 7
+
+      build_timeout_minutes:
+        description: "Hard timeout for the build job"
+        type: number
+        required: false
+        default: 20
+
+      working_directory:
+        description: "Working directory for build action (repo-relative)"
+        type: string
+        required: false
+        default: "."
+
+      build_script:
+        description: "Build script path passed to the build action (repo-relative)"
+        type: string
+        required: false
+        default: "tools/scripts/tasks/build.sh"
+
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-artifacts-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "1"
+
+jobs:
+  validate-ci:
+    name: Validate CI (gate)
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner }}
+      node_version: ${{ inputs.node_version }}
+      artifact_name: build-artifacts-validate-ci
+      retention_days: ${{ inputs.validate_retention_days }}
+    secrets:
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+  build:
+    name: Build and upload artifacts
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    timeout-minutes: ${{ inputs.build_timeout_minutes }}
+    permissions:
+      contents: read
+
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+    steps:
+      - name: Prepare runner (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+
+      - name: Build (PS)
+        uses: ./.github/actions/build
+        with:
+          working-directory: ${{ inputs.working_directory }}
+          script: ${{ inputs.build_script }}
+
+      - name: Upload artifacts (PS)
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: build-artifacts
+          path: ${{ inputs.artifact_paths }}
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+      - name: Build artifacts complete
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/scripts/branding/print-section.sh "build.artifacts" "Build artifacts complete"
+          echo "PS.BUILD_ARTIFACTS: OK"
+
+  summary:
+    name: Build artifacts summary
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci, build]
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Write summary (PS)
+        uses: ./.github/actions/ps-write-summary
+        with:
+          workflow: "build-artifacts"
+          output_path: "reports/summary/build-artifacts.json"
+          results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            build=${{ needs.build.result }}
+
+      - name: Upload summary
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: build-artifacts-summary
+          path: |
+            reports/summary/build-artifacts.json
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}

@@ -1,0 +1,108 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Harden Runner
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Apply runner hardening with Political Sphere defaults.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: enforce or audit egress policy via step-security/harden-runner.
+#   - Does NOT: modify job permissions or install dependencies.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - CI-safe with explicit input validation
+#   - Intended to run as the first step in every job
+#
+# Dependencies:
+#   - step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+#   - tools/scripts/branding/validate-inputs.sh
+#
+# Dependents:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/build-artifacts.yml
+#   - ./.github/workflows/security-scheduled.yml
+#   - ./.github/workflows/release.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: workflows as the first job step
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller
+#   - Constraints: workflows must not call step-security/harden-runner directly
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Harden Runner"
+description: "Harden GitHub runner with Political Sphere defaults"
+
+inputs:
+  egress_policy:
+    description: >
+      Egress policy passed through to step-security/harden-runner.
+      Allowed values: audit | block
+      Default: audit
+    required: false
+    default: "audit"
+
+  allowed_endpoints:
+    description: >
+      Optional allowlist of endpoints for block mode.
+      Format: newline-separated hostnames or host:port entries.
+      Leave empty to use upstream defaults.
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        . "tools/scripts/branding/validate-inputs.sh"
+
+        policy="$(echo "${{ inputs.egress_policy }}" | tr '[:upper:]' '[:lower:]' | xargs)"
+        require_enum "inputs.egress_policy" "${policy}" audit block || exit 1
+
+        # If block mode is selected, allowed_endpoints SHOULD be provided in most repos.
+        # We don't hard-fail here (some repos may rely on upstream defaults),
+        # but we warn to reduce surprises.
+        if [[ "${policy}" == "block" ]]; then
+          if [[ -z "$(echo "${{ inputs.allowed_endpoints }}" | xargs)" ]]; then
+            echo "WARN: egress_policy=block but allowed_endpoints is empty;" >&2
+            echo "network access may be restricted." >&2
+          fi
+        fi
+
+        echo "PS_EGRESS_POLICY=${policy}" >> "${GITHUB_ENV}"
+        echo "PS.HARDEN_RUNNER: egress_policy=${policy}"
+        if [[ -n "$(echo "${{ inputs.allowed_endpoints }}" | xargs)" ]]; then
+          echo "PS.HARDEN_RUNNER: allowed_endpoints=provided"
+        else
+          echo "PS.HARDEN_RUNNER: allowed_endpoints=empty"
+        fi
+
+    - name: Harden runner
+      uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
+      with:
+        egress-policy: ${{ env.PS_EGRESS_POLICY }}
+        # Only set allowlist if provided (avoids accidental overrides)
+        allowed-endpoints: ${{ inputs.allowed_endpoints }}
+
+    - name: Harden runner complete
+      shell: bash
+      run: |
+        echo "PS.HARDEN_RUNNER: OK"

@@ -1,0 +1,152 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PR Comment
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Post a structured comment to a pull request for workflow status visibility.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: publish a PR comment with a provided message body.
+#   - Does NOT: decide comment content or when to run.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Minimal permissions (issues: write only when required)
+#   - Clear validation of required inputs
+#
+# Dependencies:
+#   - GitHub CLI (gh) available on the runner
+#   - ./.github/actions/ps-banner
+#   - tools/scripts/branding/validate-inputs.sh
+#
+# Dependents:
+#   - ./.github/workflows/pr-gates.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: PR workflows when failures occur
+#
+# Security & Policy Notes:
+#   - Secrets: requires github_token input for API auth
+#   - Permissions: issues: write required in caller
+#   - Constraints: only posts to the current repo
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: none
+#   - CI vs local: intended for CI only
+# ==============================================================================
+
+name: "PS PR Comment"
+description: "Post a comment to a pull request"
+
+inputs:
+  pr_number:
+    description: "Pull request number to comment on"
+    required: true
+  body:
+    description: "Comment body (markdown supported)"
+    required: true
+  github_token:
+    description: "GitHub token with issues: write"
+    required: true
+  expected_base_sha:
+    description: "Optional expected base SHA for the PR"
+    required: false
+    default: ""
+  expected_head_sha:
+    description: "Optional expected head SHA for the PR"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Print banner
+      uses: ./.github/actions/ps-banner
+
+    - name: Validate inputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        # shellcheck source=tools/scripts/branding/validate-inputs.sh
+        . "tools/scripts/branding/validate-inputs.sh"
+
+        pr_number="${{ inputs.pr_number }}"
+        body="${{ inputs.body }}"
+        token="${{ inputs.github_token }}"
+        expected_base="${{ inputs.expected_base_sha }}"
+        expected_head="${{ inputs.expected_head_sha }}"
+
+        require_nonempty "inputs.pr_number" "${pr_number}" || exit 1
+        require_nonempty "inputs.body" "${body}" || exit 1
+        require_nonempty "inputs.github_token" "${token}" || exit 1
+        require_number "inputs.pr_number" "${pr_number}" || exit 1
+        require_command "gh" || exit 1
+
+        if [[ -n "${expected_base}" ]]; then
+          require_regex \
+            "inputs.expected_base_sha" \
+            "${expected_base}" \
+            '^[A-Fa-f0-9]{40}$' \
+            "Expected a full-length 40-char commit SHA." || exit 1
+        fi
+
+        if [[ -n "${expected_head}" ]]; then
+          require_regex \
+            "inputs.expected_head_sha" \
+            "${expected_head}" \
+            '^[A-Fa-f0-9]{40}$' \
+            "Expected a full-length 40-char commit SHA." || exit 1
+        fi
+
+        echo "PS.PR_COMMENT: pr_number=${pr_number}"
+        echo "PS.PR_COMMENT: body_length=${#body}"
+
+    - name: Validate PR refs
+      if: ${{ inputs.expected_base_sha != '' || inputs.expected_head_sha != '' }}
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PS_PR_NUMBER: ${{ inputs.pr_number }}
+        PS_EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
+        PS_EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
+      run: |
+        set -euo pipefail
+
+        actual_base="$(gh api --jq '.base.sha' "repos/${GITHUB_REPOSITORY}/pulls/${PS_PR_NUMBER}")"
+        actual_head="$(gh api --jq '.head.sha' "repos/${GITHUB_REPOSITORY}/pulls/${PS_PR_NUMBER}")"
+
+        if [[ -n "${PS_EXPECTED_BASE_SHA}" && "${actual_base}" != "${PS_EXPECTED_BASE_SHA}" ]]; then
+          echo "ERROR: PR base SHA mismatch for #${PS_PR_NUMBER}." >&2
+          echo "Expected: ${PS_EXPECTED_BASE_SHA}" >&2
+          echo "Actual:   ${actual_base}" >&2
+          exit 1
+        fi
+
+        if [[ -n "${PS_EXPECTED_HEAD_SHA}" && "${actual_head}" != "${PS_EXPECTED_HEAD_SHA}" ]]; then
+          echo "ERROR: PR head SHA mismatch for #${PS_PR_NUMBER}." >&2
+          echo "Expected: ${PS_EXPECTED_HEAD_SHA}" >&2
+          echo "Actual:   ${actual_head}" >&2
+          exit 1
+        fi
+
+    - name: Post PR comment
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.github_token }}
+        PS_PR_NUMBER: ${{ inputs.pr_number }}
+        PS_COMMENT_BODY: ${{ inputs.body }}
+      run: |
+        set -euo pipefail
+
+        gh api \
+          -X POST \
+          "repos/${GITHUB_REPOSITORY}/issues/${PS_PR_NUMBER}/comments" \
+          -f body="${PS_COMMENT_BODY}"
+
+        echo "PS.PR_COMMENT: OK"

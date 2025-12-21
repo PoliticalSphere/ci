@@ -1,0 +1,43 @@
+# ==============================================================================
+# Political Sphere — ShellCheck Configuration (.shellcheckrc)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Enforce safe, portable shell scripting defaults for the CI/CD platform.
+#
+# Meta:
+#   Version: 1.0.0
+#   Owner: political-sphere
+#   Classification: internal
+#   Last reviewed: 2025-12-19
+#   Review interval (days): 180
+#
+# Governance:
+#   - No global suppressions without an explicit, documented rationale.
+#   - Prefer fixing scripts over disabling checks.
+#   - If suppression is required, it must be local and justified:
+#       shellcheck disable=SCxxxx  # rationale
+# ==============================================================================
+
+# Treat undefined variables strictly; prefer deterministic scripts.
+# (ShellCheck itself is a linter; strictness is enforced by failing CI on findings.)
+
+# Follow `source` statements only within the repository (reduces noise and risk).
+# Adjust if you vendor shared libraries elsewhere.
+# NOTE: external-sources flag is intentionally disabled in config; if you need to
+# follow external sources, enable it via command-line during local runs.
+#
+# CI behaviour: the platform CLI runner invokes shellcheck with --external-sources
+# (-x) to resolve sourced helper files so linting is more precise in CI.
+
+# Do not follow arbitrary paths from outside the repo.
+# (ShellCheck uses this mainly to find sourced files; keep it conservative.)
+source-path=.
+
+# Default shell dialect.
+# Use bash as the platform default. If a script is POSIX sh, it should specify
+# #!/bin/sh and be checked separately if desired.
+shell=bash
+
+# Optional: specify severity threshold only if you intend to allow lower levels.
+# For PS, prefer failing on all findings (handled by CI), so keep this unset.
+# --severity=style

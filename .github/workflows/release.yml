@@ -1,0 +1,185 @@
+# ==============================================================================
+# Political Sphere — Reusable Workflow: Release (Optional)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Create a Git tag and GitHub Release for the platform repository.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: run Validate-CI, create tag, publish GitHub Release.
+#   - Does NOT: run builds/tests or publish packages/containers.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Least privilege with explicit permissions
+#   - SHA-pinned actions only
+#   - Validate-CI gate runs first
+#
+# Dependencies:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/actions/ps-harden-runner
+#   - ./.github/actions/ps-checkout
+#   - ./.github/actions/ps-run
+#   - ./.github/actions/ps-upload-artifacts
+#   - ./.github/actions/ps-write-summary
+#   - tools/scripts/branding/print-section.sh
+#
+# Dependents:
+#   - External callers via workflow_call
+#
+# Execution Model:
+#   - Trigger: workflow_call
+#   - Reusable workflow (internal platform building block)
+#
+# Security & Policy Notes:
+#   - Secrets: uses GH_TOKEN (GitHub-provided) for release creation
+#   - Permissions: contents: write only in the release job
+#   - Constraints: no deployments or package publishing
+#
+# Operational Notes:
+#   - Timeouts: defined per job in this workflow
+#   - Artifacts: uploads reports/** and logs/** with 7-day retention
+#   - CI vs local: not designed for local execution
+# ==============================================================================
+
+name: Release
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        required: false
+        default: "ubuntu-22.04"
+        type: string
+      node_version:
+        description: "Node.js major version"
+        required: false
+        default: "22"
+        type: string
+      release_version:
+        description: "Release version (SemVer, without leading v)"
+        required: true
+        type: string
+      release_ref:
+        description: "Git ref to release from (branch or SHA)"
+        required: false
+        default: "main"
+        type: string
+      generate_notes:
+        description: "If true, auto-generate GitHub release notes"
+        required: false
+        default: true
+        type: boolean
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        required: false
+        default: "0"
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.workflow }}-${{ inputs.release_version }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: "1"
+
+jobs:
+  validate-ci:
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner }}
+      node_version: ${{ inputs.node_version }}
+      checkout_ref: ${{ inputs.release_ref }}
+      artifact_name: release-validate-ci
+      retention_days: 7
+
+  release:
+    name: Publish release
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    permissions:
+      contents: write  # justification: release publishing requires tag + release creation
+    timeout-minutes: 15
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Checkout (full history, PS)
+        uses: ./.github/actions/ps-checkout
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          ref: ${{ inputs.release_ref }}
+
+      - name: Publish release (PS)
+        uses: ./.github/actions/ps-run
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PS_RELEASE_VERSION: ${{ inputs.release_version }}
+          PS_GENERATE_NOTES: ${{ inputs.generate_notes }}
+        with:
+          id: "release.publish"
+          title: "Publish release"
+          description: "Tag and create GitHub Release"
+          script: "tools/scripts/release/release.sh"
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: release-artifacts
+          path: |
+            reports/**
+            logs/**
+          if_no_files_found: "warn"
+          retention_days: "7"
+
+      - name: Release complete
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash tools/scripts/branding/print-section.sh "release" "Release complete"
+          echo "PS.RELEASE: OK"
+
+  summary:
+    name: Release summary
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci, release]
+    if: ${{ always() }}
+    permissions:
+      contents: read
+    steps:
+      - name: Harden runner (PS)
+        uses: ./.github/actions/ps-harden-runner
+
+      - name: Write summary (PS)
+        uses: ./.github/actions/ps-write-summary
+        with:
+          workflow: "release"
+          output_path: "reports/summary/release.json"
+          results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            release=${{ needs.release.result }}
+
+      - name: Upload summary
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: release-summary
+          path: |
+            reports/summary/release.json
+          if_no_files_found: "warn"
+          retention_days: "7"

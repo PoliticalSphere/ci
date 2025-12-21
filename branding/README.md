@@ -1,0 +1,31 @@
+# Branding
+
+Political Sphere CI output must be consistent, recognisable, and professional.
+This directory defines the branding assets and usage rules.
+
+## Assets
+
+- `branding/ps-banner.txt` Political Sphere ASCII banner.
+- `tools/scripts/branding/format.env` Output formatting tokens for CLI sections.
+- `tools/scripts/branding/format.sh` Formatting helpers for bash scripts.
+- `tools/scripts/branding/validate-inputs.sh` Shared input validation helpers.
+
+## Usage Rules
+
+- The banner is displayed in local hooks and major CI steps.
+- Use the banner exactly as provided; do not modify without approval.
+- Output is sectioned and deterministic to aid AI parsing.
+
+## Where It’s Used
+
+- `tools/scripts/branding/print-banner.sh`
+- `.github/actions/ps-banner`
+- `tools/scripts/branding/print-section.sh`
+- `tools/scripts/gates/gate-pre-commit.sh`
+- `tools/scripts/gates/gate-pre-push.sh`
+
+## Output Style
+
+- Clear, short section headers.
+- No unstructured noise or unnecessary verbosity.
+- Failures are explicit with remediation guidance.

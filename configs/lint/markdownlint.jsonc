@@ -1,0 +1,45 @@
+{
+  // Political Sphere — Markdownlint Configuration (JSONC)
+  // Metadata is preserved as comments for human readers.
+  // Version: 1.1.0
+
+  "default": true,
+
+  // Line length: readable in terminals, PRs, and AI contexts.
+  "MD013": {
+    "line_length": 100,
+    "code_blocks": false,
+    "tables": false,
+    "headings": false
+  },
+
+  // Inline HTML: allowed sparingly for structure (e.g. <br>), not styling.
+  "MD033": {
+    "allowed_elements": ["br"]
+  },
+
+  // First line heading: disabled when front-matter, banners, or metadata present.
+  "MD041": false,
+
+  // Trailing whitespace: enabled — catches quality issues and avoids noisy diffs.
+  "MD009": true,
+
+  // Multiple consecutive blank lines: keep docs tight and readable.
+  "MD012": {
+    "maximum": 1
+  },
+
+  // Heading style: enforce ATX (#) headings.
+  "MD003": {
+    "style": "atx"
+  },
+
+  // Emphasis style: avoid mixed underscore/asterisk usage.
+  "MD049": {
+    "style": "asterisk"
+  },
+
+  "MD050": {
+    "style": "asterisk"
+  }
+}

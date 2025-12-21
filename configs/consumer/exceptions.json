@@ -1,0 +1,33 @@
+{
+  "meta": {
+    "version": "1.0.0",
+    "owner": "political-sphere",
+    "classification": "internal",
+    "last_reviewed": "2025-12-19",
+    "review_interval_days": 180
+  },
+  "exceptions": {
+    "files": {
+      "allow_missing": [],
+      "allow_present": []
+    },
+    "scripts": {
+      "allow_missing": []
+    },
+    "tools": {
+      "allow_missing": [],
+      "allow_present": []
+    },
+    "workflows": {
+      "allow_missing_uses": [],
+      "allow_top_level": []
+    },
+    "imports": {
+      "allow_unresolved": []
+    }
+  },
+  "notes": {
+    "require_reason": true,
+    "require_risk_decision": true
+  }
+}
