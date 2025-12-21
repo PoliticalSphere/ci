@@ -62,16 +62,21 @@ runs:
           exit 1
         fi
 
-        action_root="${GITHUB_ACTION_PATH}"
-        platform_root="${PS_PLATFORM_ROOT:-}"
-        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
-          echo "PS.CI_VALIDATE: using PS_PLATFORM_ROOT=${platform_root}"
-        else
-          platform_root="$(cd "${action_root}/../../.." >/dev/null 2>&1 && pwd)"
+        echo "DEBUG: GITHUB_WORKSPACE=${GITHUB_WORKSPACE}"
+        echo "DEBUG: GITHUB_ACTION_PATH=${GITHUB_ACTION_PATH}"
+        echo "DEBUG: PS_PLATFORM_ROOT=${PS_PLATFORM_ROOT:-<unset>}"
+        ls -la "${GITHUB_WORKSPACE}" || true
+        if [[ -n "${PS_PLATFORM_ROOT:-}" ]]; then
+          ls -la "${PS_PLATFORM_ROOT}" || true
         fi
+        ls -la "${GITHUB_WORKSPACE}/.ps-platform" || true
 
-        if [[ -z "${platform_root}" ]]; then
-          echo "ERROR: unable to determine platform repo root from GITHUB_ACTION_PATH" >&2
+        action_root="${GITHUB_ACTION_PATH}"
+        platform_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}/.ps-platform}"
+        echo "DEBUG: platform_root=${platform_root}"
+        if [[ ! -d "${platform_root}" ]]; then
+          echo "ERROR: platform_root directory not found: ${platform_root}" >&2
+          echo "HINT: ensure the workflow checks out the platform repo into .ps-platform and exports PS_PLATFORM_ROOT." >&2
           exit 1
         fi
 
