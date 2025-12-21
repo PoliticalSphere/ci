@@ -27,6 +27,11 @@ config_path="${repo_root}/configs/security/gitleaks.toml"
 report_dir="${PS_REPORT_DIR:-${repo_root}/reports/security}"
 report_path="${report_dir}/gitleaks-pr.sarif"
 
+if [[ "${PS_SKIP_SECRETS_SCAN:-0}" == "1" ]]; then
+  detail "Secrets scan: skipped (PS_SKIP_SECRETS_SCAN=1)."
+  exit 0
+fi
+
 # Prefer deterministic behaviour: require config in CI, allow bootstrap locally.
 if [[ "${CI:-0}" == "1" && ! -f "${config_path}" ]]; then
   error "gitleaks config missing at ${config_path}"
