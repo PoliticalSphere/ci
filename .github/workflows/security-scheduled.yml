@@ -31,7 +31,7 @@
 #   - github/codeql-action/autobuild@7c9a7896f03bb1f3de14c5663ed46759e27443e0
 #   - github/codeql-action/analyze@7c9a7896f03bb1f3de14c5663ed46759e27443e0
 #   - github/codeql-action/upload-sarif@7c9a7896f03bb1f3de14c5663ed46759e27443e0
-#   - ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2
+#   - ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a
 #   - trufflesecurity/trufflehog@ef6e76c3c4023279497fab4721ffa071a722fd05
 #   - tools/scripts/branding/print-section.sh
 #
@@ -375,7 +375,7 @@ jobs:
           fetch-depth: 1
 
       - name: Run Scorecard (SARIF)
-        uses: ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2  # v2.4.3
+        uses: ossf/scorecard-action@4eaacf0543bb3f2c246792bd56e8cdeffafb205a  # v2.4.3
         with:
           results_file: results.sarif
           results_format: sarif
