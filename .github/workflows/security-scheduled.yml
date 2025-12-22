@@ -27,10 +27,10 @@
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary
 #   - ./.github/actions/semgrep-cli
-#   - github/codeql-action/init@7c9a7896f03bb1f3de14c5663ed46759e27443e0
-#   - github/codeql-action/autobuild@7c9a7896f03bb1f3de14c5663ed46759e27443e0
-#   - github/codeql-action/analyze@7c9a7896f03bb1f3de14c5663ed46759e27443e0
-#   - github/codeql-action/upload-sarif@7c9a7896f03bb1f3de14c5663ed46759e27443e0
+#   - github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - github/codeql-action/autobuild@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+#   - github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
 #   - ossf/scorecard-action@99c09fe975337306107572b4fdf4db224cf8e2f2
 #   - trufflesecurity/trufflehog@ef6e76c3c4023279497fab4721ffa071a722fd05
 #   - tools/scripts/branding/print-section.sh
@@ -262,7 +262,7 @@ jobs:
           fetch-depth: 1
 
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
+        uses: github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
         with:
           languages: >-
             ${{ (github.event_name == 'workflow_call' && inputs.codeql_languages) ||
@@ -270,10 +270,10 @@ jobs:
             'javascript' }}
 
       - name: Autobuild
-        uses: github/codeql-action/autobuild@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
+        uses: github/codeql-action/autobuild@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
 
       - name: Analyze
-        uses: github/codeql-action/analyze@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
+        uses: github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
         with:
           output: codeql-results
 
@@ -383,7 +383,7 @@ jobs:
 
       - name: Upload SARIF to code scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
+        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
         with:
           sarif_file: results.sarif
 
@@ -505,7 +505,7 @@ jobs:
 
       - name: Upload SARIF to code scanning
         if: always()
-        uses: github/codeql-action/upload-sarif@7c9a7896f03bb1f3de14c5663ed46759e27443e0  # v4.31.9
+        uses: github/codeql-action/upload-sarif@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
         with:
           sarif_file: reports/security/trivy.sarif
 
