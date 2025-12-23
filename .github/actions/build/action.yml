@@ -80,21 +80,21 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Validate inputs: script
+    - name: "Validate inputs: script"
       if: ${{ inputs.script == '' }}
       shell: bash
       run: |
         echo "ERROR: inputs.script is required." >&2
         exit 1
 
-    - name: Validate inputs: working-directory
+    - name: "Validate inputs: working-directory"
       if: ${{ inputs.working-directory == '' }}
       shell: bash
       run: |
         echo "ERROR: inputs.working-directory is required." >&2
         exit 1
 
-    - name: Log config (build)
+    - name: "Log config (build)"
       shell: bash
       env:
         PS_WORKING_DIR: ${{ inputs.working-directory }}
