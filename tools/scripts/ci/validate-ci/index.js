@@ -283,16 +283,17 @@ const highRisk = loadHighRiskTriggers(highRiskAllowlistPath);
 const permissionsBaseline = loadPermissionsBaseline(permissionsBaselinePath);
 const artifactPolicy = loadArtifactPolicy(artifactPolicyPath);
 
+const { spawnSync } = require('child_process');
+
 function tryGit(args) {
-  try {
-    return execSync(`git ${args}`, {
-      cwd: workspaceRoot,
-      stdio: ['ignore', 'pipe', 'ignore'],
-      encoding: 'utf8',
-    }).trim();
-  } catch {
-    return '';
-  }
+  const parts = String(args).split(/\s+/).filter(Boolean);
+  const r = spawnSync('git', parts, {
+    cwd: workspaceRoot,
+    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: 'utf8',
+  });
+  if (r && r.status === 0) return String(r.stdout || '').trim();
+  return '';
 }
 
 function ensureCommit(sha) {
