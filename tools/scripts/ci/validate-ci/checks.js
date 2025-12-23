@@ -67,8 +67,21 @@ function compileRegex(reStr) {
     throw new Error(`unsupported regex flags '${flags}'`);
   }
 
+  // Detect potentially catastrophic backtracking patterns such as nested
+  // unbounded quantifiers (e.g., `(.+)+`, `(.+)*`, `(a+){1,}`) which can lead
+  // to super-linear runtime on crafted inputs. We reject patterns that use
+  // an inner quantified group followed by another unbounded quantifier.
+  const nestedUnbounded = /(\([^)]*(?:\+|\*|\{\s*\d+\s*,\s*\})[^)]*\))\s*(?:\+|\*|\{\s*\d+\s*,\s*\})/;
+  if (nestedUnbounded.test(pattern)) {
+    throw new Error(
+      `unsafe regex pattern detected (potential catastrophic backtracking): ${pattern}`,
+    );
+  }
+
   return new RegExp(pattern, flags);
 }
+
+export { compileRegex };
 
 // Shared helper: validate a `uses:` reference (docker, remote action pinning, allowlist,
 // and optional remote verification). Returns { violations, handled } where handled is
