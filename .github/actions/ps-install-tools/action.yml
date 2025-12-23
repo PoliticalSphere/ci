@@ -81,6 +81,9 @@ runs:
 
     - name: Validate inputs
       shell: bash
+      env:
+        PS_TOOLS_RAW: ${{ inputs.tools }}
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
       run: |
         set -euo pipefail
 
@@ -95,8 +98,8 @@ runs:
         # shellcheck source=/dev/null
         . "${validate_sh}"
 
-        tools_raw="${{ inputs.tools }}"
-        install_dir="${{ inputs.install_dir }}"
+        tools_raw="${PS_TOOLS_RAW:-}"
+        install_dir="${PS_INSTALL_DIR_INPUT:-}"
 
         require_nonempty "inputs.tools" "${tools_raw}" || exit 1
         require_regex \
@@ -140,6 +143,9 @@ runs:
 
     - name: Install tools (pinned)
       shell: bash
+      env:
+        PS_TOOLS_RAW: ${{ inputs.tools }}
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
       run: |
         set -euo pipefail
 
@@ -151,10 +157,10 @@ runs:
           exit 1
         fi
 
-        tools_raw="${{ inputs.tools }}"
+        tools_raw="${PS_TOOLS_RAW:-}"
         IFS=',' read -r -a tools_arr <<< "${tools_raw}"
 
-        export PS_INSTALL_DIR="${GITHUB_WORKSPACE}/${{ inputs.install_dir }}"
+        export PS_INSTALL_DIR="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
         mkdir -p "${PS_INSTALL_DIR}"
 
         bash "${installer}" "${tools_arr[@]}"

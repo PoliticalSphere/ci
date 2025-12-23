@@ -36,6 +36,9 @@ runs:
   steps:
     - name: Validate inputs
       shell: bash
+      env:
+        PS_EGRESS_POLICY_INPUT: ${{ inputs.egress_policy }}
+        PS_ALLOWED_ENDPOINTS_INPUT: ${{ inputs.allowed_endpoints }}
       run: |
         set -euo pipefail
 
@@ -56,19 +59,19 @@ runs:
         # shellcheck source=/dev/null
         . "${validate_sh}"
 
-        policy="$(echo "${{ inputs.egress_policy }}" | tr '[:upper:]' '[:lower:]' | xargs)"
+        policy="$(echo "${PS_EGRESS_POLICY_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
         require_enum "inputs.egress_policy" "${policy}" audit block || exit 1
 
         # Warn (not fail) if block mode has no allowlist.
         if [[ "${policy}" == "block" ]]; then
-          if [[ -z "$(echo "${{ inputs.allowed_endpoints }}" | xargs)" ]]; then
+          if [[ -z "$(echo "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
             echo "WARN: egress_policy=block but allowed_endpoints is empty; network access may be restricted." >&2
           fi
         fi
 
         echo "PS_EGRESS_POLICY=${policy}" >> "${GITHUB_ENV}"
         echo "PS.HARDEN_RUNNER: egress_policy=${policy}"
-        if [[ -n "$(echo "${{ inputs.allowed_endpoints }}" | xargs)" ]]; then
+        if [[ -n "$(echo "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
           echo "PS.HARDEN_RUNNER: allowed_endpoints=provided"
         else
           echo "PS.HARDEN_RUNNER: allowed_endpoints=empty"

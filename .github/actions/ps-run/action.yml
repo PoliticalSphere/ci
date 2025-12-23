@@ -87,6 +87,13 @@ runs:
 
     - name: Run step (banner + section + script)
       shell: bash
+      env:
+        PS_REL_SCRIPT: ${{ inputs.script }}
+        PS_REL_WD: ${{ inputs.working-directory }}
+        PS_ARGS: ${{ inputs.args }}
+        PS_ID: ${{ inputs.id }}
+        PS_TITLE: ${{ inputs.title }}
+        PS_DESCRIPTION: ${{ inputs.description }}
       run: |
         set -euo pipefail
 
@@ -117,7 +124,7 @@ runs:
           exit 1
         fi
 
-        rel_script="${{ inputs.script }}"
+        rel_script="${PS_REL_SCRIPT:-}"
         if [[ -z "${rel_script}" ]]; then
           echo "ERROR: inputs.script is required" >&2
           exit 1
@@ -136,7 +143,7 @@ runs:
           exit 1
         fi
 
-        rel_wd="${{ inputs.working-directory }}"
+        rel_wd="${PS_REL_WD:-}"
         if [[ -z "${rel_wd}" ]]; then
           rel_wd="."
         fi
@@ -157,15 +164,16 @@ runs:
         echo "PS.RUN: script=${rel_script}"
         echo "PS.RUN: working_directory=${rel_wd}"
 
-        bash "${section_script}" "${{ inputs.id }}" "${{ inputs.title }}" "${{ inputs.description }}"
+        bash "${section_script}" "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"
 
         cd "${wd}"
 
-        args="${{ inputs.args }}"
+        args="${PS_ARGS:-}"
         if [[ -n "${args}" ]]; then
           # Intentional word-splitting: args is a workflow-author-controlled string.
-          # shellcheck disable=SC2086
-          bash "${target}" -- ${args}
+          # Split into an array safely to preserve quoting semantics.
+          read -r -a args_arr <<< "${args}"
+          bash "${target}" -- "${args_arr[@]}"
         else
           bash "${target}"
         fi
