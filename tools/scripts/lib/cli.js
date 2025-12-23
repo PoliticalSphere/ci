@@ -19,7 +19,6 @@ export function parseArgs(argv) {
       args[key] = true;
     } else {
       args[key] = value;
-      i += 1;
     }
   }
   return args;
