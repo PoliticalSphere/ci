@@ -14,7 +14,7 @@ try {
   const env = {
     // Disable in-place updates explicitly
     PS_LINT_INLINE: '0',
-    PATH: process.env.PATH,
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'xterm',

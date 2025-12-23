@@ -1,0 +1,37 @@
+#!/usr/bin/env node
+
+import { execFileSync } from 'node:child_process';
+import { fail, getRepoRoot } from './test-utils.js';
+
+const repoRoot = getRepoRoot();
+
+// Simulate two separate processes in the same GitHub Actions run by setting
+// GITHUB_RUN_ID in both child processes and invoking the printing helper.
+let out = '';
+try {
+  const env = {
+    GITHUB_ACTIONS: 'true',
+    GITHUB_RUN_ID: '1001',
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    TERM: 'xterm',
+  };
+
+  // Run the helper twice in separate shells to simulate separate steps
+  const cmd = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary`;
+  const first = execFileSync('bash', ['-lc', cmd], { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 });
+  const second = execFileSync('bash', ['-lc', cmd], { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 });
+
+  out = first + second;
+} catch (err) {
+  out = (err.stdout || '') + (err.stderr || '');
+}
+
+const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
+if (headerCount !== 1) {
+  fail(`Unexpected header count with GITHUB_RUN_ID: expected 1, found ${headerCount}\nOutput:\n${out}`);
+}
+
+console.log('OK: lint summary dedupes across processes when GITHUB_RUN_ID is set');
+process.exit(0);

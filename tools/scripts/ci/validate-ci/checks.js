@@ -7,6 +7,24 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { createRequire } from 'node:module';
+
+// Optionally use the RE2 engine (if available) to protect against
+// catastrophic backtracking. We try to require it at load time and fall
+// back to native RegExp when not available.
+let RE2 = null;
+try {
+  const require = createRequire(import.meta.url);
+  RE2 = require('re2');
+} catch (err) {
+  RE2 = null;
+}
+
+// Allow tests to override the regex engine (for injecting a fake engine).
+let regexEngineOverride = null;
+export function setRegexEngineForTest(engine) {
+  regexEngineOverride = engine;
+}
 
 import { section } from './console.js';
 import {
@@ -77,6 +95,13 @@ function compileRegex(reStr) {
       `unsafe regex pattern detected (potential catastrophic backtracking): ${pattern}`,
     );
   }
+
+  // If a test has overridden the regex engine, use it (useful for unit tests).
+  if (regexEngineOverride) return new regexEngineOverride(pattern, flags);
+
+  // Prefer RE2 (if available) because it provides formal guarantees against
+  // backtracking-based DoS. Fall back to native RegExp otherwise.
+  if (RE2) return new RE2(pattern, flags);
 
   return new RegExp(pattern, flags);
 }

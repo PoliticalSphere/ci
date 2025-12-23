@@ -290,6 +290,7 @@ function tryGit(args) {
     cwd: workspaceRoot,
     stdio: ['ignore', 'pipe', 'ignore'],
     encoding: 'utf8',
+    env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' },
   });
   if (r && r.status === 0) return String(r.stdout || '').trim();
   return '';

@@ -19,7 +19,7 @@ try {
   const env = {
     // Minimal, explicit environment for the child process
     CI: '1',
-    PATH: process.env.PATH,
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'dumb',

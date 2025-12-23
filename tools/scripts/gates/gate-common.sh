@@ -106,64 +106,47 @@ lint_init() {
 
 # Print a compact, single LINT block and update in-place when possible
 print_lint_summary() {
-  # Erase previous block only when attached to a real interactive TTY and
-  # in-place updates are enabled (PS_LINT_INLINE=1). Some environments may
-  # present a pseudo-TTY that does not support cursor movement reliably; in
-  # those cases users can disable in-place updates by setting
-  # PS_LINT_INLINE=0 in their environment.
-  if [[ "${PS_LINT_INLINE:-1}" == "1" && -t 1 && "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
-    local n=${LINT_SUMMARY_LINES}
-    # Move cursor up n lines and clear them reliably (portable across terminals)
-    printf '\033[%dA' "$n"
-    for ((i=0;i<n;i++)); do
-      # Use carriage return before clearing line to ensure cursor at line start
-      printf '\r\033[2K\033[1E'
-    done
-    # Return cursor to original top position
-    printf '\033[%dA' "$n"
-  fi
-
   # If in-place updates are disabled, or the current process will not do
   # interactive in-place updates (no real TTY), and we've already printed
-  # the summary once, avoid re-printing it — repeated prints clutter
-  # non-interactive logs where cursor movement isn't available.
-  # If inline updates are disabled, or the environment is non-interactive
-  # (no real TTY), or we are running inside known CI-like systems where
-  # pseudo-TTYs may not behave reliably (GitHub Actions / CI), avoid
-  # re-printing the summary block after the first time.
+  # the summary once in this process, avoid re-printing it — repeated
+  # prints clutter non-interactive logs where cursor movement isn't available.
   if { [[ "${PS_LINT_INLINE:-1}" != "1" ]] || [[ ! -t 1 ]] || [[ -n "${GITHUB_ACTIONS:-}" ]] || [[ "${CI:-0}" == "1" ]] || [[ -z "${TERM:-}" ]] || [[ "${TERM}" == "dumb" ]]; } && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
     return 0
   fi
 
-  # Header: print full header only the first time; subsequent updates
-  # print a blank header line to preserve line counts but avoid repeating
-  # the '▶ LINT' banner multiple times in logs.
+  # Build the full summary into a buffer first so we can compare against
+  # the last printed summary (persisted to disk). This lets multiple
+  # processes invoked in the same job avoid duplicating identical blocks
+  # in CI logs while preserving in-place updates in interactive runs.
+  local buf=""
+
+  # Save previous initialized state and use it while building the buffer to
+  # avoid changing behavior mid-flight when consulting the cache later.
+  local prev_initialized="${LINT_SUMMARY_INITIALIZED:-0}"
+
+  # Helper to append lines to the buffer (preserve color sequences)
+  _append() { buf+="$1\n"; }
+
+  # Header: decide whether to print the full banner or a blank line to
+  # preserve line counts (use the previous initialized state so we don't
+  # flip it before checking for cache dedupe)
   local c_reset="" c_bold="" c_dim="" c_cyan="" c_green="" c_red="" c_yellow=""
-  if [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 0 ]]; then
-    # Prefer colors when supported (FORCE_COLOR, CI, or a real TTY). Fall back
-    # to plain text only when colors are explicitly disabled via NO_COLOR.
+  if [[ "${prev_initialized}" -eq 0 ]]; then
     if ps_supports_color; then
       c_reset="\033[0m"; c_bold="\033[1m"; c_dim="\033[90m"; c_cyan="\033[36m"; c_green="\033[32m"; c_red="\033[31m"; c_yellow="\033[33m"
-      printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT & TYPE CHECK" "${c_reset}"
+      _append "${c_green}${PS_FMT_ICON:-▶}${c_reset} ${c_bold}${c_cyan}LINT & TYPE CHECK${c_reset}"
     else
-      printf "%s %s\n" "${PS_FMT_ICON:-▶}" "LINT & TYPE CHECK"
+      _append "${PS_FMT_ICON:-▶} LINT & TYPE CHECK"
     fi
-    # Mark that we've printed at least once
-    LINT_SUMMARY_INITIALIZED=1
   else
-    # Preserve line counts with a blank line to avoid duplicating the banner
-    printf "\n"
+    _append ""
   fi
 
-  # Indentation for lint rows (align with start of "LINT" header)
-  local lint_indent="  " 
 
-  # Column width for labels
+  # Indentation and column padding
+  local lint_indent="  "
   local pad=24
 
-
-  # Ensure color vars are initialized when color is supported so rows
-  # display colors even if the initial header was printed without color.
   if ps_supports_color; then
     c_reset="${c_reset:-\033[0m}"
     c_bold="${c_bold:-\033[1m}"
@@ -175,38 +158,101 @@ print_lint_summary() {
   fi
 
   # Rows
-  local pad=24
-  local i
+  local i padded label status log
   for i in "${!LINT_IDS[@]}"; do
-    local label="${LINT_LABELS[$i]}"
-    local status="${LINT_STATUSES[$i]}"
-    local log="${LINT_LOGS[$i]}"
+    label="${LINT_LABELS[$i]}"
+    status="${LINT_STATUSES[$i]}"
+    log="${LINT_LOGS[$i]}"
     printf -v padded "%-${pad}s" "${label}"
+
     if ps_supports_color; then
-        case "$status" in
-        PASS)
-          # Keep the log path plain (no color) so CI viewers preserve it as a
-          # single clickable token. Color only the status and the "Findings Log" label.
-          printf "%s%s %b%-7s%b   %bFindings Log%b (%s)\n" "${lint_indent}" "${padded}" "${c_green}${c_bold}" "PASS" "${c_reset}" "${c_cyan}${c_bold}" "${c_reset}" "${log}" ;;
+      case "$status" in
+      PASS)
+        _append "${lint_indent}${padded} ${c_green}${c_bold}PASS${c_reset}   ${c_cyan}${c_bold}Findings Log${c_reset} (${log})" ;;
 
-        FAIL)
-          printf "%s%s %b%-7s%b   %bFindings Log%b (%s)\n" "${lint_indent}" "${padded}" "${c_red}${c_bold}" "FAIL" "${c_reset}" "${c_cyan}${c_bold}" "${c_reset}" "${log}" ;;
+      FAIL)
+        _append "${lint_indent}${padded} ${c_red}${c_bold}FAIL${c_reset}   ${c_cyan}${c_bold}Findings Log${c_reset} (${log})" ;;
 
-        SKIPPED)
-          printf "%s%s %b%-7s%b   %bFindings Log%b (%s)\n" "${lint_indent}" "${padded}" "${c_yellow}${c_bold}" "SKIPPED" "${c_reset}" "${c_cyan}${c_bold}" "${c_reset}" "${log}" ;;
-        Running*)
-          printf "%s%s %b%s%b\n" "${lint_indent}" "${padded}" "${c_cyan}" "Running..." "${c_reset}" ;;
-        Waiting)
-          printf "%s%s %b%s%b\n" "${lint_indent}" "${padded}" "${c_dim}" "Waiting..." "${c_reset}" ;;
-        *)
-          printf "    %s %s\n" "${padded}" "${status}" ;;
+      SKIPPED)
+        _append "${lint_indent}${padded} ${c_yellow}${c_bold}SKIPPED${c_reset}   ${c_cyan}${c_bold}Findings Log${c_reset} (${log})" ;;
+
+      Running*)
+        _append "${lint_indent}${padded} ${c_cyan}Running...${c_reset}" ;;
+
+      Waiting)
+        _append "${lint_indent}${padded} ${c_dim}Waiting...${c_reset}" ;;
+
+      *)
+        _append "    ${padded} ${status}" ;;
       esac
     else
-      printf "%s%s %s\n" "${lint_indent}" "${padded}" "${status}"
+      _append "${lint_indent}${padded} ${status}"
     fi
   done
 
+  # Ensure the lint logs directory exists for our cache file
+  mkdir -p "${LINT_DIR}"
+
+  # Compare with last printed summary (persisted). If identical, avoid
+  # re-printing to prevent duplicate blocks appearing in CI logs
+  local cache_file="${LINT_DIR}/.last_summary"
+  local tmp_file="${LINT_DIR}/.last_summary.tmp"
+  local meta_file="${LINT_DIR}/.last_summary.meta"
+  # Use %b so backslash-escaped sequences (e.g., \033[32m) are interpreted
+  # into real ANSI escape characters when written to the temp file.
+  printf "%b" "$buf" > "$tmp_file"
+  if [[ -f "$cache_file" ]] && cmp -s "$cache_file" "$tmp_file"; then
+    # If this is a real GitHub Actions run, only dedupe when the cached
+    # summary was written during the same run (compare run ids in meta).
+    if [[ -n "${GITHUB_RUN_ID:-}" ]]; then
+      if [[ -f "$meta_file" ]] && grep -Fxq "${GITHUB_RUN_ID}" "$meta_file"; then
+        rm -f "$tmp_file"
+        return 0
+      fi
+    fi
+
+    # In other CI environments, allow explicit opt-in for cross-process
+    # dedupe via PS_LINT_SUMMARY_USE_CACHE=1.
+    if [[ "${CI:-0}" == "1" && "${PS_LINT_SUMMARY_USE_CACHE:-0}" == "1" ]]; then
+      rm -f "$tmp_file"
+      return 0
+    fi
+
+    # Otherwise, only skip when we've already initialized the summary in
+    # this process (i.e., the second print within the same process).
+    if [[ "${prev_initialized}" -eq 1 ]]; then
+      rm -f "$tmp_file"
+      return 0
+    fi
+  fi
+
+  # If we reach here, the buffer differs from the last printed summary.
+  # Perform in-place erase of the previous block only when attached to a
+  # real interactive TTY and in-place updates are enabled (PS_LINT_INLINE=1).
+  if [[ "${PS_LINT_INLINE:-1}" == "1" && -t 1 && "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
+    local n=${LINT_SUMMARY_LINES}
+    printf '\033[%dA' "$n"
+    for ((i=0;i<n;i++)); do
+      printf '\r\033[2K\033[1E'
+    done
+    printf '\033[%dA' "$n"
+  fi
+
+  # Emit the buffer and persist it; also store the GitHub run id (if any)
+  # so future processes in the same Actions run can reliably dedupe.
+  # Use %b so backslash-escaped sequences are rendered as ANSI escapes.
+  printf "%b\n" "$buf"
+  mv "$tmp_file" "$cache_file" || rm -f "$tmp_file"
+  printf "%s" "${GITHUB_RUN_ID:-}" > "$meta_file" || true
+
   LINT_SUMMARY_LINES=$((1 + ${#LINT_IDS[@]}))
+
+  # If we were not initialized previously, mark as initialized now so
+  # subsequent calls in this process behave like before.
+  if [[ "${prev_initialized}" -eq 0 ]]; then
+    LINT_SUMMARY_INITIALIZED=1
+  fi
+
   return 0
 }
 

@@ -1,7 +1,10 @@
 #!/usr/bin/env node
 
 import { fail, section } from './test-utils.js';
-import { compileRegex } from '../scripts/ci/validate-ci/checks.js';
+import {
+  compileRegex,
+  setRegexEngineForTest,
+} from '../scripts/ci/validate-ci/checks.js';
 
 function assert(condition, message) {
   if (!condition) fail(message);
@@ -26,6 +29,23 @@ try {
     threw = true;
   }
   assert(!threw, "expected compileRegex to accept '(\\.[0-9]+){0,2}$'");
+
+  // Test override hook: ensure a provided engine is used when set
+  class FakeEngine {
+    constructor(pat, flags) {
+      this.pat = pat;
+      this.flags = flags;
+    }
+    test() {
+      return false;
+    }
+  }
+
+  setRegexEngineForTest(FakeEngine);
+  const inst = compileRegex('abc');
+  assert(inst instanceof FakeEngine, 'expected FakeEngine to be used');
+  // Reset override
+  setRegexEngineForTest(null);
 
   console.log('OK: regex safety checks passed');
   process.exit(0);
