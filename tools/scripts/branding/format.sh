@@ -45,6 +45,12 @@ PS_FMT_BULLET_INDENT="${PS_FMT_BULLET_INDENT:-  }"
 PS_FMT_BULLET="${PS_FMT_BULLET:--}"
 PS_FMT_SECTION_ID_CASE="${PS_FMT_SECTION_ID_CASE:-upper}"
 
+# ANSI formatting codes (overridable)
+PS_FMT_RESET="${PS_FMT_RESET:-$'\033[0m'}"
+PS_FMT_DIM="${PS_FMT_DIM:-$'\033[2m'}"
+PS_FMT_BOLD="${PS_FMT_BOLD:-$'\033[1m'}"
+
+
 ps_supports_color() {
   # NO_COLOR: treat any non-empty value as "disable"
   if [[ -n "${NO_COLOR:-}" && "${NO_COLOR:-}" != "0" ]]; then
@@ -54,7 +60,7 @@ ps_supports_color() {
   if [[ "${FORCE_COLOR:-0}" != "0" ]]; then
     return 0
   fi
-  [[ -t 1 ]]
+  [[ -t 1 ]] && return 0 || return 1
 }
 
 # Internal: print to stdout or stderr with optional ANSI style prefix/suffix.
@@ -77,48 +83,56 @@ _ps_print() {
       printf "%s\n" "${msg}"
     fi
   fi
+  return 0
 }
 
 ps_detail() {
   local msg="${PS_FMT_DETAIL_INDENT}$*"
-  _ps_print 1 $'\033[2m' $'\033[0m' "${msg}"
+  _ps_print 1 "${PS_FMT_DIM}" "${PS_FMT_RESET}" "${msg}"
+  return 0
 }
 
 ps_detail_err() {
   local msg="${PS_FMT_DETAIL_INDENT}$*"
-  _ps_print 2 $'\033[2m' $'\033[0m' "${msg}"
+  _ps_print 2 "${PS_FMT_DIM}" "${PS_FMT_RESET}" "${msg}"
+  return 0
 }
 
 ps_bullet() {
   printf "%s%s %s\n" "${PS_FMT_BULLET_INDENT}" "${PS_FMT_BULLET}" "$*"
+  return 0
 }
 
 ps_info() {
   _ps_print 1 "" "" "${PS_FMT_ICON} $*"
+  return 0
 }
 
 ps_ok() {
   if ps_supports_color; then
-    _ps_print 1 $'\033[1m\033[32m' $'\033[0m' "${PS_FMT_ICON} OK: $*"
+    _ps_print 1 $'\033[1m\033[32m' "${PS_FMT_RESET}" "${PS_FMT_ICON} OK: $*"
   else
     _ps_print 1 "" "" "${PS_FMT_ICON} OK: $*"
   fi
+  return 0
 }
 
 ps_warn() {
   if ps_supports_color; then
-    _ps_print 2 $'\033[1m\033[33m' $'\033[0m' "WARN: $*"
+    _ps_print 2 $'\033[1m\033[33m' "${PS_FMT_RESET}" "WARN: $*"
   else
     _ps_print 2 "" "" "WARN: $*"
   fi
+  return 0
 }
 
 ps_error() {
   if ps_supports_color; then
-    _ps_print 2 $'\033[1m\033[31m' $'\033[0m' "ERROR: $*"
+    _ps_print 2 $'\033[1m\033[31m' "${PS_FMT_RESET}" "ERROR: $*"
   else
     _ps_print 2 "" "" "ERROR: $*"
   fi
+  return 0
 }
 
 ps_die() {
