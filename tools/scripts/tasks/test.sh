@@ -62,7 +62,7 @@ if [[ "${#test_files[@]}" -gt 0 ]]; then
     if [[ -x "${branding_script}" ]]; then
       bash "${branding_script}" "test" "Running test" "$(basename "${f}")"
     else
-      echo "Running test: $(basename "${f}")"
+      printf 'Running test: %q\n' "$(basename "${f}")"
     fi
     node "${f}"
   done
@@ -81,5 +81,6 @@ fi
 if [[ -x "${branding_script}" ]]; then
   bash "${branding_script}" "tests.result" "Tests passed" "${#test_files[@]} test file(s) validated"
 else
-  echo "Tests passed: ${#test_files[@]} test file(s) validated"
+  count="${#test_files[@]}"
+  printf 'Tests passed: %q\n' "${count} test file(s) validated"
 fi
