@@ -241,13 +241,12 @@ function checkRequiredScripts({
 }
 
 function gatherDeps(packageJson) {
-  // avoid useless empty spread object
-  return Object.assign(
-    {},
-    packageJson.dependencies || {},
-    packageJson.devDependencies || {},
-    packageJson.optionalDependencies || {},
-  );
+  // Combine dependency objects using object spread for clarity and modern style
+  return {
+    ...(packageJson.dependencies || {}),
+    ...(packageJson.devDependencies || {}),
+    ...(packageJson.optionalDependencies || {}),
+  };
 }
 
 function checkTools({
@@ -374,13 +373,13 @@ function checkDocsClaims({
     ? policy.docs_claims
     : [];
   section('docs.claims', 'Doc claims', `${docsClaims.length} rule(s)`);
-  for (const claim of docsClaims) {
-    const docPath = resolvePath(repoRoot, claim.path || '');
-    if (!claim.path || !fs.existsSync(docPath)) continue;
-    const raw = readText(docPath).toLowerCase();
-    const needle = String(claim.contains || '').toLowerCase();
-    if (!needle || !raw.includes(needle)) continue;
-
+  function checkClaimTools(
+    claim,
+    deps,
+    failOnMissing,
+    toolMissingAllow,
+    violations,
+  ) {
     const requiredToolsClaim = claim.requires_tools || [];
     for (const tool of requiredToolsClaim) {
       if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
@@ -391,7 +390,15 @@ function checkDocsClaims({
         });
       }
     }
+  }
 
+  function checkClaimScripts(
+    claim,
+    packageJson,
+    failOnMissing,
+    scriptMissingAllow,
+    violations,
+  ) {
     const requiredScriptsClaim = claim.requires_scripts || [];
     for (const script of requiredScriptsClaim) {
       if (
@@ -406,7 +413,15 @@ function checkDocsClaims({
         });
       }
     }
+  }
 
+  function checkClaimFiles(
+    claim,
+    repoRoot,
+    failOnMissing,
+    fileMissingAllow,
+    violations,
+  ) {
     const requiredFilesClaim = claim.requires_files || [];
     for (const file of requiredFilesClaim) {
       if (
@@ -421,6 +436,30 @@ function checkDocsClaims({
         });
       }
     }
+  }
+
+  for (const claim of docsClaims) {
+    const docPath = resolvePath(repoRoot, claim.path || '');
+    if (!claim.path || !fs.existsSync(docPath)) continue;
+    const raw = readText(docPath).toLowerCase();
+    const needle = String(claim.contains || '').toLowerCase();
+    if (!needle || !raw.includes(needle)) continue;
+
+    checkClaimTools(claim, deps, failOnMissing, toolMissingAllow, violations);
+    checkClaimScripts(
+      claim,
+      packageJson,
+      failOnMissing,
+      scriptMissingAllow,
+      violations,
+    );
+    checkClaimFiles(
+      claim,
+      repoRoot,
+      failOnMissing,
+      fileMissingAllow,
+      violations,
+    );
   }
 }
 
@@ -504,21 +543,37 @@ function checkPathIntegrity({
           if (!entry.isFile()) continue;
           if (!exts.includes(path.extname(entry.name))) continue;
 
-          const imports = scanRelativeImports(full, exts);
-          for (const item of imports) {
-            if (item.resolved) continue;
-            const key = `${rel}:${item.target}`;
-            if (importAllow.has(key) || importAllow.has(item.target)) {
-              continue;
-            }
-            if (failOnMissing) {
-              violations.push({
-                code: 'import-unresolved',
-                message: `unresolved import '${item.target}' in ${rel}`,
-                path: rel,
-              });
+          function checkUnresolvedImports(
+            imports,
+            rel,
+            importAllow,
+            failOnMissing,
+            violations,
+          ) {
+            for (const item of imports) {
+              if (item.resolved) continue;
+              const key = `${rel}:${item.target}`;
+              if (importAllow.has(key) || importAllow.has(item.target)) {
+                continue;
+              }
+              if (failOnMissing) {
+                violations.push({
+                  code: 'import-unresolved',
+                  message: `unresolved import '${item.target}' in ${rel}`,
+                  path: rel,
+                });
+              }
             }
           }
+
+          const imports = scanRelativeImports(full, exts);
+          checkUnresolvedImports(
+            imports,
+            rel,
+            importAllow,
+            failOnMissing,
+            violations,
+          );
         }
       }
     }

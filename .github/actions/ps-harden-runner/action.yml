@@ -51,33 +51,33 @@ runs:
 
         validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
-          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
-          echo "HINT: set PS_PLATFORM_ROOT to the platform repo root (e.g. .ps-platform)." >&2
+          printf '%q\n' "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          printf '%q\n' "HINT: set PS_PLATFORM_ROOT to the platform repo root (e.g. .ps-platform)." >&2
           exit 1
         fi
 
         # shellcheck source=/dev/null
         . "${validate_sh}"
 
-        policy="$(echo "${PS_EGRESS_POLICY_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
+        policy="$(printf '%s' "${PS_EGRESS_POLICY_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
         require_enum "inputs.egress_policy" "${policy}" audit block || exit 1
 
         # Warn (not fail) if block mode has no allowlist.
         if [[ "${policy}" == "block" ]]; then
-          if [[ -z "$(echo "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
-            echo "WARN: egress_policy=block but allowed_endpoints is empty; network access may be restricted." >&2
+          if [[ -z "$(printf '%s' "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
+            printf '%q\n' "WARN: egress_policy=block but allowed_endpoints is empty; network access may be restricted." >&2
           fi
         fi
 
-        echo "PS_EGRESS_POLICY=${policy}" >> "${GITHUB_ENV}"
-        if [[ -n "$(echo "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
+        printf '%s\n' "PS_EGRESS_POLICY=${policy}" >> "${GITHUB_ENV}"
+        if [[ -n "$(printf '%s' "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
           # Persist validated allowed endpoints for downstream step usage
-          echo "PS_ALLOWED_ENDPOINTS_VALIDATED=${PS_ALLOWED_ENDPOINTS_INPUT}" >> "${GITHUB_ENV}"
-          echo "PS.HARDEN_RUNNER: allowed_endpoints=provided"
+          printf '%s\n' "PS_ALLOWED_ENDPOINTS_VALIDATED=${PS_ALLOWED_ENDPOINTS_INPUT}" >> "${GITHUB_ENV}"
+          printf '%q\n' "PS.HARDEN_RUNNER: allowed_endpoints=provided"
         else
-          echo "PS.HARDEN_RUNNER: allowed_endpoints=empty"
+          printf '%q\n' "PS.HARDEN_RUNNER: allowed_endpoints=empty"
         fi
-        echo "PS.HARDEN_RUNNER: egress_policy=${policy}"
+        printf '%q\n' "PS.HARDEN_RUNNER: egress_policy=${policy}"
 
 
     - name: Ensure harden-runner post path exists
@@ -112,4 +112,4 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        echo "PS.HARDEN_RUNNER: OK"
+        printf '%s\n' "PS.HARDEN_RUNNER: OK"

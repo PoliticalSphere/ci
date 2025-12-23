@@ -417,16 +417,16 @@ function checkLocalActionStep({ rel, uses, step, workspaceRoot }) {
     violationsLocal.push(
       makeViolation(
         rel,
-          `local action missing action.yml or action.yaml: ${uses}`,
-          step.startLine || 1,
-          step.startColumn || null,
-          2,
-        ),
-      );
-    }
-
-    return violationsLocal;
+        `local action missing action.yml or action.yaml: ${uses}`,
+        step.startLine || 1,
+        step.startColumn || null,
+        2,
+      ),
+    );
   }
+
+  return violationsLocal;
+}
 
 async function checkRemoteActionStep({
   rel,
@@ -496,7 +496,14 @@ function checkInlineRun({
   violations.push(...checkInlineSecrets({ rel, jobId, step }));
 
   if (allowInline) {
-    violations.push(...checkInlineAllowlistConstraints({ rel, jobId, step, inlineConstraints }));
+    violations.push(
+      ...checkInlineAllowlistConstraints({
+        rel,
+        jobId,
+        step,
+        inlineConstraints,
+      }),
+    );
   } else {
     if (runLineCount > inlineMaxLines) {
       violations.push(
@@ -522,7 +529,15 @@ function checkInlineRun({
     }
   }
 
-  violations.push(...checkUnsafeRunPatterns({ rel, jobId, step, unsafePatterns, unsafeAllowlist }));
+  violations.push(
+    ...checkUnsafeRunPatterns({
+      rel,
+      jobId,
+      step,
+      unsafePatterns,
+      unsafeAllowlist,
+    }),
+  );
 
   return violations;
 }
@@ -543,7 +558,12 @@ function checkInlineSecrets({ rel, jobId, step }) {
   return violations;
 }
 
-function checkInlineAllowlistConstraints({ rel, jobId, step, inlineConstraints }) {
+function checkInlineAllowlistConstraints({
+  rel,
+  jobId,
+  step,
+  inlineConstraints,
+}) {
   const violations = [];
   for (const r of inlineConstraints.forbidRegex) {
     let re;
@@ -590,7 +610,13 @@ function checkInlineAllowlistConstraints({ rel, jobId, step, inlineConstraints }
   return violations;
 }
 
-function checkUnsafeRunPatterns({ rel, jobId, step, unsafePatterns, unsafeAllowlist }) {
+function checkUnsafeRunPatterns({
+  rel,
+  jobId,
+  step,
+  unsafePatterns,
+  unsafeAllowlist,
+}) {
   const violations = [];
   for (const pattern of unsafePatterns) {
     for (const reStr of pattern.runRegex || []) {
@@ -676,7 +702,9 @@ function checkSecretsHandling({ rel, jobId, step }) {
         ),
       );
     }
-    const echoLineIdx = runLines.findIndex((line) => /\${{\s*secrets\./.test(line) && /\b(echo|printf)\b/.test(line));
+    const echoLineIdx = runLines.findIndex(
+      (line) => /\${{\s*secrets\./.test(line) && /\b(echo|printf)\b/.test(line),
+    );
     if (echoLineIdx >= 0) {
       const line = step.runLineNumbers?.[echoLineIdx] || rLine;
       const col = step.runLineColumns?.[echoLineIdx] || rCol;

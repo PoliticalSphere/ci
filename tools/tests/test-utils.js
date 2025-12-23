@@ -5,11 +5,11 @@ import YAML from 'yaml';
 
 // Reuse console helpers from Validate-CI to avoid duplication across the repo.
 export {
-  section,
-  info,
   detail,
   getRepoRoot,
+  info,
   isCI,
+  section,
 } from '../scripts/ci/validate-ci/console.js';
 
 export function fail(message) {

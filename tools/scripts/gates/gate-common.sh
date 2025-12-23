@@ -104,8 +104,11 @@ lint_init() {
 
 # Print a compact, single LINT block and update in-place when possible
 print_lint_summary() {
-  # Erase previous block if present (TTY)
-  if ps_supports_color && [[ "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
+  # Erase previous block if present (only when attached to a real TTY).
+  # Note: CI environments often set COLOR hints (via CI/FORCE_COLOR) but do not
+  # provide a real TTY; emitting cursor control sequences in those logs will
+  # cause duplicated printed blocks. Use -t 1 to verify an actual TTY.
+  if [[ -t 1 ]] && [[ "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
     local n=${LINT_SUMMARY_LINES}
     # Move cursor up n lines and clear them reliably (portable across terminals)
     printf '\033[%dA' "$n"
@@ -117,10 +120,12 @@ print_lint_summary() {
     printf '\033[%dA' "$n"
   fi
 
-  # If not TTY and we've already printed the summary once, avoid
-  # re-printing it — repeated prints clutter CI logs where control
-  # sequences may not behave as expected.
-  if ! ps_supports_color && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
+  # If not attached to a TTY and we've already printed the summary once,
+  # avoid re-printing it — repeated prints clutter CI logs where control
+  # sequences (cursor movement) do not behave as expected even if colors
+  # are enabled by CI variables. Check the actual TTY rather than color
+  # support, which can be forced in CI environments.
+  if [[ ! -t 1 ]] && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
     return 0
   fi
 

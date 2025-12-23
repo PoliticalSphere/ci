@@ -55,7 +55,8 @@ run_knip() {
   else
     (cd "${repo_root}" && "${KNIP_BIN}" "${KNIP_ARGS[@]}")
   fi
-  return 0
+  local rc=$?
+  return "${rc}"
 }
 
 output="$(run_knip 2>&1)" || true

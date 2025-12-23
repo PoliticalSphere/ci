@@ -13,7 +13,6 @@
 //   - Exit codes are meaningful (0 pass, 1 fail)
 // ======================================================================
 
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -448,9 +447,12 @@ violations.push(...workflowViolations, ...actionViolations);
       const thresholdMessage = failedByScore
         ? 'Below threshold -> failing.'
         : 'Above threshold -> OK by score.';
-      bullet(`Configured failure threshold: ${scoreFailThreshold}%. ${thresholdMessage}`, {
-        stream: 'stderr',
-      });
+      bullet(
+        `Configured failure threshold: ${scoreFailThreshold}%. ${thresholdMessage}`,
+        {
+          stream: 'stderr',
+        },
+      );
     }
 
     process.exit(1);

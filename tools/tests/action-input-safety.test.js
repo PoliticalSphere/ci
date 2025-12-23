@@ -21,7 +21,7 @@ if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) {
 const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
 const actionDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 
-let violations = [];
+const violations = [];
 
 for (const dir of actionDirs) {
   const ymlPath = path.join(actionsRoot, dir, 'action.yml');
@@ -44,7 +44,7 @@ for (const dir of actionDirs) {
           violations.push({ file: ymlPath, line: j + 1, text: l.trim() });
         }
         // detect echo strings that interpolate variables like ${...}
-        if (/echo\s+["'].*\$\{[^\}]*["']/.test(l)) {
+        if (/echo\s+["'].*\$\{[^}]*\}.*["']/.test(l)) {
           violations.push({ file: ymlPath, line: j + 1, text: l.trim() });
         }
       }

@@ -444,6 +444,8 @@ async function main() {
   process.exit(0);
 }
 
-main().catch((err) => {
+try {
+  await main();
+} catch (err) {
   fail(err?.stack || err?.message || String(err));
-});
+}

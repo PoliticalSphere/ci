@@ -108,8 +108,10 @@ export function permissionLevel(value) {
 }
 
 function parseRepoEntry(line) {
+  // Match owner/repo where allowed characters include letters, digits, underscore,
+  // dot, space and hyphen. Group parts explicitly to make precedence clear.
   const repoMatch = line.match(
-    /^\s*-\s*repo:\s*([A-Za-z\d_.\-]+\/[A-Za-z\d_.\-]+)/,
+    /^\s*-\s*repo:\s*((?:[A-Za-z0-9_. -]+)\/(?:[A-Za-z0-9_. -]+))/,
   );
   return repoMatch ? repoMatch[1] : null;
 }
@@ -188,7 +190,8 @@ function parseSectionStart(line) {
   const trimmed = line.trim();
   if (trimmed === 'global:') return { type: 'global', indent: getIndent(line) };
   if (trimmed === 'forbid:') return { type: 'forbid', indent: getIndent(line) };
-  if (trimmed === 'require:') return { type: 'require', indent: getIndent(line) };
+  if (trimmed === 'require:')
+    return { type: 'require', indent: getIndent(line) };
   return null;
 }
 
@@ -215,21 +218,56 @@ function updateSectionStates(states, lineIndent, sectionIndents, trimmed) {
   const { inGlobal, inForbid, inRequire, inRunRegex, inRequireAll } = states;
   const newStates = { ...states };
 
-  if (inGlobal && shouldExitSection(lineIndent, sectionIndents.globalIndent, 'global:', trimmed)) {
+  if (
+    inGlobal &&
+    shouldExitSection(
+      lineIndent,
+      sectionIndents.globalIndent,
+      'global:',
+      trimmed,
+    )
+  ) {
     newStates.inGlobal = false;
   }
-  if (inForbid && shouldExitSection(lineIndent, sectionIndents.forbidIndent, 'forbid:', trimmed)) {
+  if (
+    inForbid &&
+    shouldExitSection(
+      lineIndent,
+      sectionIndents.forbidIndent,
+      'forbid:',
+      trimmed,
+    )
+  ) {
     newStates.inForbid = false;
     newStates.inRunRegex = false;
   }
-  if (inRequire && shouldExitSection(lineIndent, sectionIndents.requireIndent, 'require:', trimmed)) {
+  if (
+    inRequire &&
+    shouldExitSection(
+      lineIndent,
+      sectionIndents.requireIndent,
+      'require:',
+      trimmed,
+    )
+  ) {
     newStates.inRequire = false;
     newStates.inRequireAll = false;
   }
-  if (inRunRegex && shouldExitSection(lineIndent, sectionIndents.runRegexIndent, '- ', trimmed)) {
+  if (
+    inRunRegex &&
+    shouldExitSection(lineIndent, sectionIndents.runRegexIndent, '- ', trimmed)
+  ) {
     newStates.inRunRegex = false;
   }
-  if (inRequireAll && shouldExitSection(lineIndent, sectionIndents.requireAllIndent, '- ', trimmed)) {
+  if (
+    inRequireAll &&
+    shouldExitSection(
+      lineIndent,
+      sectionIndents.requireAllIndent,
+      '- ',
+      trimmed,
+    )
+  ) {
     newStates.inRequireAll = false;
   }
 
@@ -344,8 +382,9 @@ function parsePatternId(line) {
 }
 
 function parseUses(line) {
+  // Allow 'owner/repo' or 'owner/repo/subpath'. Group to be explicit.
   const usesMatch = line.match(
-    /^\s*uses:\s*([A-Za-z\d_.\-]+\/[A-Za-z\d_.\-]+)/,
+    /^\s*uses:\s*((?:[A-Za-z0-9_. -]+)\/(?:[A-Za-z0-9_. -]+)(?:\/.+)?)/,
   );
   return usesMatch ? usesMatch[1] : null;
 }
@@ -357,7 +396,7 @@ function parseEnabled(line) {
 
 function parseWithEntry(line) {
   const withMatch = line.match(
-    /^\s*([A-Za-z\d_-]+):\s*([A-Za-z\d_.\-]+)\s*$/,
+    /^\s*([A-Za-z0-9_-]+):\s*([A-Za-z0-9_. -]+)\s*$/,
   );
   return withMatch ? { key: withMatch[1], value: withMatch[2] } : null;
 }
@@ -466,9 +505,7 @@ function parseTrigger(line) {
 }
 
 function parseWorkflowPath(line) {
-  const pathMatch = line.match(
-    /^\s*workflow_path:\s*["']?(.+?)["']?\s*$/,
-  );
+  const pathMatch = line.match(/^\s*workflow_path:\s*["']?(.+?)["']?\s*$/);
   return pathMatch ? pathMatch[1] : null;
 }
 
@@ -541,7 +578,12 @@ export function loadHighRiskTriggers(filePath) {
       }
 
       if (current) {
-        inSelector = updateSelectorState(inSelector, indent, selectorIndent, trimmed);
+        inSelector = updateSelectorState(
+          inSelector,
+          indent,
+          selectorIndent,
+          trimmed,
+        );
 
         const status = parseHighRiskStatus(line);
         if (status) current.status = status;
@@ -743,7 +785,11 @@ export function loadArtifactPolicy(filePath) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    const sectionStates = updateArtifactSectionStates(inRequired, inAllowlist, trimmed);
+    const sectionStates = updateArtifactSectionStates(
+      inRequired,
+      inAllowlist,
+      trimmed,
+    );
     inRequired = sectionStates.inRequired;
     inAllowlist = sectionStates.inAllowlist;
 

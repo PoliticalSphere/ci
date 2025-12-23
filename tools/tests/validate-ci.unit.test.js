@@ -39,7 +39,7 @@ function assertViolationMeta(v, { relPath, minWeight }) {
   assert(v, 'expected violation to exist');
   if (relPath) {
     assert(
-      String(v.path).replace(/\\/g, '/') === relPath,
+      String(v.path).replaceAll('\\', '/') === relPath,
       `expected violation path '${relPath}', got '${v.path}'`,
     );
   }
@@ -57,7 +57,7 @@ function assertViolationMeta(v, { relPath, minWeight }) {
 
 const alwaysOkVerifier = async () => ({ ok: true, error: null });
 
-async function main() {
+try {
   // ----------------------------------------------------------------------------
   // Setup temp workspace
   // ----------------------------------------------------------------------------
@@ -235,8 +235,6 @@ async function main() {
 
   section('result', 'Validate-CI unit tests passed');
   process.exit(0);
-}
-
-main().catch((err) => {
+} catch (err) {
   fail(err?.stack || err?.message || String(err));
-});
+}

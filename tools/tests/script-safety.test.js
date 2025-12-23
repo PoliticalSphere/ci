@@ -13,12 +13,13 @@ const actionsRoot = path.join(repoRoot, '.github', 'actions');
 
 section('safety', 'Script safety checks', `Root: ${actionsRoot}`);
 
-if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) process.exit(0);
+if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory())
+  process.exit(0);
 
 const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
 const actionDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 
-let violations = [];
+const violations = [];
 
 for (const dir of actionDirs) {
   const actionFile = path.join(actionsRoot, dir, 'action.yml');
@@ -36,10 +37,20 @@ for (const dir of actionDirs) {
     for (let i = 0; i < lines.length; i++) {
       const l = lines[i];
       if (/\beval\b/.test(l) || /bash\s+-c/.test(l) || /`/.test(l)) {
-        violations.push({ file: scriptPath, line: i + 1, text: l.trim(), reason: 'eval/bash -c/backtick' });
+        violations.push({
+          file: scriptPath,
+          line: i + 1,
+          text: l.trim(),
+          reason: 'eval/bash -c/backtick',
+        });
       }
-      if (/echo\s+["'].*\$\{[^\}]+\}.*["']/.test(l)) {
-        violations.push({ file: scriptPath, line: i + 1, text: l.trim(), reason: 'echo with ${...} (prefer printf %q)' });
+      if (/echo\s+["'].*\$\{[^}]+\}.*["']/.test(l)) {
+        violations.push({
+          file: scriptPath,
+          line: i + 1,
+          text: l.trim(),
+          reason: 'echo with variable interpolation (prefer printf %q)',
+        });
       }
     }
   }
@@ -48,7 +59,9 @@ for (const dir of actionDirs) {
 if (violations.length > 0) {
   console.error('\nScript safety violations detected:');
   for (const v of violations) {
-    console.error(`${path.relative(repoRoot, v.file)}:${v.line}: (${v.reason}) ${v.text}`);
+    console.error(
+      `${path.relative(repoRoot, v.file)}:${v.line}: (${v.reason}) ${v.text}`,
+    );
   }
   fail('Found potentially unsafe patterns in referenced scripts.');
 }

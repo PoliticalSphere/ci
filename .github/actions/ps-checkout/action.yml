@@ -71,13 +71,13 @@ runs:
         action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
         platform_root="${PS_PLATFORM_ROOT:-}"
         if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
-          echo "PS.CHECKOUT: using PS_PLATFORM_ROOT=${platform_root}"
+          printf '%q\n' "PS.CHECKOUT: using PS_PLATFORM_ROOT=${platform_root}"
         else
           platform_root="${action_root}"
         fi
         validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
-          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          printf '%q\n' "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
           exit 1
         fi
         # shellcheck source=tools/scripts/branding/validate-inputs.sh

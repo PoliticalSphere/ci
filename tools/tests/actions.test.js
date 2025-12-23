@@ -103,11 +103,13 @@ for (const dir of actionDirs) {
   const yml = path.join(actionsRoot, dir, 'action.yml');
   const yaml = path.join(actionsRoot, dir, 'action.yaml');
 
-  const actionFile = fs.existsSync(yml)
-    ? yml
-    : fs.existsSync(yaml)
-      ? yaml
-      : null;
+  // Determine which action file to use (prefer .yml over .yaml)
+  let actionFile = null;
+  if (fs.existsSync(yml)) {
+    actionFile = yml;
+  } else if (fs.existsSync(yaml)) {
+    actionFile = yaml;
+  }
   if (!actionFile) {
     fail(`missing action.yml or action.yaml in .github/actions/${dir}`);
   }

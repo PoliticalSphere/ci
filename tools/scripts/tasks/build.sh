@@ -20,7 +20,7 @@ set -euo pipefail
 # ==============================================================================
 
 die() { echo "ERROR: $*" >&2; exit 1; }
-warn() { echo "WARN: $*" >&2; }
+warn() { echo "WARN: $*" >&2; return 0; }
 
 # ----------------------------
 # Resolve repo root
@@ -36,7 +36,7 @@ if [[ -f "${format_sh}" ]]; then
   # shellcheck source=tools/scripts/branding/format.sh
   . "${format_sh}"
   die() { ps_error "$*"; exit 1; }
-  warn() { ps_warn "$*"; }
+  warn() { ps_warn "$*"; return 0; }
 fi
 
 detail() {
@@ -75,10 +75,8 @@ command -v node >/dev/null 2>&1 || die "node is required but was not found on PA
 command -v npm  >/dev/null 2>&1 || die "npm is required but was not found on PATH."
 
 # Determinism precondition (install handled upstream, but lockfile must exist in CI)
-if [[ "${CI}" == "1" ]]; then
-  if [[ ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
-    die "No lockfile found (package-lock.json / npm-shrinkwrap.json / pnpm-lock.yaml / yarn.lock). Deterministic CI builds require a lockfile."
-  fi
+if [[ "${CI}" == "1" && ! -f package-lock.json && ! -f npm-shrinkwrap.json && ! -f pnpm-lock.yaml && ! -f yarn.lock ]]; then
+  die "No lockfile found (package-lock.json / npm-shrinkwrap.json / pnpm-lock.yaml / yarn.lock). Deterministic CI builds require a lockfile."
 fi
 
 # ----------------------------

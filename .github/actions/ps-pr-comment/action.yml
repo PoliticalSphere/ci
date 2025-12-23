@@ -131,7 +131,7 @@ runs:
         fi
 
         printf 'PS.PR_COMMENT: pr_number=%q\n' "$PS_PR_NUMBER"
-        echo "PS.PR_COMMENT: body_length=${#PS_BODY}"
+        printf '%s\n' "PS.PR_COMMENT: body_length=${#PS_BODY}"
 
     - name: Validate PR refs
       if: ${{ inputs.expected_base_sha != '' || inputs.expected_head_sha != '' }}
@@ -148,16 +148,16 @@ runs:
         actual_head="$(gh api --jq '.head.sha' "repos/${GITHUB_REPOSITORY}/pulls/${PS_PR_NUMBER}")"
 
         if [[ -n "${PS_EXPECTED_BASE_SHA}" && "${actual_base}" != "${PS_EXPECTED_BASE_SHA}" ]]; then
-          echo "ERROR: PR base SHA mismatch for #${PS_PR_NUMBER}." >&2
-          echo "Expected: ${PS_EXPECTED_BASE_SHA}" >&2
-          echo "Actual:   ${actual_base}" >&2
+          printf '%q\n' "ERROR: PR base SHA mismatch for #${PS_PR_NUMBER}." >&2
+          printf '%q\n' "Expected: ${PS_EXPECTED_BASE_SHA}" >&2
+          printf '%q\n' "Actual:   ${actual_base}" >&2
           exit 1
         fi
 
         if [[ -n "${PS_EXPECTED_HEAD_SHA}" && "${actual_head}" != "${PS_EXPECTED_HEAD_SHA}" ]]; then
-          echo "ERROR: PR head SHA mismatch for #${PS_PR_NUMBER}." >&2
-          echo "Expected: ${PS_EXPECTED_HEAD_SHA}" >&2
-          echo "Actual:   ${actual_head}" >&2
+          printf '%q\n' "ERROR: PR head SHA mismatch for #${PS_PR_NUMBER}." >&2
+          printf '%q\n' "Expected: ${PS_EXPECTED_HEAD_SHA}" >&2
+          printf '%q\n' "Actual:   ${actual_head}" >&2
           exit 1
         fi
 

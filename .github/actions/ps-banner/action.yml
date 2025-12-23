@@ -31,17 +31,17 @@ runs:
         printf 'PS.BANNER: banner=%q\n' "$banner"
 
         if [[ ! -d "${platform_root}" ]]; then
-          echo "ERROR: PS_PLATFORM_ROOT directory not found: ${platform_root}" >&2
+          printf '%q\n' "ERROR: PS_PLATFORM_ROOT directory not found: ${platform_root}" >&2
           exit 1
         fi
 
         if [[ ! -f "${script}" ]]; then
-          echo "ERROR: print-banner.sh not found at ${script}" >&2
+          printf '%q\n' "ERROR: print-banner.sh not found at ${script}" >&2
           exit 1
         fi
 
         if [[ ! -f "${banner}" ]]; then
-          echo "ERROR: ps-banner.txt not found at ${banner}" >&2
+          printf '%q\n' "ERROR: ps-banner.txt not found at ${banner}" >&2
           exit 1
         fi
 
@@ -51,4 +51,4 @@ runs:
         # If your script instead reads a fixed path internally, use this:
         # bash "${script}"
 
-        echo "PS.BANNER: OK"
+        printf '%s\n' "PS.BANNER: OK"

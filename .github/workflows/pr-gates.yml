@@ -165,6 +165,15 @@ on:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
         required: false
+      SONAR_TOKEN:
+        description: "SonarCloud token for analysis"
+        required: false
+      SONAR_ORGANIZATION:
+        description: "SonarCloud organization key"
+        required: false
+      SONAR_PROJECT_KEY:
+        description: "SonarCloud project key"
+        required: false
 
 permissions:
   contents: read
@@ -470,6 +479,16 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
+      - name: Check SonarCloud configuration
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -n "${{ secrets.SONAR_TOKEN }}" ]]; then
+            echo "SONAR_ENABLED=true" >> "$GITHUB_ENV"
+          else
+            echo "SONAR_ENABLED=false" >> "$GITHUB_ENV"
+          fi
+
       - name: Install dependencies (npm ci)
         shell: bash
         run: |
@@ -478,14 +497,14 @@ jobs:
           npm ci --no-audit --no-fund
 
       - name: SonarCloud Scan
-        if: ${{ secrets.SONAR_TOKEN != '' }}
+        if: env.SONAR_ENABLED == 'true'
         uses: sonarsource/sonarcloud-github-action@v2.1.0
         with:
           args: >-
             -Dsonar.sources=.
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.organization=$SONAR_ORGANIZATION
-            -Dsonar.projectKey=$SONAR_PROJECT_KEY
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION || '' }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY || '' }}
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}

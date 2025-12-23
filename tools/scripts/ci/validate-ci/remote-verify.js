@@ -104,7 +104,6 @@ export function createRemoteVerifier({
     }
   }
 
-
   async function fetchCommit(repo, ref) {
     const key = `${repo}@${ref}`;
     if (cache.has(key)) {
