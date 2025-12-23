@@ -151,6 +151,18 @@ print_lint_summary() {
   local pad=24
 
 
+  # Ensure color vars are initialized when color is supported so rows
+  # display colors even if the initial header was printed without color.
+  if ps_supports_color; then
+    c_reset="${c_reset:-\033[0m}"
+    c_bold="${c_bold:-\033[1m}"
+    c_dim="${c_dim:-\033[90m}"
+    c_cyan="${c_cyan:-\033[36m}"
+    c_green="${c_green:-\033[32m}"
+    c_red="${c_red:-\033[31m}"
+    c_yellow="${c_yellow:-\033[33m}"
+  fi
+
   # Rows
   local pad=24
   local i
