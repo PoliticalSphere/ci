@@ -62,7 +62,9 @@ require_cmd() {
     error "${cmd} is required but not found on PATH"
     exit 1
   fi
-}
+
+  return 0
+} 
 
 require_var() {
   local name="$1"
@@ -71,7 +73,9 @@ require_var() {
     error "${name} is required in tooling.env"
     exit 1
   fi
-}
+
+  return 0
+} 
 
 set -a
 # shellcheck source=/dev/null
@@ -91,7 +95,9 @@ fi
 
 # Shared temp directory
 _tmpdir="$(mktemp -d)"
-cleanup() { rm -rf "${_tmpdir}"; }
+cleanup() { rm -rf "${_tmpdir}"; 
+  return 0
+}
 trap cleanup EXIT
 
 install_actionlint() {
@@ -105,7 +111,9 @@ install_actionlint() {
   printf '%s\n' "${ACTIONLINT_SHA256}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/actionlint.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/actionlint" "${install_dir}/actionlint"
-}
+
+  return 0
+} 
 
 install_shellcheck() {
   detail "PS.INSTALL: shellcheck=${SHELLCHECK_VERSION}"
@@ -118,7 +126,9 @@ install_shellcheck() {
   printf '%s\n' "${SHELLCHECK_SHA256}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
   tar -xJf "${_tmpdir}/shellcheck.tar.xz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${install_dir}/shellcheck"
-}
+
+  return 0
+} 
 
 install_hadolint() {
   detail "PS.INSTALL: hadolint=${HADOLINT_VERSION}"
@@ -130,7 +140,9 @@ install_hadolint() {
     "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
   printf '%s\n' "${HADOLINT_SHA256}  ${_tmpdir}/hadolint" | sha256sum -c -
   install -m 0755 "${_tmpdir}/hadolint" "${install_dir}/hadolint"
-}
+
+  return 0
+} 
 
 install_yamllint() {
   detail "PS.INSTALL: yamllint=${YAMLLINT_VERSION}"
@@ -167,6 +179,8 @@ install_yamllint() {
     --user \
     --no-deps \
     "${wheel_path}"
+
+  return 0
 }
 
 install_gitleaks() {
@@ -180,7 +194,9 @@ install_gitleaks() {
   printf '%s\n' "${GITLEAKS_SHA256}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/gitleaks.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/gitleaks" "${install_dir}/gitleaks"
-}
+
+  return 0
+} 
 
 install_trivy() {
   detail "PS.INSTALL: trivy=${TRIVY_VERSION}"
@@ -193,7 +209,9 @@ install_trivy() {
   printf '%s\n' "${TRIVY_SHA256}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/trivy.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/trivy" "${install_dir}/trivy"
-}
+
+  return 0
+} 
 
 for tool in "$@"; do
   case "${tool}" in
