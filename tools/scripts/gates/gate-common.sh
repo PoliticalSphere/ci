@@ -106,6 +106,23 @@ lint_init() {
 
 # Print a compact, single LINT block and update in-place when possible
 print_lint_summary() {
+  # Erase previous block only when attached to a real interactive TTY and
+  # in-place updates are enabled (PS_LINT_INLINE=1). Some environments may
+  # present a pseudo-TTY that does not support cursor movement reliably; in
+  # those cases users can disable in-place updates by setting
+  # PS_LINT_INLINE=0 in their environment.
+  if [[ "${PS_LINT_INLINE:-1}" == "1" && -t 1 && "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
+    local n=${LINT_SUMMARY_LINES}
+    # Move cursor up n lines and clear them reliably (portable across terminals)
+    printf '\033[%dA' "$n"
+    for ((i=0;i<n;i++)); do
+      # Use carriage return before clearing line to ensure cursor at line start
+      printf '\r\033[2K\033[1E'
+    done
+    # Return cursor to original top position
+    printf '\033[%dA' "$n"
+  fi
+
   # If in-place updates are disabled, or the current process will not do
   # interactive in-place updates (no real TTY), and we've already printed
   # the summary once in this process, avoid re-printing it — repeated

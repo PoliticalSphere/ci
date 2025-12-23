@@ -17,19 +17,28 @@ try {
     USER: process.env.USER,
     TERM: 'xterm',
   };
-  out = execFileSync('bash', ['-lc', commandString], { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 });
+  out = execFileSync('bash', ['-lc', commandString], {
+    encoding: 'utf8',
+    cwd: repoRoot,
+    env,
+    timeout: 30_000,
+  });
 } catch (err) {
   out = (err.stdout || '') + (err.stderr || '');
 }
 
 const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
 if (headerCount !== 1) {
-  fail(`Unexpected header count in GITHUB_ACTIONS: expected 1, found ${headerCount}\nOutput:\n${out}`);
+  fail(
+    `Unexpected header count in GITHUB_ACTIONS: expected 1, found ${headerCount}\nOutput:\n${out}`,
+  );
 }
 
 const biomeCount = (out.match(/BIOME/g) || []).length;
 if (biomeCount !== 1) {
-  fail(`Unexpected BIOME row count in GITHUB_ACTIONS: expected 1, found ${biomeCount}\nOutput:\n${out}`);
+  fail(
+    `Unexpected BIOME row count in GITHUB_ACTIONS: expected 1, found ${biomeCount}\nOutput:\n${out}`,
+  );
 }
 
 console.log('OK: lint summary prints only once in GITHUB_ACTIONS-like env');

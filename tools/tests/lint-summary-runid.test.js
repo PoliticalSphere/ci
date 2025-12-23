@@ -20,8 +20,18 @@ try {
 
   // Run the helper twice in separate shells to simulate separate steps
   const cmd = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary`;
-  const first = execFileSync('bash', ['-lc', cmd], { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 });
-  const second = execFileSync('bash', ['-lc', cmd], { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 });
+  const first = execFileSync('bash', ['-lc', cmd], {
+    encoding: 'utf8',
+    cwd: repoRoot,
+    env,
+    timeout: 30_000,
+  });
+  const second = execFileSync('bash', ['-lc', cmd], {
+    encoding: 'utf8',
+    cwd: repoRoot,
+    env,
+    timeout: 30_000,
+  });
 
   out = first + second;
 } catch (err) {
@@ -30,8 +40,12 @@ try {
 
 const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
 if (headerCount !== 1) {
-  fail(`Unexpected header count with GITHUB_RUN_ID: expected 1, found ${headerCount}\nOutput:\n${out}`);
+  fail(
+    `Unexpected header count with GITHUB_RUN_ID: expected 1, found ${headerCount}\nOutput:\n${out}`,
+  );
 }
 
-console.log('OK: lint summary dedupes across processes when GITHUB_RUN_ID is set');
+console.log(
+  'OK: lint summary dedupes across processes when GITHUB_RUN_ID is set',
+);
 process.exit(0);
