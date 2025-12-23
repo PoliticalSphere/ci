@@ -44,12 +44,23 @@ LINT_SUMMARY_INITIALIZED=0
 
 # Simple color helpers
 ps_supports_color() {
+  # Respect explicit opt-out
   if [[ -n "${NO_COLOR:-}" && "${NO_COLOR}" != "0" ]]; then
     return 1
   fi
+
+  # Respect explicit opt-in
   if [[ "${FORCE_COLOR:-0}" != "0" ]]; then
     return 0
   fi
+
+  # Prefer colors in CI logs by default (unless NO_COLOR is set). Many CI
+  # systems are non-TTY but still support color sequences in their logs.
+  if [[ "${CI:-0}" != "0" ]]; then
+    return 0
+  fi
+
+  # Fallback to TTY detection for interactive/local runs
   [[ -t 1 ]] && return 0 || return 1
 }
 
