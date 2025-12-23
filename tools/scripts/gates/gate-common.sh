@@ -127,7 +127,11 @@ print_lint_summary() {
   # interactive in-place updates (no real TTY), and we've already printed
   # the summary once, avoid re-printing it — repeated prints clutter
   # non-interactive logs where cursor movement isn't available.
-  if { [[ "${PS_LINT_INLINE:-1}" != "1" ]] || [[ ! -t 1 ]]; } && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
+  # If inline updates are disabled, or the environment is non-interactive
+  # (no real TTY), or we are running inside known CI-like systems where
+  # pseudo-TTYs may not behave reliably (GitHub Actions / CI), avoid
+  # re-printing the summary block after the first time.
+  if { [[ "${PS_LINT_INLINE:-1}" != "1" ]] || [[ ! -t 1 ]] || [[ -n "${GITHUB_ACTIONS:-}" ]] || [[ "${CI:-0}" == "1" ]] || [[ -z "${TERM:-}" ]] || [[ "${TERM}" == "dumb" ]]; } && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
     return 0
   fi
 
@@ -181,13 +185,15 @@ print_lint_summary() {
     if ps_supports_color; then
         case "$status" in
         PASS)
-          printf "%s%s %b%-7s%b   %b%b%b\n" "${lint_indent}" "${padded}" "${c_green}${c_bold}" "PASS" "${c_reset}" "${c_cyan}${c_bold}" "Findings Log" "${c_reset} ${c_dim}(${log})${c_reset}" ;;
+          # Keep the log path plain (no color) so CI viewers preserve it as a
+          # single clickable token. Color only the status and the "Findings Log" label.
+          printf "%s%s %b%-7s%b   %bFindings Log%b (%s)\n" "${lint_indent}" "${padded}" "${c_green}${c_bold}" "PASS" "${c_reset}" "${c_cyan}${c_bold}" "${c_reset}" "${log}" ;;
 
         FAIL)
-          printf "%s%s %b%-7s%b   %b%b%b\n" "${lint_indent}" "${padded}" "${c_red}${c_bold}" "FAIL" "${c_reset}" "${c_cyan}${c_bold}" "Findings Log" "${c_reset} ${c_dim}(${log})${c_reset}" ;;
+          printf "%s%s %b%-7s%b   %bFindings Log%b (%s)\n" "${lint_indent}" "${padded}" "${c_red}${c_bold}" "FAIL" "${c_reset}" "${c_cyan}${c_bold}" "${c_reset}" "${log}" ;;
 
         SKIPPED)
-          printf "%s%s %b%-7s%b   %b%b%b\n" "${lint_indent}" "${padded}" "${c_yellow}${c_bold}" "SKIPPED" "${c_reset}" "${c_cyan}${c_bold}" "Findings Log" "${c_reset} ${c_dim}(${log})${c_reset}" ;;
+          printf "%s%s %b%-7s%b   %bFindings Log%b (%s)\n" "${lint_indent}" "${padded}" "${c_yellow}${c_bold}" "SKIPPED" "${c_reset}" "${c_cyan}${c_bold}" "${c_reset}" "${log}" ;;
         Running*)
           printf "%s%s %b%s%b\n" "${lint_indent}" "${padded}" "${c_cyan}" "Running..." "${c_reset}" ;;
         Waiting)
