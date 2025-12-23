@@ -109,10 +109,8 @@ export function permissionLevel(value) {
 
 function parseRepoEntry(line) {
   // Match owner/repo where allowed characters include letters, digits, underscore,
-  // dot, space and hyphen. Group owner/repo together to make precedence explicit.
-  const repoMatch = line.match(
-    /^\s*-\s*repo:\s*((?:[A-Za-z0-9_. -]+\/[A-Za-z0-9_. -]+))/,
-  );
+  // dot, space and hyphen. Use a simpler character class to reduce regex complexity.
+  const repoMatch = line.match(/^[\s]*-[\s]*repo:[\s]*([\w .-]+\/[\w .-]+)/);
   return repoMatch ? repoMatch[1] : null;
 }
 
