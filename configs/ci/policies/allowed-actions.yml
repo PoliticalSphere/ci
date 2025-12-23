@@ -88,6 +88,11 @@ allowlist:
     purpose: Secrets scanning (scheduled deep scan)
     notes: Use scheduled scans only; output SARIF to artifacts
 
+  - repo: sonarsource/sonarcloud-github-action
+    category: scanning
+    purpose: SonarCloud analysis for code quality and security
+    notes: Baseline analysis intended non-blocking; risk decision recorded in docs/risk-decisions.md#rd-2025-004
+
 
 validation_notes:
   # Repo format is always "owner/name" with no "@ref" portion.

@@ -416,11 +416,10 @@ jobs:
     needs: [validate-ci, test, typecheck]
     permissions:
       contents: read
-      checks: write
     timeout-minutes: 30
     env:
       PS_FULL_SCAN: "1"
-    if: ${{ secrets.SONAR_TOKEN != '' }}
+    if: secrets.SONAR_TOKEN != ''
     continue-on-error: true
     steps:
       - name: Harden runner (PS)
@@ -466,19 +465,20 @@ jobs:
       - name: Install dependencies (npm ci)
         shell: bash
         run: |
-          set -euo pipefail
-          npm ci --no-audit --no-fund
+          set -euo pipefail          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "sonar.deps" "Install dependencies (npm ci)"          npm ci --no-audit --no-fund
 
       - name: SonarCloud Scan
-        uses: sonarsource/sonarcloud-github-action@v2.1.0
+        uses: sonarsource/sonarcloud-github-action@e2a1ee7c31ee491f1e09c74535b1c0d3e9f5cd82
         with:
           args: >-
             -Dsonar.sources=.
             -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+            -Dsonar.organization=$SONAR_ORGANIZATION
+            -Dsonar.projectKey=$SONAR_PROJECT_KEY
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 
       - name: Upload artifacts
         if: always()
