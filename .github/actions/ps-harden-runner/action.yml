@@ -70,12 +70,15 @@ runs:
         fi
 
         echo "PS_EGRESS_POLICY=${policy}" >> "${GITHUB_ENV}"
-        echo "PS.HARDEN_RUNNER: egress_policy=${policy}"
         if [[ -n "$(echo "${PS_ALLOWED_ENDPOINTS_INPUT:-}" | xargs)" ]]; then
+          # Persist validated allowed endpoints for downstream step usage
+          echo "PS_ALLOWED_ENDPOINTS_VALIDATED=${PS_ALLOWED_ENDPOINTS_INPUT}" >> "${GITHUB_ENV}"
           echo "PS.HARDEN_RUNNER: allowed_endpoints=provided"
         else
           echo "PS.HARDEN_RUNNER: allowed_endpoints=empty"
         fi
+        echo "PS.HARDEN_RUNNER: egress_policy=${policy}"
+
 
     - name: Ensure harden-runner post path exists
       shell: bash
@@ -103,7 +106,7 @@ runs:
       uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.1.4
       with:
         egress-policy: ${{ env.PS_EGRESS_POLICY }}
-        allowed-endpoints: ${{ inputs.allowed_endpoints }}
+        allowed-endpoints: ${{ env.PS_ALLOWED_ENDPOINTS_VALIDATED }}
 
     - name: Harden runner complete
       shell: bash

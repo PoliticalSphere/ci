@@ -60,11 +60,14 @@ runs:
   steps:
     - name: Preflight (checkout)
       shell: bash
+      env:
+        PS_FETCH_DEPTH: ${{ inputs.fetch_depth }}
+        PS_REF_INPUT: ${{ inputs.ref }}
       run: |
         set -euo pipefail
 
-        depth="${{ inputs.fetch_depth }}"
-        ref="${{ inputs.ref }}"
+        depth="${PS_FETCH_DEPTH:-}"
+        ref="${PS_REF_INPUT:-}"
         action_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
         platform_root="${PS_PLATFORM_ROOT:-}"
         if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then

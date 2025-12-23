@@ -75,6 +75,11 @@ runs:
   steps:
     - name: Validate inputs (PS)
       shell: bash
+      env:
+        PS_NAME: ${{ inputs.name }}
+        PS_RETENTION: ${{ inputs.retention_days }}
+        PS_NOFILES: ${{ inputs.if_no_files_found }}
+        PS_PATHS: ${{ inputs.path }}
       run: |
         set -euo pipefail
 
@@ -95,10 +100,10 @@ runs:
         # shellcheck source=/dev/null
         . "${validate_sh}"
 
-        name="${{ inputs.name }}"
-        retention="${{ inputs.retention_days }}"
-        nofiles="${{ inputs.if_no_files_found }}"
-        paths="${{ inputs.path }}"
+        name="${PS_NAME:-}"
+        retention="${PS_RETENTION:-}"
+        nofiles="${PS_NOFILES:-}"
+        paths="${PS_PATHS:-}"
 
         require_nonempty "inputs.name" "${name}" || exit 1
         require_nonempty "inputs.path" "${paths}" || exit 1

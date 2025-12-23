@@ -60,12 +60,16 @@ runs:
   steps:
     - name: Write summary
       shell: bash
+      env:
+        PS_SUMMARY_WORKFLOW: ${{ inputs.workflow }}
+        PS_SUMMARY_OUTPUT_PATH: ${{ inputs.output_path }}
+        PS_SUMMARY_RESULTS: ${{ inputs.results }}
       run: |
         set -euo pipefail
 
-        workflow="${{ inputs.workflow }}"
-        output_path="${{ inputs.output_path }}"
-        results_block="${{ inputs.results }}"
+        workflow="${PS_SUMMARY_WORKFLOW:-}"
+        output_path="${PS_SUMMARY_OUTPUT_PATH:-}"
+        results_block="${PS_SUMMARY_RESULTS:-}"
 
         if [[ -z "${workflow}" || -z "${output_path}" || -z "${results_block}" ]]; then
           echo "ERROR: workflow, output_path, and results are required." >&2

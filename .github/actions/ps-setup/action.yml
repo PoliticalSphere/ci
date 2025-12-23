@@ -79,17 +79,23 @@ runs:
 
     - name: Setup summary (PS)
       shell: bash
+      env:
+        PS_NODE_VERSION: ${{ inputs.node_version }}
+        PS_FETCH_DEPTH: ${{ inputs.fetch_depth }}
+        PS_REF_INPUT: ${{ inputs.ref }}
+        PS_CACHE: ${{ inputs.cache }}
+        PS_INSTALL_DEPS: ${{ inputs.install_dependencies }}
       run: |
         set -euo pipefail
-        echo "PS.SETUP: node_version=${{ inputs.node_version }}"
-        echo "PS.SETUP: fetch_depth=${{ inputs.fetch_depth }}"
-        if [[ -n "${{ inputs.ref }}" ]]; then
-          echo "PS.SETUP: ref=${{ inputs.ref }}"
+        echo "PS.SETUP: node_version=${PS_NODE_VERSION}"
+        echo "PS.SETUP: fetch_depth=${PS_FETCH_DEPTH}"
+        if [[ -n "${PS_REF_INPUT}" ]]; then
+          echo "PS.SETUP: ref=${PS_REF_INPUT}"
         else
           echo "PS.SETUP: ref=<default>"
         fi
-        echo "PS.SETUP: cache=${{ inputs.cache }}"
-        echo "PS.SETUP: install_dependencies=${{ inputs.install_dependencies }}"
+        echo "PS.SETUP: cache=${PS_CACHE}"
+        echo "PS.SETUP: install_dependencies=${PS_INSTALL_DEPS}"
 
     - name: Node setup (PS)
       uses: ./.github/actions/ps-node-setup
