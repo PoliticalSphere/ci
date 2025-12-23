@@ -105,6 +105,10 @@ export default [
         'error',
         { prefer: 'type-imports' },
       ],
+
+      // Cognitive complexity — detect and limit hard-to-read functions
+      // Use SonarJS rule with a conservative threshold to start; adjust if needed.
+      'sonarjs/cognitive-complexity': ['error', 15],
     },
   },
 ];
