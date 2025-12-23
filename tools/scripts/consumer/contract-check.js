@@ -237,6 +237,7 @@ function checkRequiredScripts({
       });
     }
   }
+  return requiredScripts;
 }
 
 function gatherDeps(packageJson) {
@@ -642,7 +643,7 @@ async function main() {
 
   const packageJson = readPackageJson(repoRoot);
 
-  checkRequiredScripts({
+  const requiredScripts = checkRequiredScripts({
     policy,
     packageJson,
     failOnMissing,
