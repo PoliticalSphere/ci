@@ -212,7 +212,10 @@ function parseRegexEntry(line) {
     // Use explicit substring handling so this function's implementation
     // is distinct from `cleanRegexEntry` while preserving behavior.
     let val = trimmed.slice(2).trim();
-    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+    if (
+      (val.startsWith('"') && val.endsWith('"')) ||
+      (val.startsWith("'") && val.endsWith("'"))
+    ) {
       val = val.slice(1, -1);
     }
     return val;

@@ -122,9 +122,10 @@ print_lint_summary() {
   fi
 
   # If the current process will not do interactive in-place updates (no
-  # real TTY OR running inside CI) and we've already printed the summary
-  # once, avoid re-printing it — repeated prints clutter CI logs.
-  if { [[ ! -t 1 ]] || [[ "${CI:-0}" == "1" ]]; } && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
+  # real TTY) and we've already printed the summary once, avoid re-printing
+  # it — repeated prints clutter non-interactive logs where cursor movement
+  # isn't available.
+  if [[ ! -t 1 ]] && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
     return 0
   fi
 
@@ -133,9 +134,9 @@ print_lint_summary() {
   # the '▶ LINT' banner multiple times in logs.
   local c_reset="" c_bold="" c_dim="" c_cyan="" c_green="" c_red="" c_yellow=""
   if [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 0 ]]; then
-    # If NO_COLOR is explicitly set, print a plain header; otherwise print
-    # a colored header for visibility in CI logs.
-    if [[ -z "${NO_COLOR:-}" ]]; then
+    # Prefer colors when supported (FORCE_COLOR, CI, or a real TTY). Fall back
+    # to plain text only when colors are explicitly disabled via NO_COLOR.
+    if ps_supports_color; then
       c_reset="\033[0m"; c_bold="\033[1m"; c_dim="\033[90m"; c_cyan="\033[36m"; c_green="\033[32m"; c_red="\033[31m"; c_yellow="\033[33m"
       printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT & TYPE CHECK" "${c_reset}"
     else

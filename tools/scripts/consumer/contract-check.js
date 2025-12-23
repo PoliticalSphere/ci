@@ -543,13 +543,13 @@ function processDirectoryForIntegrity(
   for (const entry of entries) {
     const full = path.join(current, entry.name);
     const rel = path.relative(repoRoot, full);
-    
+
     if (shouldIgnorePath(rel, ignore)) continue;
-    
+
     if (entry.isDirectory()) {
       continue; // Will be processed separately
     }
-    
+
     if (!entry.isFile()) continue;
     if (!exts.includes(path.extname(entry.name))) continue;
 
@@ -576,7 +576,7 @@ function processDirectoryStack(
   const stack = [absRoot];
   while (stack.length > 0) {
     const current = stack.pop();
-    
+
     // Process files in current directory
     processDirectoryForIntegrity(
       current,
@@ -587,7 +587,7 @@ function processDirectoryStack(
       failOnMissing,
       violations,
     );
-    
+
     // Add subdirectories to stack for later processing
     const entries = fs.readdirSync(current, { withFileTypes: true });
     for (const entry of entries) {
@@ -617,7 +617,7 @@ function checkPathIntegrity({
     : ['.ts', '.tsx', '.js', '.jsx'];
 
   section('imports.integrity', 'Path integrity', `${roots.length} root(s)`);
-  
+
   for (const root of roots) {
     const absRoot = resolvePath(repoRoot, root);
     if (!fs.existsSync(absRoot)) continue;

@@ -25,7 +25,12 @@ try {
     USER: process.env.USER,
     TERM: 'dumb',
   };
-  out = execSync(cmd, { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 });
+  out = execSync(cmd, {
+    encoding: 'utf8',
+    cwd: repoRoot,
+    env,
+    timeout: 30_000,
+  });
 } catch (err) {
   // Some commands may exit non-zero or time out; capture stdout/stderr for assertions
   out = (err.stdout || '') + (err.stderr || '');
@@ -34,13 +39,17 @@ try {
 // Ensure header string appears exactly once (avoid duplicate banners)
 const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
 if (headerCount !== 1) {
-  fail(`Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`);
+  fail(
+    `Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`,
+  );
 }
 
 // Ensure the BIOME row occurs exactly once (not duplicated)
 const biomeCount = (out.match(/BIOME/g) || []).length;
 if (biomeCount !== 1) {
-  fail(`Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${out}`);
+  fail(
+    `Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${out}`,
+  );
 }
 
 console.log('OK: lint summary prints only once in non-TTY mode');
