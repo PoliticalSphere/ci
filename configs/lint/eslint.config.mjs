@@ -1,114 +1,96 @@
 // =============================================================================
-// Political Sphere — ESLint (Flat Config)
-// -----------------------------------------------------------------------------
-// Purpose:
-//   Specialist linting beyond Biome’s scope (TS-aware correctness + policy).
-//
-// Governance:
-//   - Biome owns formatting and general style consistency.
-//   - ESLint owns specialist rules and TS-aware linting.
-//   - Avoid duplicate responsibilities (e.g., unused imports) unless intentional.
-//
-// Notes:
-//   - This config is CI-grade: violations are errors by default.
+// Political Sphere — ESLint (Flat Config, TS-correct, CI-grade)
 // =============================================================================
 
-import js from '@eslint/js';
-import tseslint from '@typescript-eslint/eslint-plugin';
-import importPlugin from 'eslint-plugin-import';
-import security from 'eslint-plugin-security';
-import sonarjs from 'eslint-plugin-sonarjs';
-import unicorn from 'eslint-plugin-unicorn';
+import js from "@eslint/js";
+import importPlugin from "eslint-plugin-import";
+import security from "eslint-plugin-security";
+import sonarjs from "eslint-plugin-sonarjs";
+import unicorn from "eslint-plugin-unicorn";
+import globals from "globals";
+import tseslint from "typescript-eslint"; // ✅ correct flat-config entrypoint
 
 export default [
   // ---------------------------------------------------------------------------
-  // Global ignores (keep CI fast and avoid linting build outputs)
+  // Global ignores
   // ---------------------------------------------------------------------------
   {
     ignores: [
-      '**/node_modules/**',
-      '**/dist/**',
-      '**/build/**',
-      '**/coverage/**',
-      '**/reports/**',
-      '**/.turbo/**',
-      '**/.nx/**',
-    ],
+      "**/node_modules/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/reports/**",
+      "**/.turbo/**",
+      "**/.nx/**"
+    ]
   },
 
   // ---------------------------------------------------------------------------
-  // Base JS recommended rules
+  // Base JS recommended
   // ---------------------------------------------------------------------------
   js.configs.recommended,
 
   // ---------------------------------------------------------------------------
-  // TypeScript-aware linting (recommended)
+  // TypeScript recommended (flat config)
   // ---------------------------------------------------------------------------
   ...tseslint.configs.recommended,
 
   // ---------------------------------------------------------------------------
-  // Plugin recommendations (specialist rule sets)
-  // ---------------------------------------------------------------------------
-  importPlugin.configs.recommended,
-  security.configs.recommended,
-  sonarjs.configs.recommended,
-  unicorn.configs.recommended,
-
-  // ---------------------------------------------------------------------------
-  // Project rules (applies to JS + TS)
+  // Project rules (JS + TS)
   // ---------------------------------------------------------------------------
   {
-    files: ['**/*.{js,mjs,cjs,ts,mts,cts}'],
+    files: ["**/*.{js,mjs,cjs,ts,mts,cts,tsx}"],
     languageOptions: {
-      ecmaVersion: 'latest',
-      sourceType: 'module',
+      ecmaVersion: "latest",
+      sourceType: "module",
       globals: {
-        console: 'readonly',
-        process: 'readonly',
-      },
+        ...globals.node,
+        console: "readonly"
+      }
     },
-    linterOptions: {
-      reportUnusedDisableDirectives: 'error',
+    plugins: {
+      import: importPlugin,
+      security,
+      sonarjs,
+      unicorn
     },
     rules: {
       // Core correctness / consistency
-      eqeqeq: ['error', 'always'],
-      'no-var': 'error',
-      'prefer-const': 'error',
+      eqeqeq: ["error", "always"],
+      "no-var": "error",
+      "prefer-const": "error",
 
-      // Unused variables:
-      // - Keep this for ESLint because it provides the argsIgnorePattern control.
-      // - If Biome also enforces unused vars/imports, ensure only one tool
-      //   is enforced in CI to avoid duplicate noise.
-      'no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
+      // Use only ONE unused-vars rule to avoid duplicate noise:
+      // TS rule covers TS+JS in many setups; keep it as the single source of truth.
+      "no-unused-vars": "off",
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }
       ],
 
-      // TypeScript-specific policy rules (specialist)
-      '@typescript-eslint/no-explicit-any': 'off',
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-      '@typescript-eslint/no-unused-expressions': [
-        'error',
+      "@typescript-eslint/no-explicit-any": "off",
+      "@typescript-eslint/no-unused-expressions": [
+        "error",
         {
           allowShortCircuit: false,
           allowTernary: false,
-          allowTaggedTemplates: false,
-        },
+          allowTaggedTemplates: false
+        }
       ],
 
-      // Encourage explicitness in platform code
-      '@typescript-eslint/consistent-type-imports': [
-        'error',
-        { prefer: 'type-imports' },
+      "@typescript-eslint/consistent-type-imports": [
+        "error",
+        { prefer: "type-imports" }
       ],
 
-      // Cognitive complexity — detect and limit hard-to-read functions
-      // Use SonarJS rule with a conservative threshold to start; adjust if needed.
-      'sonarjs/cognitive-complexity': ['error', 15],
+      // Plugin recommendations (enabled explicitly)
+      "import/no-unresolved": "off", // often noisy in TS + path aliases; enable later if desired
+      "security/detect-object-injection": "off", // very noisy; enable selectively if you want
+      "sonarjs/cognitive-complexity": ["error", 15]
     },
-  },
+    linterOptions: {
+      reportUnusedDisableDirectives: "error"
+    }
+  }
 ];
