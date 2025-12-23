@@ -101,24 +101,24 @@ collect_targets_pr() {
     return 1
   fi
 
-  if ! git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null; then
+  # Ensure we have the commit objects locally; try to fetch if missing.
+  if ! (git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \
+         git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null); then
     retry_cmd 3 2 git fetch --no-tags --depth=1 origin "${PS_PR_BASE_SHA}" >/dev/null 2>&1 || true
-  fi
-  if ! git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
     retry_cmd 3 2 git fetch --no-tags --depth=1 origin "${PS_PR_HEAD_SHA}" >/dev/null 2>&1 || true
   fi
 
   if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \
      git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
-  diff_files=()
-  while IFS= read -r file; do
-    diff_files+=("${file}")
-  done < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
+    diff_files=()
+    while IFS= read -r file; do
+      diff_files+=("${file}")
+    done < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
   elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-  diff_files=()
-  while IFS= read -r file; do
-    diff_files+=("${file}")
-  done < <(git diff --name-only HEAD~1 HEAD)
+    diff_files=()
+    while IFS= read -r file; do
+      diff_files+=("${file}")
+    done < <(git diff --name-only HEAD~1 HEAD)
   else
     return 1
   fi
