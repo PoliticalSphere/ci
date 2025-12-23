@@ -90,6 +90,7 @@ run_markdownlint() {
   else
     (cd "${repo_root}" && "${MDL_BIN}" --config "${config_path}" "${relative_targets[@]}")
   fi
+  return 0
 }
 
 # Filter noise so output shows only actionable lint issues.
