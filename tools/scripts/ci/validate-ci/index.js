@@ -283,7 +283,7 @@ const highRisk = loadHighRiskTriggers(highRiskAllowlistPath);
 const permissionsBaseline = loadPermissionsBaseline(permissionsBaselinePath);
 const artifactPolicy = loadArtifactPolicy(artifactPolicyPath);
 
-const { spawnSync } = require('child_process');
+import { spawnSync } from 'node:child_process';
 
 function tryGit(args) {
   const parts = String(args).split(/\s+/).filter(Boolean);
