@@ -37,6 +37,10 @@ LINT_LOGS=()
 LINT_FAILED=0
 export LINT_FAILED
 LINT_SUMMARY_LINES=0
+# Track whether we've printed the summary at least once (used to avoid
+# re-printing the block in non-interactive logs where terminal control
+# sequences don't behave as expected).
+LINT_SUMMARY_INITIALIZED=0
 
 # Simple color helpers
 ps_supports_color() {
@@ -102,13 +106,29 @@ print_lint_summary() {
     printf '\033[%dA' "$n"
   fi
 
-  # Header
+  # If not TTY and we've already printed the summary once, avoid
+  # re-printing it — repeated prints clutter CI logs where control
+  # sequences may not behave as expected.
+  if ! ps_supports_color && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
+    return 0
+  fi
+
+  # Header: print full header only the first time; subsequent updates
+  # print a blank header line to preserve line counts but avoid repeating
+  # the '▶ LINT' banner multiple times in logs.
   local c_reset="" c_bold="" c_dim="" c_cyan="" c_green="" c_red="" c_yellow=""
-  if ps_supports_color; then
-    c_reset="\033[0m"; c_bold="\033[1m"; c_dim="\033[90m"; c_cyan="\033[36m"; c_green="\033[32m"; c_red="\033[31m"; c_yellow="\033[33m"
-    printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT" "${c_reset}"
+  if [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 0 ]]; then
+    if ps_supports_color; then
+      c_reset="\033[0m"; c_bold="\033[1m"; c_dim="\033[90m"; c_cyan="\033[36m"; c_green="\033[32m"; c_red="\033[31m"; c_yellow="\033[33m"
+      printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT" "${c_reset}"
+    else
+      printf "%s %s\n" "${PS_FMT_ICON:-▶}" "LINT & TYPE CHECK"
+    fi
+    # Mark that we've printed at least once
+    LINT_SUMMARY_INITIALIZED=1
   else
-    printf "%s %s\n" "${PS_FMT_ICON:-▶}" "LINT & TYPE CHECK"
+    # Preserve line counts with a blank line to avoid duplicating the banner
+    printf "\n"
   fi
 
   # Indentation for lint rows (align with start of "LINT" header)
