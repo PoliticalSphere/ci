@@ -1,6 +1,6 @@
 #!/usr/bin/env node
-import assert from 'node:assert/strict';
 import { normalizeActionToRepo, mapStatusToInfo } from '../../../tools/scripts/ci/validate-ci/remote-verify.js';
+import assert from 'node:assert/strict';
 
 // Tests for normalizeActionToRepo
 assert.equal(normalizeActionToRepo('actions/checkout@v2'), 'actions/checkout');

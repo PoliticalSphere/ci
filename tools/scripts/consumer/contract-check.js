@@ -143,6 +143,387 @@ function scanRelativeImports(filePath, extensions) {
     }));
 }
 
+async function checkRequiredFiles({
+  repoRoot,
+  requiredFiles,
+  failOnMissing,
+  fileMissingAllow,
+  violations,
+}) {
+  section(
+    'files.required',
+    'Required files',
+    `${requiredFiles.length} requirement(s)`,
+  );
+  for (const required of requiredFiles) {
+    const target = resolvePath(repoRoot, required);
+    if (
+      failOnMissing &&
+      !fs.existsSync(target) &&
+      !fileMissingAllow.has(required)
+    ) {
+      violations.push({
+        code: 'required-file-missing',
+        message: `required file missing: ${required}`,
+        path: required,
+      });
+    }
+  }
+}
+
+function checkForbiddenFiles({
+  repoRoot,
+  forbiddenFiles,
+  filePresentAllow,
+  violations,
+}) {
+  section(
+    'files.forbidden',
+    'Forbidden files',
+    `${forbiddenFiles.length} rule(s)`,
+  );
+  for (const forbidden of forbiddenFiles) {
+    const target = resolvePath(repoRoot, forbidden);
+    if (fs.existsSync(target) && !filePresentAllow.has(forbidden)) {
+      violations.push({
+        code: 'forbidden-file-present',
+        message: `forbidden file present: ${forbidden}`,
+        path: forbidden,
+      });
+    }
+  }
+}
+
+function readPackageJson(repoRoot) {
+  const packageJsonPath = resolvePath(repoRoot, 'package.json');
+  let packageJson = {};
+  if (fs.existsSync(packageJsonPath)) {
+    try {
+      packageJson = JSON.parse(readText(packageJsonPath));
+    } catch (err) {
+      fatal(`package.json is not valid JSON: ${err.message}`);
+    }
+  }
+  return packageJson;
+}
+
+function checkRequiredScripts({
+  policy,
+  packageJson,
+  failOnMissing,
+  scriptMissingAllow,
+  violations,
+}) {
+  const rawScripts = policy.required_scripts || {};
+  const requiredScripts = Array.isArray(rawScripts)
+    ? Object.fromEntries(rawScripts.map((name) => [name, [name]]))
+    : rawScripts;
+  const scriptNames = Object.keys(requiredScripts);
+  section(
+    'scripts.required',
+    'Required scripts',
+    `${scriptNames.length} script(s)`,
+  );
+  for (const name of scriptNames) {
+    const options = Array.isArray(requiredScripts[name])
+      ? requiredScripts[name]
+      : [requiredScripts[name]];
+    const found = options.some((opt) => packageJson.scripts?.[opt]);
+    if (failOnMissing && !found && !scriptMissingAllow.has(name)) {
+      violations.push({
+        code: 'script-missing',
+        message: `required script missing: ${name}`,
+        path: 'package.json',
+      });
+    }
+  }
+}
+
+function gatherDeps(packageJson) {
+  // avoid useless empty spread object
+  return Object.assign(
+    {},
+    packageJson.dependencies || {},
+    packageJson.devDependencies || {},
+    packageJson.optionalDependencies || {},
+  );
+}
+
+function checkTools({
+  policy,
+  deps,
+  failOnMissing,
+  toolMissingAllow,
+  toolPresentAllow,
+  violations,
+}) {
+  const tooling = policy.tooling || {};
+  const requiredTools = Array.isArray(tooling.require) ? tooling.require : [];
+  const forbiddenTools = Array.isArray(tooling.disallow)
+    ? tooling.disallow
+    : [];
+
+  section(
+    'tools.required',
+    'Required tools',
+    `${requiredTools.length} tool(s)`,
+  );
+  for (const tool of requiredTools) {
+    if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
+      violations.push({
+        code: 'tool-missing',
+        message: `required tool missing: ${tool}`,
+        path: 'package.json',
+      });
+    }
+  }
+
+  section(
+    'tools.forbidden',
+    'Forbidden tools',
+    `${forbiddenTools.length} rule(s)`,
+  );
+  for (const tool of forbiddenTools) {
+    if (deps[tool] && !toolPresentAllow.has(tool)) {
+      violations.push({
+        code: 'tool-forbidden',
+        message: `forbidden tool present: ${tool}`,
+        path: 'package.json',
+      });
+    }
+  }
+}
+
+function checkWorkflows({
+  policy,
+  repoRoot,
+  failOnUnknown,
+  workflowTopLevelAllow,
+  workflowMissingAllow,
+  failOnMissing,
+  violations,
+}) {
+  const workflows = policy.workflows || {};
+  const workflowFiles = listWorkflowFiles(repoRoot);
+  const allowedTopLevel = Array.isArray(workflows.allowed_top_level)
+    ? workflows.allowed_top_level
+    : [];
+
+  section(
+    'workflows.catalog',
+    'Workflow catalog',
+    `${workflowFiles.length} workflow(s)`,
+  );
+  for (const wfPath of workflowFiles) {
+    const name = path.basename(wfPath);
+    if (
+      failOnUnknown &&
+      allowedTopLevel.length > 0 &&
+      !allowedTopLevel.includes(name) &&
+      !workflowTopLevelAllow.has(name)
+    ) {
+      violations.push({
+        code: 'workflow-not-allowed',
+        message: `top-level workflow not allowlisted: ${name}`,
+        path: path.relative(repoRoot, wfPath),
+      });
+    }
+  }
+
+  const rawUses = new Set();
+  for (const wfPath of workflowFiles) {
+    const raw = readText(wfPath);
+    for (const use of extractUsesFromWorkflow(raw)) {
+      rawUses.add(use);
+    }
+  }
+
+  const requiredUses = Array.isArray(workflows.required_reusable)
+    ? workflows.required_reusable
+    : [];
+  section(
+    'workflows.required',
+    'Required reusable workflows',
+    `${requiredUses.length} rule(s)`,
+  );
+  for (const use of requiredUses) {
+    const matched = [...rawUses].some((entry) => entry.includes(use));
+    if (failOnMissing && !matched && !workflowMissingAllow.has(use)) {
+      violations.push({
+        code: 'workflow-use-missing',
+        message: `required reusable workflow not used: ${use}`,
+        path: '.github/workflows',
+      });
+    }
+  }
+}
+
+function checkDocsClaims({
+  policy,
+  repoRoot,
+  deps,
+  packageJson,
+  failOnMissing,
+  toolMissingAllow,
+  scriptMissingAllow,
+  fileMissingAllow,
+  violations,
+}) {
+  const docsClaims = Array.isArray(policy.docs_claims)
+    ? policy.docs_claims
+    : [];
+  section('docs.claims', 'Doc claims', `${docsClaims.length} rule(s)`);
+  for (const claim of docsClaims) {
+    const docPath = resolvePath(repoRoot, claim.path || '');
+    if (!claim.path || !fs.existsSync(docPath)) continue;
+    const raw = readText(docPath).toLowerCase();
+    const needle = String(claim.contains || '').toLowerCase();
+    if (!needle || !raw.includes(needle)) continue;
+
+    const requiredToolsClaim = claim.requires_tools || [];
+    for (const tool of requiredToolsClaim) {
+      if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
+        violations.push({
+          code: 'doc-claim-tool-missing',
+          message: `doc claim '${claim.contains}' requires tool: ${tool}`,
+          path: claim.path,
+        });
+      }
+    }
+
+    const requiredScriptsClaim = claim.requires_scripts || [];
+    for (const script of requiredScriptsClaim) {
+      if (
+        failOnMissing &&
+        !packageJson.scripts?.[script] &&
+        !scriptMissingAllow.has(script)
+      ) {
+        violations.push({
+          code: 'doc-claim-script-missing',
+          message: `doc claim '${claim.contains}' requires script: ${script}`,
+          path: claim.path,
+        });
+      }
+    }
+
+    const requiredFilesClaim = claim.requires_files || [];
+    for (const file of requiredFilesClaim) {
+      if (
+        failOnMissing &&
+        !fs.existsSync(resolvePath(repoRoot, file)) &&
+        !fileMissingAllow.has(file)
+      ) {
+        violations.push({
+          code: 'doc-claim-file-missing',
+          message: `doc claim '${claim.contains}' requires file: ${file}`,
+          path: claim.path,
+        });
+      }
+    }
+  }
+}
+
+function checkLockfileAndPackageManager({
+  packageManager,
+  requiredFiles,
+  packageJson,
+  repoRoot,
+  failOnMissing,
+  failOnUnknown,
+  violations,
+}) {
+  if (
+    packageManager.lockfile &&
+    !requiredFiles.includes(packageManager.lockfile)
+  ) {
+    const lockTarget = resolvePath(repoRoot, packageManager.lockfile);
+    if (failOnMissing && !fs.existsSync(lockTarget)) {
+      violations.push({
+        code: 'lockfile-missing',
+        message: `required lockfile missing: ${packageManager.lockfile}`,
+        path: packageManager.lockfile,
+      });
+    }
+  }
+
+  if (packageManager.name && packageJson.packageManager) {
+    const declared = String(packageJson.packageManager).toLowerCase();
+    const expected = String(packageManager.name).toLowerCase();
+    if (failOnUnknown && !declared.startsWith(expected)) {
+      violations.push({
+        code: 'package-manager-mismatch',
+        message: `packageManager mismatch (expected ${packageManager.name})`,
+        path: 'package.json',
+      });
+    }
+  }
+  if (packageManager.name && !packageJson.packageManager && failOnMissing) {
+    violations.push({
+      code: 'package-manager-missing',
+      message: 'packageManager field missing in package.json',
+      path: 'package.json',
+    });
+  }
+}
+
+function checkPathIntegrity({
+  policy,
+  repoRoot,
+  importAllow,
+  failOnMissing,
+  violations,
+}) {
+  const pathIntegrity = policy.path_integrity || {};
+  if (pathIntegrity.enabled === true) {
+    const roots = Array.isArray(pathIntegrity.roots) ? pathIntegrity.roots : [];
+    const ignore = Array.isArray(pathIntegrity.ignore)
+      ? pathIntegrity.ignore
+      : [];
+    const exts = Array.isArray(pathIntegrity.extensions)
+      ? pathIntegrity.extensions
+      : ['.ts', '.tsx', '.js', '.jsx'];
+
+    section('imports.integrity', 'Path integrity', `${roots.length} root(s)`);
+    for (const root of roots) {
+      const absRoot = resolvePath(repoRoot, root);
+      if (!fs.existsSync(absRoot)) continue;
+
+      const stack = [absRoot];
+      while (stack.length > 0) {
+        const current = stack.pop();
+        const entries = fs.readdirSync(current, { withFileTypes: true });
+        for (const entry of entries) {
+          const full = path.join(current, entry.name);
+          const rel = path.relative(repoRoot, full);
+          if (shouldIgnorePath(rel, ignore)) continue;
+          if (entry.isDirectory()) {
+            stack.push(full);
+            continue;
+          }
+          if (!entry.isFile()) continue;
+          if (!exts.includes(path.extname(entry.name))) continue;
+
+          const imports = scanRelativeImports(full, exts);
+          for (const item of imports) {
+            if (item.resolved) continue;
+            const key = `${rel}:${item.target}`;
+            if (importAllow.has(key) || importAllow.has(item.target)) {
+              continue;
+            }
+            if (failOnMissing) {
+              violations.push({
+                code: 'import-unresolved',
+                message: `unresolved import '${item.target}' in ${rel}`,
+                path: rel,
+              });
+            }
+          }
+        }
+      }
+    }
+  }
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const repoRoot = process.env.PS_CONTRACT_REPO_ROOT || getRepoRoot();
@@ -244,306 +625,81 @@ async function main() {
       ? policy.package_manager
       : {};
 
-  section(
-    'files.required',
-    'Required files',
-    `${requiredFiles.length} requirement(s)`,
-  );
-  for (const required of requiredFiles) {
-    const target = resolvePath(repoRoot, required);
-    if (
-      failOnMissing &&
-      !fs.existsSync(target) &&
-      !fileMissingAllow.has(required)
-    ) {
-      violations.push({
-        code: 'required-file-missing',
-        message: `required file missing: ${required}`,
-        path: required,
-      });
-    }
-  }
+  await checkRequiredFiles({
+    repoRoot,
+    requiredFiles,
+    failOnMissing,
+    fileMissingAllow,
+    violations,
+  });
 
-  section(
-    'files.forbidden',
-    'Forbidden files',
-    `${forbiddenFiles.length} rule(s)`,
-  );
-  for (const forbidden of forbiddenFiles) {
-    const target = resolvePath(repoRoot, forbidden);
-    if (fs.existsSync(target) && !filePresentAllow.has(forbidden)) {
-      violations.push({
-        code: 'forbidden-file-present',
-        message: `forbidden file present: ${forbidden}`,
-        path: forbidden,
-      });
-    }
-  }
+  checkForbiddenFiles({
+    repoRoot,
+    forbiddenFiles,
+    filePresentAllow,
+    violations,
+  });
 
-  const packageJsonPath = resolvePath(repoRoot, 'package.json');
-  let packageJson = {};
-  if (fs.existsSync(packageJsonPath)) {
-    try {
-      packageJson = JSON.parse(readText(packageJsonPath));
-    } catch (err) {
-      fatal(`package.json is not valid JSON: ${err.message}`);
-    }
-  }
+  const packageJson = readPackageJson(repoRoot);
 
-  const rawScripts = policy.required_scripts || {};
-  const requiredScripts = Array.isArray(rawScripts)
-    ? Object.fromEntries(rawScripts.map((name) => [name, [name]]))
-    : rawScripts;
-  const scriptNames = Object.keys(requiredScripts);
-  section(
-    'scripts.required',
-    'Required scripts',
-    `${scriptNames.length} script(s)`,
-  );
-  for (const name of scriptNames) {
-    const options = Array.isArray(requiredScripts[name])
-      ? requiredScripts[name]
-      : [requiredScripts[name]];
-    const found = options.some((opt) => packageJson.scripts?.[opt]);
-    if (failOnMissing && !found && !scriptMissingAllow.has(name)) {
-      violations.push({
-        code: 'script-missing',
-        message: `required script missing: ${name}`,
-        path: 'package.json',
-      });
-    }
-  }
+  checkRequiredScripts({
+    policy,
+    packageJson,
+    failOnMissing,
+    scriptMissingAllow,
+    violations,
+  });
 
-  const tooling = policy.tooling || {};
-  const requiredTools = Array.isArray(tooling.require) ? tooling.require : [];
-  const forbiddenTools = Array.isArray(tooling.disallow)
-    ? tooling.disallow
-    : [];
-  const deps = {
-    ...(packageJson.dependencies || {}),
-    ...(packageJson.devDependencies || {}),
-    ...(packageJson.optionalDependencies || {}),
-  };
+  const deps = gatherDeps(packageJson);
 
-  section(
-    'tools.required',
-    'Required tools',
-    `${requiredTools.length} tool(s)`,
-  );
-  for (const tool of requiredTools) {
-    if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
-      violations.push({
-        code: 'tool-missing',
-        message: `required tool missing: ${tool}`,
-        path: 'package.json',
-      });
-    }
-  }
+  checkTools({
+    policy,
+    deps,
+    failOnMissing,
+    toolMissingAllow,
+    toolPresentAllow,
+    violations,
+  });
 
-  section(
-    'tools.forbidden',
-    'Forbidden tools',
-    `${forbiddenTools.length} rule(s)`,
-  );
-  for (const tool of forbiddenTools) {
-    if (deps[tool] && !toolPresentAllow.has(tool)) {
-      violations.push({
-        code: 'tool-forbidden',
-        message: `forbidden tool present: ${tool}`,
-        path: 'package.json',
-      });
-    }
-  }
+  checkWorkflows({
+    policy,
+    repoRoot,
+    failOnUnknown,
+    workflowTopLevelAllow,
+    workflowMissingAllow,
+    failOnMissing,
+    violations,
+  });
 
-  const workflows = policy.workflows || {};
-  const workflowFiles = listWorkflowFiles(repoRoot);
-  const allowedTopLevel = Array.isArray(workflows.allowed_top_level)
-    ? workflows.allowed_top_level
-    : [];
+  checkDocsClaims({
+    policy,
+    repoRoot,
+    deps,
+    packageJson,
+    failOnMissing,
+    toolMissingAllow,
+    scriptMissingAllow,
+    fileMissingAllow,
+    violations,
+  });
 
-  section(
-    'workflows.catalog',
-    'Workflow catalog',
-    `${workflowFiles.length} workflow(s)`,
-  );
-  for (const wfPath of workflowFiles) {
-    const name = path.basename(wfPath);
-    if (
-      failOnUnknown &&
-      allowedTopLevel.length > 0 &&
-      !allowedTopLevel.includes(name) &&
-      !workflowTopLevelAllow.has(name)
-    ) {
-      violations.push({
-        code: 'workflow-not-allowed',
-        message: `top-level workflow not allowlisted: ${name}`,
-        path: path.relative(repoRoot, wfPath),
-      });
-    }
-  }
+  checkLockfileAndPackageManager({
+    packageManager,
+    requiredFiles,
+    packageJson,
+    repoRoot,
+    failOnMissing,
+    failOnUnknown,
+    violations,
+  });
 
-  const rawUses = new Set();
-  for (const wfPath of workflowFiles) {
-    const raw = readText(wfPath);
-    for (const use of extractUsesFromWorkflow(raw)) {
-      rawUses.add(use);
-    }
-  }
-
-  const requiredUses = Array.isArray(workflows.required_reusable)
-    ? workflows.required_reusable
-    : [];
-  section(
-    'workflows.required',
-    'Required reusable workflows',
-    `${requiredUses.length} rule(s)`,
-  );
-  for (const use of requiredUses) {
-    const matched = [...rawUses].some((entry) => entry.includes(use));
-    if (failOnMissing && !matched && !workflowMissingAllow.has(use)) {
-      violations.push({
-        code: 'workflow-use-missing',
-        message: `required reusable workflow not used: ${use}`,
-        path: '.github/workflows',
-      });
-    }
-  }
-
-  const docsClaims = Array.isArray(policy.docs_claims)
-    ? policy.docs_claims
-    : [];
-  section('docs.claims', 'Doc claims', `${docsClaims.length} rule(s)`);
-  for (const claim of docsClaims) {
-    const docPath = resolvePath(repoRoot, claim.path || '');
-    if (!claim.path || !fs.existsSync(docPath)) continue;
-    const raw = readText(docPath).toLowerCase();
-    const needle = String(claim.contains || '').toLowerCase();
-    if (!needle || !raw.includes(needle)) continue;
-
-    const requiredToolsClaim = claim.requires_tools || [];
-    for (const tool of requiredToolsClaim) {
-      if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
-        violations.push({
-          code: 'doc-claim-tool-missing',
-          message: `doc claim '${claim.contains}' requires tool: ${tool}`,
-          path: claim.path,
-        });
-      }
-    }
-
-    const requiredScriptsClaim = claim.requires_scripts || [];
-    for (const script of requiredScriptsClaim) {
-      if (
-        failOnMissing &&
-        !packageJson.scripts?.[script] &&
-        !scriptMissingAllow.has(script)
-      ) {
-        violations.push({
-          code: 'doc-claim-script-missing',
-          message: `doc claim '${claim.contains}' requires script: ${script}`,
-          path: claim.path,
-        });
-      }
-    }
-
-    const requiredFilesClaim = claim.requires_files || [];
-    for (const file of requiredFilesClaim) {
-      if (
-        failOnMissing &&
-        !fs.existsSync(resolvePath(repoRoot, file)) &&
-        !fileMissingAllow.has(file)
-      ) {
-        violations.push({
-          code: 'doc-claim-file-missing',
-          message: `doc claim '${claim.contains}' requires file: ${file}`,
-          path: claim.path,
-        });
-      }
-    }
-  }
-
-  if (
-    packageManager.lockfile &&
-    !requiredFiles.includes(packageManager.lockfile)
-  ) {
-    const lockTarget = resolvePath(repoRoot, packageManager.lockfile);
-    if (failOnMissing && !fs.existsSync(lockTarget)) {
-      violations.push({
-        code: 'lockfile-missing',
-        message: `required lockfile missing: ${packageManager.lockfile}`,
-        path: packageManager.lockfile,
-      });
-    }
-  }
-
-  if (packageManager.name && packageJson.packageManager) {
-    const declared = String(packageJson.packageManager).toLowerCase();
-    const expected = String(packageManager.name).toLowerCase();
-    if (failOnUnknown && !declared.startsWith(expected)) {
-      violations.push({
-        code: 'package-manager-mismatch',
-        message: `packageManager mismatch (expected ${packageManager.name})`,
-        path: 'package.json',
-      });
-    }
-  }
-  if (packageManager.name && !packageJson.packageManager && failOnMissing) {
-    violations.push({
-      code: 'package-manager-missing',
-      message: 'packageManager field missing in package.json',
-      path: 'package.json',
-    });
-  }
-
-  const pathIntegrity = policy.path_integrity || {};
-  if (pathIntegrity.enabled === true) {
-    const roots = Array.isArray(pathIntegrity.roots) ? pathIntegrity.roots : [];
-    const ignore = Array.isArray(pathIntegrity.ignore)
-      ? pathIntegrity.ignore
-      : [];
-    const exts = Array.isArray(pathIntegrity.extensions)
-      ? pathIntegrity.extensions
-      : ['.ts', '.tsx', '.js', '.jsx'];
-
-    section('imports.integrity', 'Path integrity', `${roots.length} root(s)`);
-    for (const root of roots) {
-      const absRoot = resolvePath(repoRoot, root);
-      if (!fs.existsSync(absRoot)) continue;
-
-      const stack = [absRoot];
-      while (stack.length > 0) {
-        const current = stack.pop();
-        const entries = fs.readdirSync(current, { withFileTypes: true });
-        for (const entry of entries) {
-          const full = path.join(current, entry.name);
-          const rel = path.relative(repoRoot, full);
-          if (shouldIgnorePath(rel, ignore)) continue;
-          if (entry.isDirectory()) {
-            stack.push(full);
-            continue;
-          }
-          if (!entry.isFile()) continue;
-          if (!exts.includes(path.extname(entry.name))) continue;
-
-          const imports = scanRelativeImports(full, exts);
-          for (const item of imports) {
-            if (item.resolved) continue;
-            const key = `${rel}:${item.target}`;
-            if (importAllow.has(key) || importAllow.has(item.target)) {
-              continue;
-            }
-            if (failOnMissing) {
-              violations.push({
-                code: 'import-unresolved',
-                message: `unresolved import '${item.target}' in ${rel}`,
-                path: rel,
-              });
-            }
-          }
-        }
-      }
-    }
-  }
+  checkPathIntegrity({
+    policy,
+    repoRoot,
+    importAllow,
+    failOnMissing,
+    violations,
+  });
 
   const summary = {
     mode,
@@ -605,6 +761,9 @@ async function main() {
   section('result', 'Consumer contract passed', 'Policy checks satisfied');
 }
 
-main().catch((err) => {
+// prefer top-level await
+try {
+  await main();
+} catch (err) {
   fatal(err.message || String(err));
-});
+}

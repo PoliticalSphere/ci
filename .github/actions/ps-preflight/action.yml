@@ -88,7 +88,7 @@ runs:
           if type -t ps_error >/dev/null 2>&1; then
             ps_error "$*"
           else
-            echo "ERROR: $*" >&2
+            printf 'ERROR: %q\n' "$*" >&2
           fi
         }
 
@@ -96,7 +96,7 @@ runs:
           if type -t ps_detail >/dev/null 2>&1; then
             ps_detail "$*"
           else
-            echo "$*"
+            printf '%s\n' "$*"
           fi
         }
 

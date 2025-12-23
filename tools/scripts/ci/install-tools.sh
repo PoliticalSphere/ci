@@ -30,6 +30,7 @@ detail() {
   else
     echo "$*"
   fi
+  return 0
 }
 
 error() {
@@ -38,6 +39,7 @@ error() {
   else
     echo "ERROR: $*" >&2
   fi
+  return 0
 }
 
 tooling_env="${repo_root}/configs/security/tooling.env"

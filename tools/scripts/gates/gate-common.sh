@@ -46,7 +46,7 @@ ps_supports_color() {
   if [[ "${FORCE_COLOR:-0}" != "0" ]]; then
     return 0
   fi
-  [[ -t 1 ]]
+  [[ -t 1 ]] && return 0 || return 1
 }
 
 # Initialize default lint block (Waiting states)
@@ -145,6 +145,7 @@ print_lint_summary() {
   done
 
   LINT_SUMMARY_LINES=$((1 + ${#LINT_IDS[@]}))
+  return 0
 }
 
 on_error() {
@@ -239,6 +240,7 @@ run_lint_step() {
 
   CURRENT_STEP_ID=""
   CURRENT_STEP_TITLE=""
+  return 0
 }
 
 run_step() {
@@ -254,6 +256,7 @@ run_step() {
 
   # Execute the command exactly as provided.
   "$@"
+  return 0
 }
 
 print_success() {
@@ -263,4 +266,5 @@ print_success() {
     "gate.ok" \
     "${GATE_NAME} gate passed" \
     "All checks completed successfully"
+  return 0
 }

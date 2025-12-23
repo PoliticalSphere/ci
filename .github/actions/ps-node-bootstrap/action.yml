@@ -124,6 +124,9 @@ runs:
           fi
         fi
 
+        # Persist validated node version for downstream steps
+        echo "PS_NODE_VERSION_VALIDATED=${PS_NODE_VERSION_INPUT}" >> "${GITHUB_ENV}"
+
         printf 'PS.NODE_BOOTSTRAP: node_version=%q\n' "$PS_NODE_VERSION_INPUT"
         printf 'PS.NODE_BOOTSTRAP: cache=%q\n' "$PS_CACHE_INPUT"
         printf 'PS.NODE_BOOTSTRAP: install_dependencies=%q\n' "$PS_INSTALL_DEP_INPUT"
@@ -132,14 +135,14 @@ runs:
       if: ${{ inputs.cache == '1' }}
       uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
       with:
-        node-version: ${{ inputs.node_version }}
+        node-version: ${{ env.PS_NODE_VERSION_VALIDATED }}
         cache: npm
 
     - name: Setup Node (no cache)
       if: ${{ inputs.cache != '1' }}
       uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
       with:
-        node-version: ${{ inputs.node_version }}
+        node-version: ${{ env.PS_NODE_VERSION_VALIDATED }}
 
     - name: Install dependencies (npm ci)
       if: ${{ inputs.install_dependencies == '1' }}

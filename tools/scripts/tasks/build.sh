@@ -45,6 +45,7 @@ detail() {
   else
     echo "$*"
   fi
+  return 0
 }
 
 cd "${repo_root}"

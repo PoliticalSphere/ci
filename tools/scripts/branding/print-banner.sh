@@ -47,20 +47,22 @@ fi
 
 print_banner() {
   if ps_supports_color; then
-    local C_RESET=$'\033[0m'
-    local C_BOLD=$'\033[1m'
-    local C_CYAN=$'\033[36m'
-    local C_DIM=$'\033[90m'
+    local c_reset=$'\033[0m'
+    local c_bold=$'\033[1m'
+    local c_cyan=$'\033[36m'
+    local c_dim=$'\033[90m'
     local sep="────────────────────────────────────────"
 
-    printf "%b" "${C_BOLD}${C_CYAN}"
+    printf "%b" "${c_bold}${c_cyan}"
     cat "${banner_path}"
-    printf "%b\n" "${C_RESET}"
-    printf "%b%s%b\n" "${C_DIM}" "${sep}" "${C_RESET}"
+    printf "%b\n" "${c_reset}"
+    printf "%b%s%b\n" "${c_dim}" "${sep}" "${c_reset}"
   else
     cat "${banner_path}"
     echo
   fi
+
+  return 0
 }
 
 print_banner

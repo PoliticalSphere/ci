@@ -33,6 +33,7 @@ set_repo_root_and_git() {
       format_loaded=1
     fi
   fi
+  return 0
 }
 
 set_full_scan_flag() {
@@ -50,6 +51,7 @@ set_full_scan_flag() {
 
   # Mark variable as intentionally used for shellcheck (suppress SC2034)
   : "${full_scan:-}"
+  return 0
 }
 
 # collect_targets_find <find-expression>
@@ -65,6 +67,7 @@ collect_targets_find() {
   while IFS= read -r -d '' f; do
     targets+=("${f}")
   done < <(find "${repo_root}" -type f "${expr_arr[@]}" -not -path "*/node_modules/*" -not -path "*/dist/*" -not -path "*/build/*" -not -path "*/coverage/*" -not -path "*/reports/*" -print0)
+  return 0
 }
 
 # retry_cmd <retries> <sleep_seconds> <command...>
@@ -157,4 +160,5 @@ collect_targets_staged() {
         ;;
     esac
   done
+  return 0
 }
