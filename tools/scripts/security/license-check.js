@@ -136,11 +136,10 @@ function matchDetails(list, regexes, value) {
 }
 
 function evaluateSimpleLicense(policy, license) {
-  // Trim outer parentheses and whitespace
-  const tokens = String(license)
-    .trim()
-    .replace(/^\(+|\)+$/g, '')
-    .trim();
+  // Normalize token and remove outer parentheses and whitespace in a clear way
+  let tokens = String(license).trim();
+  // Remove all leading '(' and all trailing ')' explicitly (avoid ambiguous alternation)
+  tokens = tokens.replace(/^\(+/, '').replace(/\)+$/, '').trim();
   if (!tokens) return { ok: false, reason: 'missing-license', match: null };
 
   if (/^SEE LICENSE IN/i.test(tokens)) {
@@ -166,6 +165,24 @@ function evaluateSimpleLicense(policy, license) {
   return { ok: false, reason: 'not-allowlisted', match: null };
 }
 
+function evaluateOrExpression(policy, expr) {
+  const parts = expr.split(/\s+OR\s+/i).map((p) => p.trim());
+  for (const part of parts) {
+    const res = evaluateSimpleLicense(policy, part);
+    if (res.ok) return { ok: true, reason: 'allowlisted-expression', match: res.match };
+  }
+  return { ok: false, reason: 'not-allowlisted', match: null };
+}
+
+function evaluateAndExpression(policy, expr) {
+  const parts = expr.split(/\s+AND\s+/i).map((p) => p.trim());
+  for (const part of parts) {
+    const res = evaluateSimpleLicense(policy, part);
+    if (!res.ok) return { ok: false, reason: 'not-allowlisted', match: null };
+  }
+  return { ok: true, reason: 'allowlisted-expression', match: null };
+}
+
 function evaluateLicense(policy, license) {
   if (!license) {
     return { ok: false, reason: 'missing-license', match: null };
@@ -176,34 +193,11 @@ function evaluateLicense(policy, license) {
   const raw = String(license).trim();
   // If it contains OR/AND, handle as an expression
   if (/\bOR\b/i.test(raw) || /\bAND\b/i.test(raw)) {
-    // Remove outer parentheses if present
-    const expr = raw.replace(/^\(+|\)+$/g, '').trim();
+    // Remove outer parentheses if present (explicitly remove leading/trailing parens)
+    const expr = raw.replace(/^\(+/, '').replace(/\)+$/, '').trim();
 
-    // Handle OR expressions first: if any branch is allowed, pass
-    if (/\bOR\b/i.test(expr)) {
-      const parts = expr.split(/\s+OR\s+/i).map((p) => p.trim());
-      for (const part of parts) {
-        const res = evaluateSimpleLicense(policy, part);
-        if (res.ok)
-          return {
-            ok: true,
-            reason: 'allowlisted-expression',
-            match: res.match,
-          };
-      }
-      return { ok: false, reason: 'not-allowlisted', match: null };
-    }
-
-    // Handle AND expressions: all branches must be allowed
-    if (/\bAND\b/i.test(expr)) {
-      const parts = expr.split(/\s+AND\s+/i).map((p) => p.trim());
-      for (const part of parts) {
-        const res = evaluateSimpleLicense(policy, part);
-        if (!res.ok)
-          return { ok: false, reason: 'not-allowlisted', match: null };
-      }
-      return { ok: true, reason: 'allowlisted-expression', match: null };
-    }
+    if (/\bOR\b/i.test(expr)) return evaluateOrExpression(policy, expr);
+    if (/\bAND\b/i.test(expr)) return evaluateAndExpression(policy, expr);
   }
 
   // Fallback: single token evaluation
@@ -327,16 +321,18 @@ for (const pkg of packages) {
   }
 
   if (!evaluation.ok) {
-    if (evaluation.reason === 'not-allowlisted' && pkgPolicy.failOnUnknown) {
-      violations.push({
-        name: pkg.name,
-        version: pkg.version,
-        license: pkg.license,
-        reason: evaluation.reason,
-        match: evaluation.match,
-      });
-    } else if (evaluation.reason === 'not-allowlisted') {
-      unknown.push(pkg);
+    if (evaluation.reason === 'not-allowlisted') {
+      if (pkgPolicy.failOnUnknown) {
+        violations.push({
+          name: pkg.name,
+          version: pkg.version,
+          license: pkg.license,
+          reason: evaluation.reason,
+          match: evaluation.match,
+        });
+      } else {
+        unknown.push(pkg);
+      }
     } else {
       violations.push({
         name: pkg.name,
