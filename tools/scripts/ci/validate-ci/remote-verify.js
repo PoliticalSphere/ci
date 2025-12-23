@@ -20,6 +20,30 @@ const defaultFetch =
 const defaultTokenProvider = () =>
   process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
 
+function normalizeActionToRepo(action) {
+  const noAt = String(action).split('@')[0];
+  const parts = noAt.split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+  return `${parts[0]}/${parts[1]}`;
+}
+
+function mapStatusToInfo(status) {
+  // Map problematic statuses to human-readable reason and internal error code.
+  switch (status) {
+    case 401:
+      return { reason: 'authentication failed', error: 'unauthorized' };
+    case 403:
+      return {
+        reason: 'permission/rate limited',
+        error: 'forbidden_or_rate_limited',
+      };
+    case 429:
+      return { reason: 'rate limited', error: 'rate_limited' };
+    default:
+      return { reason: 'unexpected status', error: 'unexpected_status' };
+  }
+}
+
 export function createRemoteVerifier({
   verifyRemoteShas = false,
   detailImpl = detail,
@@ -80,12 +104,6 @@ export function createRemoteVerifier({
     }
   }
 
-  function normalizeActionToRepo(action) {
-    const noAt = String(action).split('@')[0];
-    const parts = noAt.split('/').filter(Boolean);
-    if (parts.length < 2) return null;
-    return `${parts[0]}/${parts[1]}`;
-  }
 
   async function fetchCommit(repo, ref) {
     const key = `${repo}@${ref}`;
@@ -109,34 +127,18 @@ export function createRemoteVerifier({
         method: 'GET',
         headers,
       });
-      if (response.status === 200) {
+
+      const status = response.status;
+      if (status === 200) {
         result = { ok: true, error: null };
-      } else if (response.status === 404) {
+      } else if (status === 404) {
         result = { ok: false, error: 'ref_not_found' };
       } else {
-        const reason =
-          response.status === 401
-            ? 'authentication failed'
-            : response.status === 403
-              ? 'permission/rate limited'
-              : response.status === 429
-                ? 'rate limited'
-                : 'unexpected status';
+        const info = mapStatusToInfo(status);
         detailImpl(
-          `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(
-            0,
-            8,
-          )}… status=${response.status} (${reason})`,
+          `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
         );
-        const error =
-          response.status === 401
-            ? 'unauthorized'
-            : response.status === 403
-              ? 'forbidden_or_rate_limited'
-              : response.status === 429
-                ? 'rate_limited'
-                : 'unexpected_status';
-        result = { ok: false, error };
+        result = { ok: false, error: info.error };
       }
     } catch {
       logApiUnreachable(repo, ref);
@@ -148,26 +150,17 @@ export function createRemoteVerifier({
   }
 
   return async function validateRemoteAction(action, ref) {
-    if (!verifyRemoteShas) {
-      return { ok: true, error: 'verification_disabled' };
-    }
-    if (!action || !ref) {
-      return { ok: true, error: 'missing_action_or_ref' };
-    }
-    if (action.startsWith('./')) {
-      return { ok: true, error: 'local_action' };
-    }
-    if (!/^[a-f0-9]{40}$/.test(ref)) {
-      return { ok: true, error: 'not_sha' };
-    }
+    if (!verifyRemoteShas) return { ok: true, error: 'verification_disabled' };
+    if (!action || !ref) return { ok: true, error: 'missing_action_or_ref' };
+    if (action.startsWith('./')) return { ok: true, error: 'local_action' };
+    if (!/^[a-f0-9]{40}$/.test(ref)) return { ok: true, error: 'not_sha' };
 
     const normalizedRepo = normalizeActionToRepo(action);
     if (!normalizedRepo) return { ok: false, error: 'invalid_action_ref' };
 
     if (!(await checkNetworkAvailable())) {
-      return isCIImpl()
-        ? { ok: false, error: 'api_unreachable' }
-        : { ok: true, error: 'api_unreachable_local_skip' };
+      if (isCIImpl()) return { ok: false, error: 'api_unreachable' };
+      return { ok: true, error: 'api_unreachable_local_skip' };
     }
 
     return fetchCommit(normalizedRepo, ref);
