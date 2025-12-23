@@ -80,23 +80,29 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Preflight (build config)
+    - name: Validate inputs: script
+      if: ${{ inputs.script == '' }}
       shell: bash
       run: |
+        echo "ERROR: inputs.script is required." >&2
+        exit 1
+
+    - name: Validate inputs: working-directory
+      if: ${{ inputs.working-directory == '' }}
+      shell: bash
+      run: |
+        echo "ERROR: inputs.working-directory is required." >&2
+        exit 1
+
+    - name: Log config (build)
+      shell: bash
+      env:
+        PS_WORKING_DIR: ${{ inputs.working-directory }}
+        PS_SCRIPT: ${{ inputs.script }}
+      run: |
         set -euo pipefail
-
-        if [[ -z "${{ inputs.script }}" ]]; then
-          echo "ERROR: inputs.script is required." >&2
-          exit 1
-        fi
-
-        if [[ -z "${{ inputs.working-directory }}" ]]; then
-          echo "ERROR: inputs.working-directory is required." >&2
-          exit 1
-        fi
-
-        echo "PS.BUILD: working-directory=${{ inputs.working-directory }}"
-        echo "PS.BUILD: script=${{ inputs.script }}"
+        printf 'PS.BUILD: working-directory=%s\n' "$PS_WORKING_DIR"
+        printf 'PS.BUILD: script=%s\n' "$PS_SCRIPT"
 
     - name: Run build (PS)
       uses: ./.github/actions/ps-run
