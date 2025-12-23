@@ -68,6 +68,12 @@ runs:
   steps:
     - name: Preflight checks
       shell: bash
+      env:
+        PS_REQUIRE_FILES: ${{ inputs.require_files }}
+        PS_REQUIRE_DIRS: ${{ inputs.require_dirs }}
+        PS_REQUIRE_COMMANDS: ${{ inputs.require_commands }}
+        PS_REQUIRE_ENV: ${{ inputs.require_env }}
+
       run: |
         set -euo pipefail
 
@@ -137,9 +143,9 @@ runs:
           done <<< "${list}"
         }
 
-        check_lines "Required file" "${{ inputs.require_files }}" "file"
-        check_lines "Required directory" "${{ inputs.require_dirs }}" "dir"
-        check_lines "Required command" "${{ inputs.require_commands }}" "cmd"
-        check_lines "Required env var" "${{ inputs.require_env }}" "env"
+        check_lines "Required file" "${PS_REQUIRE_FILES:-}" "file"
+        check_lines "Required directory" "${PS_REQUIRE_DIRS:-}" "dir"
+        check_lines "Required command" "${PS_REQUIRE_COMMANDS:-}" "cmd"
+        check_lines "Required env var" "${PS_REQUIRE_ENV:-}" "env"
 
         detail "PS.PREFLIGHT: OK"
