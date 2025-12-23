@@ -16,7 +16,7 @@ let RE2 = null;
 try {
   const require = createRequire(import.meta.url);
   RE2 = require('re2');
-} catch (err) {
+} catch {
   RE2 = null;
 }
 
@@ -89,7 +89,8 @@ function compileRegex(reStr) {
   // unbounded quantifiers (e.g., `(.+)+`, `(.+)*`, `(a+){1,}`) which can lead
   // to super-linear runtime on crafted inputs. We reject patterns that use
   // an inner quantified group followed by another unbounded quantifier.
-  const nestedUnbounded = /(\([^)]*(?:\+|\*|\{\s*\d+\s*,\s*\})[^)]*\))\s*(?:\+|\*|\{\s*\d+\s*,\s*\})/;
+  const nestedUnbounded =
+    /(\([^)]*(?:\+|\*|\{\s*\d+\s*,\s*\})[^)]*\))\s*(?:\+|\*|\{\s*\d+\s*,\s*\})/;
   if (nestedUnbounded.test(pattern)) {
     throw new Error(
       `unsafe regex pattern detected (potential catastrophic backtracking): ${pattern}`,
