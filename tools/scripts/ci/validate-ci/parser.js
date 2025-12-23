@@ -30,7 +30,7 @@ export function repoFromAction(action) {
 }
 
 export function parsePermissionValue(value) {
-  const v = String(value).replace(/"/g, '').toLowerCase();
+  const v = String(value).replaceAll('"', '').toLowerCase();
   if (v === 'none' || v === 'read' || v === 'write') return v;
   return 'unknown';
 }
@@ -385,7 +385,7 @@ export function workflowKeyFromPath(relPath) {
 
 export function extractUploadPaths(step) {
   const directPath = step.with?.path
-    ? String(step.with.path).replace(/"/g, '')
+    ? String(step.with.path).replaceAll('"', '')
     : '';
   if (directPath && directPath !== '|' && directPath !== '>') {
     return [directPath];

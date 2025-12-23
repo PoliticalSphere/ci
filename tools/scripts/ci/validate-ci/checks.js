@@ -354,50 +354,69 @@ async function checkStepUses({
   const localActionsEnabled = localActions?.enabled !== false;
   if (isLocalAction(uses)) {
     if (!localActionsEnabled) return violations;
-    const violationsLocal = [];
-    const normalized = uses.startsWith('./') ? uses : `./${uses}`;
-    const resolved = path.resolve(workspaceRoot, normalized);
-    const relative = path.relative(workspaceRoot, resolved);
-    const actionsRoot = path.join(workspaceRoot, '.github', 'actions');
-    const actionsRelative = path.relative(actionsRoot, resolved);
+    return checkLocalActionStep({ rel, uses, step, workspaceRoot });
+  }
 
-    if (relative.startsWith('..') || path.isAbsolute(relative)) {
-      violationsLocal.push(
-        makeViolation(
-          rel,
-          `local action path escapes repo: ${uses}`,
-          step.startLine || 1,
-          step.startColumn || null,
-        ),
-      );
-      return violationsLocal;
-    }
+  const remoteViolations = await checkRemoteActionStep({
+    rel,
+    jobId,
+    uses,
+    step,
+    allowedActions,
+    unsafePatterns,
+    unsafeAllowlist,
+    validateRemoteAction,
+  });
+  violations.push(...remoteViolations);
 
-    if (actionsRelative.startsWith('..') || path.isAbsolute(actionsRelative)) {
-      violationsLocal.push(
-        makeViolation(
-          rel,
-          `local actions must live under .github/actions: ${uses}`,
-          step.startLine || 1,
-          step.startColumn || null,
-          2,
-        ),
-      );
-      return violationsLocal;
-    }
+  return violations;
+}
 
-    let actionDir = resolved;
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
-      actionDir = path.dirname(resolved);
-    }
+function checkLocalActionStep({ rel, uses, step, workspaceRoot }) {
+  const violationsLocal = [];
+  const normalized = uses.startsWith('./') ? uses : `./${uses}`;
+  const resolved = path.resolve(workspaceRoot, normalized);
+  const relative = path.relative(workspaceRoot, resolved);
+  const actionsRoot = path.join(workspaceRoot, '.github', 'actions');
+  const actionsRelative = path.relative(actionsRoot, resolved);
 
-    const hasYml = fs.existsSync(path.join(actionDir, 'action.yml'));
-    const hasYaml = fs.existsSync(path.join(actionDir, 'action.yaml'));
+  if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    violationsLocal.push(
+      makeViolation(
+        rel,
+        `local action path escapes repo: ${uses}`,
+        step.startLine || 1,
+        step.startColumn || null,
+      ),
+    );
+    return violationsLocal;
+  }
 
-    if (!hasYml && !hasYaml) {
-      violationsLocal.push(
-        makeViolation(
-          rel,
+  if (actionsRelative.startsWith('..') || path.isAbsolute(actionsRelative)) {
+    violationsLocal.push(
+      makeViolation(
+        rel,
+        `local actions must live under .github/actions: ${uses}`,
+        step.startLine || 1,
+        step.startColumn || null,
+        2,
+      ),
+    );
+    return violationsLocal;
+  }
+
+  let actionDir = resolved;
+  if (fs.existsSync(resolved) && fs.statSync(resolved).isFile()) {
+    actionDir = path.dirname(resolved);
+  }
+
+  const hasYml = fs.existsSync(path.join(actionDir, 'action.yml'));
+  const hasYaml = fs.existsSync(path.join(actionDir, 'action.yaml'));
+
+  if (!hasYml && !hasYaml) {
+    violationsLocal.push(
+      makeViolation(
+        rel,
           `local action missing action.yml or action.yaml: ${uses}`,
           step.startLine || 1,
           step.startColumn || null,
@@ -409,6 +428,17 @@ async function checkStepUses({
     return violationsLocal;
   }
 
+async function checkRemoteActionStep({
+  rel,
+  jobId,
+  uses,
+  step,
+  allowedActions,
+  unsafePatterns,
+  unsafeAllowlist,
+  validateRemoteAction,
+}) {
+  const violations = [];
   // Validate `uses:` reference for remote/docker/allowlist/pinning.
   const check = await checkUsesReference({
     rel,
@@ -427,14 +457,10 @@ async function checkStepUses({
     const repo = repoFromAction(action);
     if (repo !== pattern.uses) continue;
 
-    let match = true;
-    for (const [k, v] of Object.entries(pattern.with || {})) {
+    const match = Object.entries(pattern.with || {}).every(([k, v]) => {
       const actual = String(step.with[k] || '');
-      if (actual.replace(/"/g, '') !== String(v)) {
-        match = false;
-        break;
-      }
-    }
+      return actual.replaceAll('"', '') === String(v);
+    });
 
     if (match) {
       maybePushUnsafePatternViolation(violations, {
@@ -448,6 +474,7 @@ async function checkStepUses({
   }
 
   return violations;
+}
 }
 
 function checkInlineRun({
@@ -467,19 +494,11 @@ function checkInlineRun({
   const allowInline = isAllowlisted(inlineAllowlist, rel, jobId, step);
   const hasStrictMode = runHasAll(step.runLines, ['set -euo pipefail']);
 
-  if (/\${{\s*secrets\./.test(step.run)) {
-    violations.push(
-      makeViolation(
-        rel,
-        `secrets interpolated in run in job '${jobId}'`,
-        step.runLineNumbers?.[0] || step.startLine || 1,
-        step.runLineColumns?.[0] || step.startColumn || null,
-        3,
-      ),
-    );
-  }
+  violations.push(...checkInlineSecrets({ rel, jobId, step }));
 
-  if (!allowInline) {
+  if (allowInline) {
+    violations.push(...checkInlineAllowlistConstraints({ rel, jobId, step, inlineConstraints }));
+  } else {
     if (runLineCount > inlineMaxLines) {
       violations.push(
         makeViolation(
@@ -502,49 +521,78 @@ function checkInlineRun({
         ),
       );
     }
-  } else {
-    for (const r of inlineConstraints.forbidRegex) {
-      let re;
-      try {
-        re = compileRegex(r);
-      } catch (err) {
-        violations.push(
-          makeViolation(
-            rel,
-            `invalid inline allowlist regex '${r}': ${err.message}`,
-            step.runLineNumbers?.[0] || step.startLine || 1,
-            step.runLineColumns?.[0] || step.startColumn || null,
-            3,
-          ),
-        );
-        continue;
-      }
-      if (re.test(step.run)) {
-        violations.push(
-          makeViolation(
-            rel,
-            `inline bash allowlist constraints violated in job '${jobId}'`,
-            step.runLineNumbers?.[0] || step.startLine || 1,
-            step.runLineColumns?.[0] || step.startColumn || null,
-            2,
-          ),
-        );
-        break;
-      }
-    }
-    if (!runHasAll(step.runLines, inlineConstraints.requireContains)) {
+  }
+
+  violations.push(...checkUnsafeRunPatterns({ rel, jobId, step, unsafePatterns, unsafeAllowlist }));
+
+  return violations;
+}
+
+function checkInlineSecrets({ rel, jobId, step }) {
+  const violations = [];
+  if (/\${{\s*secrets\./.test(step.run)) {
+    violations.push(
+      makeViolation(
+        rel,
+        `secrets interpolated in run in job '${jobId}'`,
+        step.runLineNumbers?.[0] || step.startLine || 1,
+        step.runLineColumns?.[0] || step.startColumn || null,
+        3,
+      ),
+    );
+  }
+  return violations;
+}
+
+function checkInlineAllowlistConstraints({ rel, jobId, step, inlineConstraints }) {
+  const violations = [];
+  for (const r of inlineConstraints.forbidRegex) {
+    let re;
+    try {
+      re = compileRegex(r);
+    } catch (err) {
       violations.push(
         makeViolation(
           rel,
-          `inline bash allowlist missing required content in job '${jobId}'`,
+          `invalid inline allowlist regex '${r}': ${err.message}`,
+          step.runLineNumbers?.[0] || step.startLine || 1,
+          step.runLineColumns?.[0] || step.startColumn || null,
+          3,
+        ),
+      );
+      continue;
+    }
+    if (re.test(step.run)) {
+      violations.push(
+        makeViolation(
+          rel,
+          `inline bash allowlist constraints violated in job '${jobId}'`,
           step.runLineNumbers?.[0] || step.startLine || 1,
           step.runLineColumns?.[0] || step.startColumn || null,
           2,
         ),
       );
+      break;
     }
   }
 
+  if (!runHasAll(step.runLines, inlineConstraints.requireContains)) {
+    violations.push(
+      makeViolation(
+        rel,
+        `inline bash allowlist missing required content in job '${jobId}'`,
+        step.runLineNumbers?.[0] || step.startLine || 1,
+        step.runLineColumns?.[0] || step.startColumn || null,
+        2,
+      ),
+    );
+  }
+
+  return violations;
+}
+
+function checkUnsafeRunPatterns({ rel, jobId, step, unsafePatterns, unsafeAllowlist }) {
+  const violations = [];
   for (const pattern of unsafePatterns) {
     for (const reStr of pattern.runRegex || []) {
       let re;
@@ -573,7 +621,6 @@ function checkInlineRun({
       }
     }
   }
-
   return violations;
 }
 
@@ -598,7 +645,7 @@ function checkSecretsHandling({ rel, jobId, step }) {
   const violations = [];
   const run = step.run || '';
   const runLines = step.runLines || [];
-  const withValues = Object.values(step.with || {}).map((v) => String(v));
+  const withValues = Object.values(step.with || {}).map(String);
   const hasSecretsInRun = /\${{\s*secrets\./.test(run);
   const hasSecretsInWith = withValues.some((v) => /\${{\s*secrets\./.test(v));
 
@@ -630,15 +677,8 @@ function checkSecretsHandling({ rel, jobId, step }) {
         ),
       );
     }
-    let echoLineIdx = -1;
-    for (let idx = 0; idx < runLines.length; idx++) {
-      const line = runLines[idx];
-      if (/\${{\s*secrets\./.test(line) && /\b(echo|printf)\b/.test(line)) {
-        echoLineIdx = idx;
-        break;
-      }
-    }
-    if (echoLineIdx !== -1) {
+    const echoLineIdx = runLines.findIndex((line) => /\${{\s*secrets\./.test(line) && /\b(echo|printf)\b/.test(line));
+    if (echoLineIdx >= 0) {
       const line = step.runLineNumbers?.[echoLineIdx] || rLine;
       const col = step.runLineColumns?.[echoLineIdx] || rCol;
       violations.push(
@@ -805,7 +845,7 @@ export async function scanWorkflows({
 
         if (step.uses && isActionUpload(step.uses)) {
           if (step.with.name) {
-            uploadNames.push(String(step.with.name).replace(/"/g, ''));
+            uploadNames.push(String(step.with.name).replaceAll('"', ''));
           }
           for (const p of extractUploadPaths(step)) {
             uploadPaths.push(p);
