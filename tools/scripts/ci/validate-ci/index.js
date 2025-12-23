@@ -361,36 +361,32 @@ if (prOnly) {
 
 const violations = [];
 
-violations.push(
-  ...(await scanWorkflows({
-    workflows,
-    workspaceRoot,
-    allowedActions,
-    unsafePatterns,
-    unsafeAllowlist,
-    inlineAllowlist,
-    inlineConstraints,
-    inlineMaxLines,
-    highRisk,
-    permissionsBaseline,
-    artifactPolicy,
-    validateRemoteAction,
-    requireSectionHeaders,
-    allowedFirstSteps,
-    localActions,
-    quiet,
-  })),
-);
-
-violations.push(
-  ...(await scanActions({
-    actions,
-    platformRoot,
-    allowedActions,
-    validateRemoteAction,
-    quiet,
-  })),
-);
+const workflowViolations = await scanWorkflows({
+  workflows,
+  workspaceRoot,
+  allowedActions,
+  unsafePatterns,
+  unsafeAllowlist,
+  inlineAllowlist,
+  inlineConstraints,
+  inlineMaxLines,
+  highRisk,
+  permissionsBaseline,
+  artifactPolicy,
+  validateRemoteAction,
+  requireSectionHeaders,
+  allowedFirstSteps,
+  localActions,
+  quiet,
+});
+const actionViolations = await scanActions({
+  actions,
+  platformRoot,
+  allowedActions,
+  validateRemoteAction,
+  quiet,
+});
+violations.push(...workflowViolations, ...actionViolations);
 
 {
   const totalWeight = violations.reduce((s, v) => s + (v.weight || 1), 0);
@@ -449,10 +445,12 @@ violations.push(
       { stream: 'stderr' },
     );
     if (scoreFailThreshold !== null) {
-      bullet(
-        `Configured failure threshold: ${scoreFailThreshold}%. ${failedByScore ? 'Below threshold -> failing.' : 'Above threshold -> OK by score.'}`,
-        { stream: 'stderr' },
-      );
+      const thresholdMessage = failedByScore
+        ? 'Below threshold -> failing.'
+        : 'Above threshold -> OK by score.';
+      bullet(`Configured failure threshold: ${scoreFailThreshold}%. ${thresholdMessage}`, {
+        stream: 'stderr',
+      });
     }
 
     process.exit(1);
