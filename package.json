@@ -46,7 +46,7 @@
     "typescript": "5.9.3",
     "typescript-eslint": "8.50.0",
     "yaml": "^2.8.2",
-    "@cspell/cspell": "^6.21.0",
+    "@cspell/cspell": "9.4.0",
     "eslint-plugin-security": "^1.7.0",
     "eslint-plugin-sonarjs": "^3.0.5",
     "eslint-plugin-unicorn": "^50.6.0",
