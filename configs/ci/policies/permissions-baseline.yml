@@ -26,6 +26,12 @@ meta:
   last_reviewed: 2025-12-19
   review_interval_days: 180
 
+rule:
+  require_workflow_permissions: true
+  require_job_permissions: true
+  require_inline_justification_on_elevation: true
+  forbid_write_permissions_on_pr_from_fork: true
+
 policy:
   # If a permission key is not present in the baseline for a category,
   # it is treated as "none".

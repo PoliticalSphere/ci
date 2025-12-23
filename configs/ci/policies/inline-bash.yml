@@ -33,6 +33,11 @@ meta:
   last_reviewed: 2025-12-19
   review_interval_days: 180
 
+rule:
+  prefer_composite_actions: true
+  max_inline_lines: 15
+  require_set_euo_pipefail_in_scripts: true
+
 policy:
   default: deny
 

@@ -17,6 +17,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 . "${script_dir}/../common.sh"
 init_repo_context
 
+branding_script="${repo_root}/tools/scripts/branding/print-section.sh"
 project_tsconfig="${repo_root}/tsconfig.json"
 if [[ ! -f "${project_tsconfig}" ]]; then
   error "project tsconfig not found at ${project_tsconfig}"
@@ -40,6 +41,14 @@ if [[ "$#" -gt 0 ]]; then
   TSC_ARGS+=("$@")
 fi
 
+if [[ -x "${branding_script}" ]]; then
+  bash "${branding_script}" "typecheck" "Typecheck" "tsconfig.json"
+else
+  echo "Typecheck: tsconfig.json"
+fi
+
 # Fail on any diagnostic; keep output stable for CI parsing.
 # Be robust on older shells where an empty array can trigger 'unbound variable'.
 "${TSC_BIN}" --project "${project_tsconfig}" --pretty false ${TSC_ARGS[@]+"${TSC_ARGS[@]}"}
+
+detail "Typecheck: OK"

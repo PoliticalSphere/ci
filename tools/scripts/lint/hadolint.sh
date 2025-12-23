@@ -78,8 +78,11 @@ if [[ "${full_scan}" == "1" ]]; then
     fi
   done < <(find "${repo_root}" -type f \( -name "Dockerfile" -o -name "Dockerfile.*" -o -name "*.Dockerfile" \) -print0)
 else
-  mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
-  for f in "${staged[@]}"; do
+  staged=()
+  while IFS= read -r f; do
+    staged+=("${f}")
+  done < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
+  for f in ${staged[@]+"${staged[@]}"}; do
     if is_dockerfile_path "${f}"; then
       targets+=("${repo_root}/${f}")
     fi

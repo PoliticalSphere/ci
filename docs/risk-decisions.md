@@ -41,7 +41,7 @@ Copy the block below for each decision:
   date: 2025-12-19
   owner: political-sphere
   status: approved
-  scope: configs/ci/exceptions/actions-allowlist.yml, .github/workflows/security-scheduled.yml
+  scope: configs/ci/policies/allowed-actions.yml, .github/workflows/security-scheduled.yml
   policy: configs/ci/policies/validate-ci.yml#sha_pinning
   decision: Allow trufflesecurity/trufflehog for scheduled secrets scanning
   rationale: Add complementary secrets coverage on scheduled scans without blocking PRs.
@@ -57,7 +57,8 @@ Copy the block below for each decision:
   scope: configs/security/license-policy.yml
   policy: configs/security/license-policy.yml#allowlist
   decision: Allow `Python-2.0` SPDX license identifier in license allowlist
-  rationale: `argparse@2.0.1` is transitively required; Python-2.0 is a permissive license acceptable for the platform
+  rationale: `argparse@2.0.1` is transitively required; Python-2.0 is a permissive license
+    acceptable for the platform
   impact: Small increase in accepted dependency licenses; low security risk
   mitigation: Review and monitor packages using this license; time-bounded review scheduled
   expires: 2026-06-21

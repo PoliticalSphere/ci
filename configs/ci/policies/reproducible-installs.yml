@@ -1,0 +1,22 @@
+# ==============================================================================
+# Political Sphere — Reproducible Installs Policy
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Ensure dependency installation is deterministic in CI jobs.
+# ==============================================================================
+
+meta:
+  version: 1.0.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-21
+  review_interval_days: 180
+
+rule:
+  enabled: false
+  require_lockfiles: true
+  require_ci_installs: true
+  forbid_unpinned_installs: true
+
+notes:
+  enforcement_status: "documented only; not yet wired into validate-ci"

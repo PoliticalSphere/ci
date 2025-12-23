@@ -20,6 +20,8 @@
     "lint:biome": "bash tools/scripts/lint/biome.sh",
     "lint:eslint": "bash tools/scripts/lint/eslint.sh",
     "lint:markdown": "bash tools/scripts/lint/markdownlint.sh",
+    "lint:cspell": "bash tools/scripts/lint/cspell.sh",
+    "lint:knip": "bash tools/scripts/lint/knip.sh",
     "lint:yaml": "bash tools/scripts/lint/yamllint.sh",
     "lint:actionlint": "bash tools/scripts/lint/actionlint.sh",
     "lint:hadolint": "bash tools/scripts/lint/hadolint.sh",
@@ -32,8 +34,8 @@
     "consumer-contract": "bash tools/scripts/consumer/contract-check.sh",
     "jscpd": "bash tools/scripts/tasks/jscpd.sh",
     "validate-ci": "node tools/scripts/ci/validate-ci/index.js",
-    "preflight": "npm run lint && npm run typecheck && npm run test && npm run jscpd",
-    "ci": "npm run preflight"
+    "preflight": "npm -s run lint && npm -s run typecheck && npm -s run test && npm -s run jscpd",
+    "ci": "npm -s run preflight"
   },
   "devDependencies": {
     "@biomejs/biome": "2.3.10",
@@ -43,6 +45,12 @@
     "markdownlint-cli2": "^0.20.0",
     "typescript": "5.9.3",
     "typescript-eslint": "8.50.0",
-    "yaml": "^2.8.2"
+    "yaml": "^2.8.2",
+    "@cspell/cspell": "^6.21.0",
+    "eslint-plugin-security": "^1.7.0",
+    "eslint-plugin-sonarjs": "^0.18.0",
+    "eslint-plugin-unicorn": "^50.6.0",
+    "eslint-plugin-import": "^2.28.0",
+    "knip": "^0.8.0"
   }
 }

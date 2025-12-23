@@ -53,6 +53,11 @@ done < <(find "${tests_dir}" -maxdepth 1 -type f -name '*.test.js' -print0 | sor
 
 if [[ "${#test_files[@]}" -gt 0 ]]; then
   found_any=1
+  if [[ -x "${branding_script}" ]]; then
+    bash "${branding_script}" "tests" "Running tests" "tools/tests"
+  else
+    echo "Running tests: tools/tests"
+  fi
   for f in "${test_files[@]}"; do
     if [[ -x "${branding_script}" ]]; then
       bash "${branding_script}" "test" "Running test" "$(basename "${f}")"
@@ -71,4 +76,10 @@ if [[ ${found_any} -eq 0 ]]; then
   detail "Tests: test harness not found (bootstrap mode)."
   detail "HINT: add deterministic tests under tools/tests/."
   exit 0
+fi
+
+if [[ -x "${branding_script}" ]]; then
+  bash "${branding_script}" "tests.result" "Tests passed" "${#test_files[@]} test file(s) validated"
+else
+  echo "Tests passed: ${#test_files[@]} test file(s) validated"
 fi

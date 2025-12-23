@@ -6,18 +6,33 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 # Purpose:
 #   Print the Political Sphere ASCII banner exactly once per process execution.
-#   Safe for use in CI and local hooks.
+#   Safe for CI and local hooks.
+#
+# Env:
+#   PS_BANNER_PATH=... Optional override for banner file path
 # ==============================================================================
 
 # Print banner only once per shell/process (prevents log spam).
 if [[ "${PS_BANNER_PRINTED:-0}" == "1" ]]; then
-  exit 0
+  # If this file is sourced, return; if executed, exit. Use explicit check so
+  # ShellCheck doesn't warn about unreachable 'return'.
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 0
+  else
+    exit 0
+  fi
 fi
 export PS_BANNER_PRINTED=1
 
-# Resolve banner path relative to this script to avoid CWD ambiguity.
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 format_sh="${script_dir}/format.sh"
+
+if [[ ! -f "${format_sh}" ]]; then
+  echo "ERROR: format.sh not found at: ${format_sh}" >&2
+  echo "HINT: ensure tools/scripts/branding/format.sh exists and is committed." >&2
+  exit 1
+fi
+
 # shellcheck source=tools/scripts/branding/format.sh
 . "${format_sh}"
 
@@ -30,17 +45,22 @@ if [[ ! -f "${banner_path}" ]]; then
   exit 1
 fi
 
-if ps_supports_color; then
-  C_RESET="\033[0m"
-  C_BOLD="\033[1m"
-  C_CYAN="\033[36m"
-  C_DIM="\033[2m"
-  printf "%b" "${C_BOLD}${C_CYAN}"
-  cat "${banner_path}"
-  printf "%b\n" "${C_RESET}"
-  printf "%b%s%b\n" "${C_DIM}" "────────────────────────────────────────" "${C_RESET}"
-else
-  cat "${banner_path}"
-  # Ensure a trailing newline for clean logs.
-  echo
-fi
+print_banner() {
+  if ps_supports_color; then
+    local C_RESET=$'\033[0m'
+    local C_BOLD=$'\033[1m'
+    local C_CYAN=$'\033[36m'
+    local C_DIM=$'\033[90m'
+    local sep="────────────────────────────────────────"
+
+    printf "%b" "${C_BOLD}${C_CYAN}"
+    cat "${banner_path}"
+    printf "%b\n" "${C_RESET}"
+    printf "%b%s%b\n" "${C_DIM}" "${sep}" "${C_RESET}"
+  else
+    cat "${banner_path}"
+    echo
+  fi
+}
+
+print_banner

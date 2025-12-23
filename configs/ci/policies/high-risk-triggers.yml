@@ -22,6 +22,15 @@ meta:
   last_reviewed: 2025-12-19
   review_interval_days: 180
 
+rule:
+  # Explicitly block high-risk triggers unless allowlisted.
+  disallow_by_default:
+    - pull_request_target
+    - repository_dispatch
+    - workflow_run
+    - issue_comment
+  require_safe_checkout_ref: true
+
 policy:
   default: deny
 
@@ -44,7 +53,7 @@ high_risk_triggers:
   - workflow_run
   - repository_dispatch
 
-allowlist: []
+allowlist:
   # Empty by default. Add entries only with explicit approval.
   #
   # Example:

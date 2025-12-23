@@ -8,17 +8,23 @@ validation gate and reusable workflows.
 ### policies/
 
 - `policies/validate-ci.yml`: core validation policy rules for workflow safety.
+- `policies/allowed-actions.yml`: approved action repositories (default deny).
+- `policies/action-pinning.yml`: SHA-pinning requirements for remote actions.
+- `policies/remote-sha-verify.yml`: remote SHA verification defaults.
 - `policies/permissions-baseline.yml`: least-privilege permissions reference.
+- `policies/high-risk-triggers.yml`: high-risk trigger allowlist + safeguards.
+- `policies/harden-runner.yml`: runner hardening requirements + allowlist.
+- `policies/inline-bash.yml`: inline shell constraints + allowlist.
+- `policies/section-headers.yml`: section header requirements for run steps.
+- `policies/secrets-handling.yml`: secrets hygiene expectations.
+- `policies/local-actions.yml`: local action usage constraints.
 - `policies/unsafe-patterns.yml`: unsafe workflow patterns and remediation guidance.
+- `policies/unsafe-patterns-allowlist.yml`: approved exceptions with risk decisions.
 - `policies/artifact-policy.yml`: artifact retention and upload policy.
+- `policies/reproducible-installs.yml`: deterministic dependency install policy (documented).
+- `policies/tooling-versions.yml`: pinned tooling versions policy (documented).
+- `policies/logging-policy.yml`: logging safety policy (documented).
 - `policies/naming-policy.json`: naming conventions for key repo areas.
-
-### exceptions/
-
-- `exceptions/actions-allowlist.yml`: allowed action repositories (SHA-pinned only).
-- `exceptions/unsafe-patterns-allowlist.yml`: approved exceptions with risk decisions.
-- `exceptions/inline-bash-allowlist.yml`: approved inline-bash exceptions.
-- `exceptions/high-risk-triggers-allowlist.yml`: approved high-risk workflow triggers.
 
 ## Usage
 

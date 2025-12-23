@@ -21,7 +21,7 @@ import yaml from 'yaml';
 
 import { scanActions, scanWorkflows } from './checks.js';
 import { bullet, detail, fatal, section } from './console.js';
-import { getRepoRoot } from './env.js';
+import { getRepoRoot, isCI } from './env.js';
 import { listActionMetadata, listWorkflows, loadText } from './fs.js';
 import {
   loadAllowlist,
@@ -75,6 +75,37 @@ if (!config.rules || typeof config.rules !== 'object') {
 
 detail('Status: configuration loaded and passed basic sanity checks.');
 
+function loadRuleConfig(ruleName, rule) {
+  if (!rule || typeof rule !== 'object') return rule;
+  if (!rule.config_file || typeof rule.config_file !== 'string') return rule;
+  const configFile = path.isAbsolute(rule.config_file)
+    ? rule.config_file
+    : path.join(platformRoot, rule.config_file);
+  const ruleText = loadText(configFile);
+  if (!ruleText.trim()) {
+    fatal(`rule config for '${ruleName}' is empty: ${rule.config_file}`);
+  }
+  let parsed;
+  try {
+    parsed = yaml.parse(ruleText);
+  } catch (err) {
+    fatal(
+      `rule config for '${ruleName}' is not valid YAML (${rule.config_file}): ${err.message}`,
+    );
+  }
+  const ruleConfig = parsed?.rule;
+  if (!ruleConfig || typeof ruleConfig !== 'object') {
+    return rule;
+  }
+  return { ...ruleConfig, ...rule };
+}
+
+const mergedRules = {};
+for (const [ruleName, rule] of Object.entries(config.rules)) {
+  mergedRules[ruleName] = loadRuleConfig(ruleName, rule);
+}
+config.rules = mergedRules;
+
 const inlineMaxLines = Number(
   config.rules?.inline_bash?.max_inline_lines ?? 15,
 );
@@ -82,13 +113,19 @@ const requireSectionHeaders =
   config.rules?.outputs_and_artifacts?.require_section_headers === true;
 const allowedFirstSteps =
   config.rules?.runner_hardening?.allowed_first_steps || [];
+const localActions = config.rules?.local_actions || {};
 const scoreFailThreshold =
   typeof config.enforcement?.score_fail_threshold === 'number'
     ? config.enforcement.score_fail_threshold
     : null;
-const verifyRemoteShas = !['0', 'false'].includes(
-  String(process.env.PS_VALIDATE_CI_VERIFY_REMOTE || '1').toLowerCase(),
-);
+const verifyRemoteEnv = String(
+  process.env.PS_VALIDATE_CI_VERIFY_REMOTE || '',
+).toLowerCase();
+const verifyRemoteFromEnv =
+  verifyRemoteEnv === '' ? null : !['0', 'false'].includes(verifyRemoteEnv);
+const verifyRemoteFromConfig = config.rules?.remote_sha_verify?.enabled ?? true;
+const verifyRemoteShas =
+  verifyRemoteFromEnv === null ? verifyRemoteFromConfig : verifyRemoteFromEnv;
 detail(
   `Remote SHA verification: ${
     verifyRemoteShas ? 'ENABLED' : 'DISABLED'
@@ -137,7 +174,7 @@ function assertConfigFile(filePath, label, checks) {
 
 const allowlistPath = path.join(
   platformRoot,
-  'configs/ci/exceptions/actions-allowlist.yml',
+  'configs/ci/policies/allowed-actions.yml',
 );
 const unsafePatternsPath = path.join(
   platformRoot,
@@ -145,15 +182,15 @@ const unsafePatternsPath = path.join(
 );
 const unsafeAllowlistPath = path.join(
   platformRoot,
-  'configs/ci/exceptions/unsafe-patterns-allowlist.yml',
+  'configs/ci/policies/unsafe-patterns-allowlist.yml',
 );
 const inlineAllowlistPath = path.join(
   platformRoot,
-  'configs/ci/exceptions/inline-bash-allowlist.yml',
+  'configs/ci/policies/inline-bash.yml',
 );
 const highRiskAllowlistPath = path.join(
   platformRoot,
-  'configs/ci/exceptions/high-risk-triggers-allowlist.yml',
+  'configs/ci/policies/high-risk-triggers.yml',
 );
 const permissionsBaselinePath = path.join(
   platformRoot,
@@ -163,17 +200,58 @@ const artifactPolicyPath = path.join(
   platformRoot,
   'configs/ci/policies/artifact-policy.yml',
 );
+const actionPinningPath = path.join(
+  platformRoot,
+  'configs/ci/policies/action-pinning.yml',
+);
+const remoteShaVerifyPath = path.join(
+  platformRoot,
+  'configs/ci/policies/remote-sha-verify.yml',
+);
+const hardenRunnerPath = path.join(
+  platformRoot,
+  'configs/ci/policies/harden-runner.yml',
+);
+const inlineBashPath = path.join(
+  platformRoot,
+  'configs/ci/policies/inline-bash.yml',
+);
+const secretsHandlingPath = path.join(
+  platformRoot,
+  'configs/ci/policies/secrets-handling.yml',
+);
+const localActionsPath = path.join(
+  platformRoot,
+  'configs/ci/policies/local-actions.yml',
+);
+const sectionHeadersPath = path.join(
+  platformRoot,
+  'configs/ci/policies/section-headers.yml',
+);
 
 assertConfigFile(allowlistPath, 'Actions allowlist', [{ key: 'allowlist' }]);
+assertConfigFile(actionPinningPath, 'Action pinning policy', [{ key: 'rule' }]);
+assertConfigFile(remoteShaVerifyPath, 'Remote SHA verify policy', [
+  { key: 'rule' },
+]);
+assertConfigFile(hardenRunnerPath, 'Harden runner policy', [{ key: 'rule' }]);
+assertConfigFile(inlineBashPath, 'Inline bash policy', [
+  { key: 'rule' },
+  { key: 'allowlist' },
+  { key: 'constraints' },
+]);
+assertConfigFile(secretsHandlingPath, 'Secrets handling policy', [
+  { key: 'rule' },
+]);
+assertConfigFile(localActionsPath, 'Local actions policy', [{ key: 'rule' }]);
+assertConfigFile(sectionHeadersPath, 'Section headers policy', [
+  { key: 'rule' },
+]);
 assertConfigFile(unsafePatternsPath, 'Unsafe patterns', [{ key: 'patterns' }]);
 assertConfigFile(unsafeAllowlistPath, 'Unsafe patterns allowlist', [
   { key: 'allowlist' },
 ]);
-assertConfigFile(inlineAllowlistPath, 'Inline bash allowlist', [
-  { key: 'allowlist' },
-  { key: 'constraints' },
-]);
-assertConfigFile(highRiskAllowlistPath, 'High-risk triggers allowlist', [
+assertConfigFile(highRiskAllowlistPath, 'High-risk triggers policy', [
   { key: 'high_risk_triggers' },
   { key: 'allowlist' },
 ]);
@@ -298,6 +376,7 @@ violations.push(
     validateRemoteAction,
     requireSectionHeaders,
     allowedFirstSteps,
+    localActions,
     quiet,
   })),
 );

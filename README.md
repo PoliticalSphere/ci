@@ -1,9 +1,8 @@
 # Political Sphere CI/CD Platform
 
-This repository is the dedicated CI/CD, automation, and governance platform
-for Political Sphere (PS). It is not an application repository. It provides
-secure-by-default, free-tooling-only CI/CD building blocks that PS application
-repositories consume via reusable workflows and composite actions.
+This repository is the dedicated CI/CD, automation, and governance platform for Political Sphere (PS).
+It is not an application repository. It provides secure-by-default, free-tooling-only CI/CD building
+blocks that PS application repositories consume via reusable workflows and composite actions.
 
 ## Objectives
 

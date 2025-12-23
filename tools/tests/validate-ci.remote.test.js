@@ -33,15 +33,29 @@ function assertEqual(actual, expected, message) {
 }
 
 function assertOk(result, expectedError, label) {
-  assert(result && typeof result === 'object', `${label}: expected result object`);
+  assert(
+    result && typeof result === 'object',
+    `${label}: expected result object`,
+  );
   assertEqual(result.ok, true, `${label}: expected ok=true`);
-  assertEqual(result.error, expectedError, `${label}: expected error=${String(expectedError)}`);
+  assertEqual(
+    result.error,
+    expectedError,
+    `${label}: expected error=${String(expectedError)}`,
+  );
 }
 
 function assertFail(result, expectedError, label) {
-  assert(result && typeof result === 'object', `${label}: expected result object`);
+  assert(
+    result && typeof result === 'object',
+    `${label}: expected result object`,
+  );
   assertEqual(result.ok, false, `${label}: expected ok=false`);
-  assertEqual(result.error, expectedError, `${label}: expected error=${String(expectedError)}`);
+  assertEqual(
+    result.error,
+    expectedError,
+    `${label}: expected error=${String(expectedError)}`,
+  );
 }
 
 /**
@@ -50,7 +64,11 @@ function assertFail(result, expectedError, label) {
  * - call counting
  * - optional throwing per URL
  */
-function makeFetchStub({ statusByUrl = {}, throwByUrl = {}, defaultStatus = 200 } = {}) {
+function makeFetchStub({
+  statusByUrl = {},
+  throwByUrl = {},
+  defaultStatus = 200,
+} = {}) {
   const calls = [];
   const fetchImpl = async (url, opts = {}) => {
     calls.push({ url: String(url), opts });
@@ -95,9 +113,16 @@ async function main() {
       fetchImpl: fetch.fetchImpl,
     });
 
-    const res = await verifier('./.github/actions/foo', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+    const res = await verifier(
+      './.github/actions/foo',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    );
     assertOk(res, 'local_action', 'local action bypass');
-    assertEqual(fetch.count(), 0, 'local action bypass: fetch must not be called');
+    assertEqual(
+      fetch.count(),
+      0,
+      'local action bypass: fetch must not be called',
+    );
     info('OK: local actions bypass (no fetch)');
   }
 
@@ -113,9 +138,16 @@ async function main() {
       fetchImpl: fetch.fetchImpl,
     });
 
-    const res = await verifier('actions/checkout', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+    const res = await verifier(
+      'actions/checkout',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    );
     assertOk(res, 'verification_disabled', 'verification disabled');
-    assertEqual(fetch.count(), 0, 'verification disabled: fetch must not be called');
+    assertEqual(
+      fetch.count(),
+      0,
+      'verification disabled: fetch must not be called',
+    );
     info('OK: verification disabled short-circuits');
   }
 
@@ -135,7 +167,11 @@ async function main() {
     assertOk(res1, 'missing_action_or_ref', 'missing action');
     const res2 = await verifier('actions/checkout', '');
     assertOk(res2, 'missing_action_or_ref', 'missing ref');
-    assertEqual(fetch.count(), 0, 'missing action/ref: fetch must not be called');
+    assertEqual(
+      fetch.count(),
+      0,
+      'missing action/ref: fetch must not be called',
+    );
     info('OK: missing inputs short-circuit');
   }
 
@@ -173,10 +209,21 @@ async function main() {
       fetchImpl: fetch.fetchImpl,
     });
 
-    const res = await verifier('actions/checkout', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+    const res = await verifier(
+      'actions/checkout',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    );
     assertFail(res, 'api_unreachable', 'CI unreachable network probe');
-    assertEqual(fetch.count(), 1, 'CI unreachable: should only do the network probe');
-    assertEqual(fetch.countUrl('https://api.github.com/'), 1, 'CI unreachable: probe URL must be hit exactly once');
+    assertEqual(
+      fetch.count(),
+      1,
+      'CI unreachable: should only do the network probe',
+    );
+    assertEqual(
+      fetch.countUrl('https://api.github.com/'),
+      1,
+      'CI unreachable: probe URL must be hit exactly once',
+    );
     info('OK: CI fails when GitHub API unreachable');
   }
 
@@ -195,9 +242,20 @@ async function main() {
       fetchImpl: fetch.fetchImpl,
     });
 
-    const res = await verifier('actions/checkout', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
-    assertOk(res, 'api_unreachable_local_skip', 'local unreachable network probe');
-    assertEqual(fetch.count(), 1, 'local unreachable: should only do the network probe');
+    const res = await verifier(
+      'actions/checkout',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    );
+    assertOk(
+      res,
+      'api_unreachable_local_skip',
+      'local unreachable network probe',
+    );
+    assertEqual(
+      fetch.count(),
+      1,
+      'local unreachable: should only do the network probe',
+    );
     info('OK: local skips when GitHub API unreachable');
   }
 
@@ -205,7 +263,8 @@ async function main() {
   // 7) Successful lookup: network probe 200, commit lookup 200 => ok:true error:null.
   // ---------------------------------------------------------------------------
   {
-    const commitUrl = 'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+    const commitUrl =
+      'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
     const fetch = makeFetchStub({
       statusByUrl: {
         'https://api.github.com/': 200,
@@ -220,9 +279,16 @@ async function main() {
       fetchImpl: fetch.fetchImpl,
     });
 
-    const res = await verifier('actions/checkout', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+    const res = await verifier(
+      'actions/checkout',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    );
     assertOk(res, null, 'success lookup');
-    assertEqual(fetch.countUrl('https://api.github.com/'), 1, 'success: network probe once');
+    assertEqual(
+      fetch.countUrl('https://api.github.com/'),
+      1,
+      'success: network probe once',
+    );
     assertEqual(fetch.countUrl(commitUrl), 1, 'success: commit lookup once');
     info('OK: verified SHA found (200)');
   }
@@ -231,7 +297,8 @@ async function main() {
   // 8) Missing SHA: network probe 200, commit lookup 404 => ok:false ref_not_found.
   // ---------------------------------------------------------------------------
   {
-    const commitUrl = 'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+    const commitUrl =
+      'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
     const fetch = makeFetchStub({
       statusByUrl: {
         'https://api.github.com/': 200,
@@ -246,7 +313,10 @@ async function main() {
       fetchImpl: fetch.fetchImpl,
     });
 
-    const res = await verifier('actions/checkout', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+    const res = await verifier(
+      'actions/checkout',
+      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+    );
     assertFail(res, 'ref_not_found', 'missing SHA');
     info('OK: missing SHA returns ref_not_found (404)');
   }
@@ -256,7 +326,8 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const mk = async (status, expectedError) => {
-      const commitUrl = 'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+      const commitUrl =
+        'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
       const fetch = makeFetchStub({
         statusByUrl: {
           'https://api.github.com/': 200,
@@ -271,7 +342,10 @@ async function main() {
         fetchImpl: fetch.fetchImpl,
       });
 
-      const res = await verifier('actions/checkout', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+      const res = await verifier(
+        'actions/checkout',
+        'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      );
       assertFail(res, expectedError, `status mapping ${status}`);
     };
 
@@ -313,8 +387,16 @@ async function main() {
     const resSubpath = await verifier('github/codeql-action/upload-sarif', sha);
     assertOk(resSubpath, null, 'subpath action normalization');
 
-    assertEqual(fetch.countUrl(commitCheckout), 1, '@sha uses actions/checkout repo');
-    assertEqual(fetch.countUrl(commitCodeql), 1, 'subpath uses github/codeql-action repo');
+    assertEqual(
+      fetch.countUrl(commitCheckout),
+      1,
+      '@sha uses actions/checkout repo',
+    );
+    assertEqual(
+      fetch.countUrl(commitCodeql),
+      1,
+      'subpath uses github/codeql-action repo',
+    );
 
     info('OK: action normalization (@sha + subpath)');
   }
@@ -347,7 +429,11 @@ async function main() {
     assertOk(r1, null, 'cache first call');
     assertOk(r2, null, 'cache second call');
 
-    assertEqual(fetch.countUrl('https://api.github.com/'), 1, 'cache: network probe only once');
+    assertEqual(
+      fetch.countUrl('https://api.github.com/'),
+      1,
+      'cache: network probe only once',
+    );
     assertEqual(fetch.countUrl(commitUrl), 1, 'cache: commit lookup only once');
 
     info('OK: caching prevents duplicate lookups');

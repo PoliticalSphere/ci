@@ -1,0 +1,19 @@
+# ==============================================================================
+# Political Sphere — Local Actions Policy
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Restrict how workflows reference local composite actions.
+# ==============================================================================
+
+meta:
+  version: 1.0.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-21
+  review_interval_days: 180
+
+rule:
+  enabled: true
+  require_under_dot_github_actions: true
+  require_action_metadata: true
+  forbid_path_traversal: true
