@@ -64,16 +64,45 @@ else
 fi
 
 # Enforce "no lint issues" (warnings are issues). Keep behaviour consistent.
-if [[ "${#ESLINT_ARGS[@]}" -gt 0 ]]; then
-  if [[ "${ESL_VIA_NPX}" -eq 1 ]]; then
-    "${ESLINT_BIN}" --yes eslint --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${ESLINT_ARGS[@]}" "${targets[@]}"
+run_eslint() {
+  local out
+  set +e
+  if [[ "${#ESLINT_ARGS[@]}" -gt 0 ]]; then
+    if [[ "${ESL_VIA_NPX}" -eq 1 ]]; then
+      out="$(${ESLINT_BIN} --yes eslint --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${ESLINT_ARGS[@]}" "${targets[@]}" 2>&1)"
+    else
+      out="$(${ESLINT_BIN} --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${ESLINT_ARGS[@]}" "${targets[@]}" 2>&1)"
+    fi
   else
-    "${ESLINT_BIN}" --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${ESLINT_ARGS[@]}" "${targets[@]}"
+    if [[ "${ESL_VIA_NPX}" -eq 1 ]]; then
+      out="$(${ESLINT_BIN} --yes eslint --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${targets[@]}" 2>&1)"
+    else
+      out="$(${ESLINT_BIN} --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${targets[@]}" 2>&1)"
+    fi
   fi
-else
-  if [[ "${ESL_VIA_NPX}" -eq 1 ]]; then
-    "${ESLINT_BIN}" --yes eslint --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${targets[@]}"
-  else
-    "${ESLINT_BIN}" --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${targets[@]}"
+  local rc=$?
+  set -e
+
+  if [[ ${rc} -ne 0 ]]; then
+    # Detect missing plugin/module errors and provide actionable guidance
+    if printf '%s' "$out" | grep -Ei "Cannot find package 'eslint-plugin-[^']+" >/dev/null 2>&1 || printf '%s' "$out" | grep -Ei "ERR_MODULE_NOT_FOUND: Cannot find package 'eslint-plugin-[^']+" >/dev/null 2>&1; then
+      ps_error "ESLint failed to resolve a plugin required by ${config_path}."
+      ps_error "Possible causes: you haven't installed devDependencies, or your npm registry requires auth."
+      ps_detail "ESLint output:\n$out"
+      ps_error "Run: npm ci  (or: npm install --save-dev <missing-package>) and retry."
+      return ${rc}
+    fi
+
+    # Otherwise, print output and return the original code
+    printf '%s\n' "$out"
+    return ${rc}
   fi
-fi
+
+  # Print output (if any) and return success
+  if [[ -n "$out" ]]; then
+    printf '%s\n' "$out"
+  fi
+  return 0
+}
+
+run_eslint

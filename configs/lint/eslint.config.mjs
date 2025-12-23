@@ -14,11 +14,11 @@
 // =============================================================================
 
 import js from '@eslint/js';
+import tseslint from '@typescript-eslint/eslint-plugin';
 import importPlugin from 'eslint-plugin-import';
 import security from 'eslint-plugin-security';
 import sonarjs from 'eslint-plugin-sonarjs';
 import unicorn from 'eslint-plugin-unicorn';
-import tseslint from 'typescript-eslint';
 
 export default [
   // ---------------------------------------------------------------------------
