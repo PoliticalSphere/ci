@@ -5,7 +5,7 @@
 //   Provide structured, consistent output for Validate-CI.
 // ==============================================================================
 
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -156,10 +156,12 @@ export function fatal(message) {
 
 export function getRepoRoot() {
   try {
-    return execSync('git rev-parse --show-toplevel', {
+    const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
-    }).trim();
+    });
+    if (r && r.status === 0) return String(r.stdout || '').trim();
+    return process.cwd();
   } catch {
     return process.cwd();
   }

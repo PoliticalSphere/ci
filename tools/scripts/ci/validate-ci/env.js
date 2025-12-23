@@ -5,7 +5,7 @@
 //   Provide environment and repo-root utilities for Validate-CI.
 // ==============================================================================
 
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 
 export function isCI() {
   return String(process.env.CI || '0') === '1';
@@ -13,11 +13,12 @@ export function isCI() {
 
 export function getRepoRoot() {
   try {
-    const out = execSync('git rev-parse --show-toplevel', {
+    const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
     });
-    return out.trim();
+    if (r && r.status === 0) return String(r.stdout || '').trim();
+    return process.cwd();
   } catch {
     return process.cwd();
   }
