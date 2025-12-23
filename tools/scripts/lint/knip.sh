@@ -63,7 +63,7 @@ if [[ -n "${output}" ]]; then
   # Filter empty lines
   filtered="$(echo "${output}" | grep -Ev '^\s*$' || true)"
   if [[ -n "${filtered}" ]]; then
-    echo "${filtered}"
+    printf '%s\n' "${filtered}"
   fi
 fi
 exit ${status}
