@@ -9,6 +9,12 @@
     "type": "git",
     "url": "https://github.com/PoliticalSphere/ci.git"
   },
-  "keywords": ["test", "license", "ci"],
-  "engines": { "node": ">=14" }
+  "keywords": [
+    "test",
+    "license",
+    "ci"
+  ],
+  "engines": {
+    "node": ">=14"
+  }
 }

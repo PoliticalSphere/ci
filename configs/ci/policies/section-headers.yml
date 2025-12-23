@@ -1,0 +1,17 @@
+# ==============================================================================
+# Political Sphere — Section Headers Policy
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Require structured section headers for inline run steps and logs.
+# ==============================================================================
+
+meta:
+  version: 1.0.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-21
+  review_interval_days: 180
+
+rule:
+  require_section_headers: true
+  require_sarif_upload_when_available: true

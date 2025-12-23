@@ -81,13 +81,20 @@ if [[ "${full_scan}" == "1" ]]; then
       -not -path "*/build/*" \
       -not -path "*/coverage/*" \
       -not -path "*/reports/*" \
+      -not -path "*/.git/hooks/*" \
       -print0
   )
 else
-  mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
-  for f in "${staged[@]}"; do
+  staged=()
+  while IFS= read -r f; do
+    staged+=("${f}")
+  done < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
+  for f in ${staged[@]+"${staged[@]}"}; do
     full_path="${repo_root}/${f}"
     if is_shell_script "${full_path}"; then
+      if [[ "${f}" == .git/hooks/* ]]; then
+        continue
+      fi
       targets+=("${full_path}")
     fi
   done

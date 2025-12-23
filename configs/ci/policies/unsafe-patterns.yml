@@ -28,7 +28,7 @@ policy:
   fail_on_match: true
 
   allowlist:
-    file: configs/ci/exceptions/unsafe-patterns-allowlist.yml
+    file: configs/ci/policies/unsafe-patterns-allowlist.yml
     # Allowlist must reference:
     #   - pattern id (e.g., UP-011)
     #   - selector (workflow_path + job_id + step_name/step_id where applicable)
@@ -322,7 +322,7 @@ patterns:
       Always specify an explicit tag or digest. Prefer digests for critical CI.
 
   # ---------------------------------------------------------------------------
-  # Actions supply-chain integrity (overlaps with actions-allowlist policy)
+  # Actions supply-chain integrity (overlaps with allowed-actions policy)
   # ---------------------------------------------------------------------------
 
   - id: UP-050

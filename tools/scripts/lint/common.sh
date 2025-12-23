@@ -107,14 +107,20 @@ collect_targets_pr() {
 
   if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \
      git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
-    mapfile -t diff_files < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
+  diff_files=()
+  while IFS= read -r file; do
+    diff_files+=("${file}")
+  done < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
   elif git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-    mapfile -t diff_files < <(git diff --name-only HEAD~1 HEAD)
+  diff_files=()
+  while IFS= read -r file; do
+    diff_files+=("${file}")
+  done < <(git diff --name-only HEAD~1 HEAD)
   else
     return 1
   fi
 
-  for f in "${diff_files[@]}"; do
+  for f in ${diff_files[@]+"${diff_files[@]}"}; do
     # shellcheck disable=SC2254
     case "${f}" in
       ${pattern})
@@ -137,8 +143,11 @@ collect_targets_staged() {
       return 0
     fi
   fi
-  mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
-  for f in "${staged[@]}"; do
+  staged=()
+  while IFS= read -r f; do
+    staged+=("${f}")
+  done < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
+  for f in ${staged[@]+"${staged[@]}"}; do
     # shellcheck disable=SC2254
     case "${f}" in
       ${pattern})

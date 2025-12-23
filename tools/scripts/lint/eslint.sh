@@ -32,10 +32,15 @@ if [[ ! -f "${config_path}" ]]; then
 fi
 
 ESLINT_BIN=""
+ESL_VIA_NPX=0
 if [[ -x "${repo_root}/node_modules/.bin/eslint" ]]; then
   ESLINT_BIN="${repo_root}/node_modules/.bin/eslint"
 elif command -v eslint >/dev/null 2>&1; then
   ESLINT_BIN="$(command -v eslint)"
+elif command -v npx >/dev/null 2>&1; then
+  ESLINT_BIN="$(command -v npx)"
+  ESL_VIA_NPX=1
+  ps_detail "eslint not found locally — will attempt to run via npx (consider running: npm ci)"
 else
   ps_error "eslint is required but not found (run: npm ci)"
   exit 1
@@ -60,16 +65,15 @@ fi
 
 # Enforce "no lint issues" (warnings are issues). Keep behaviour consistent.
 if [[ "${#ESLINT_ARGS[@]}" -gt 0 ]]; then
-  "${ESLINT_BIN}" \
-    --config "${config_path}" \
-    --max-warnings 0 \
-    --no-error-on-unmatched-pattern \
-    "${ESLINT_ARGS[@]}" \
-    "${targets[@]}"
+  if [[ "${ESL_VIA_NPX}" -eq 1 ]]; then
+    "${ESLINT_BIN}" --yes eslint --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${ESLINT_ARGS[@]}" "${targets[@]}"
+  else
+    "${ESLINT_BIN}" --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${ESLINT_ARGS[@]}" "${targets[@]}"
+  fi
 else
-  "${ESLINT_BIN}" \
-    --config "${config_path}" \
-    --max-warnings 0 \
-    --no-error-on-unmatched-pattern \
-    "${targets[@]}"
+  if [[ "${ESL_VIA_NPX}" -eq 1 ]]; then
+    "${ESLINT_BIN}" --yes eslint --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${targets[@]}"
+  else
+    "${ESLINT_BIN}" --config "${config_path}" --max-warnings 0 --no-error-on-unmatched-pattern "${targets[@]}"
+  fi
 fi

@@ -64,11 +64,17 @@ if [[ "${CI:-0}" == "1" && -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" 
 
   if git cat-file -e "${PS_PR_BASE_SHA}^{commit}" 2>/dev/null && \
      git cat-file -e "${PS_PR_HEAD_SHA}^{commit}" 2>/dev/null; then
-    mapfile -t diff_files < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
+    diff_files=()
+    while IFS= read -r file; do
+      diff_files+=("${file}")
+    done < <(git diff --name-only "${PS_PR_BASE_SHA}" "${PS_PR_HEAD_SHA}")
   else
     detail "JSCPD: unable to resolve PR base/head; falling back to HEAD~1."
     if git rev-parse --verify HEAD~1 >/dev/null 2>&1; then
-      mapfile -t diff_files < <(git diff --name-only HEAD~1 HEAD)
+      diff_files=()
+      while IFS= read -r file; do
+        diff_files+=("${file}")
+      done < <(git diff --name-only HEAD~1 HEAD)
     else
       detail "JSCPD: no prior commit available for diff."
       exit 0

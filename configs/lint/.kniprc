@@ -1,0 +1,5 @@
+{
+  "entryPoints": ["."],
+  "ignores": ["node_modules", "dist", "build", "coverage", "reports"],
+  "skipUnusedPeer": true
+}

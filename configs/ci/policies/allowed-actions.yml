@@ -7,14 +7,12 @@
 #
 # Non-negotiable rules:
 #   - DEFAULT DENY: any external action not allowlisted here is forbidden.
-#   - FULL-LENGTH COMMIT SHA REQUIRED for external actions (40-hex).
-#   - Tags and branches are forbidden (even for allowlisted actions).
 #   - Adding or removing allowlisted actions requires a documented risk decision.
 #
 # Scope:
 #   - This allowlists action publishers/repos (owner/name) only.
 #   - Pinning and ref format are validated separately (and must always pass).
-#   - Local actions may be allowed by policy (see allow_local_actions).
+#   - Local action rules live in the local-actions policy.
 #
 # Governance:
 #   - Entries MUST be unique by `repo`.
@@ -32,21 +30,9 @@ meta:
 policy:
   default: deny
 
-  pinning:
-    require_full_length_sha: true
-    forbid_tags: true
-    forbid_branches: true
-    required_ref_regex: '^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+@[a-f0-9]{40}$'
-
   change_control:
     require_risk_decision_for_changes: true
     risk_decisions_file: docs/risk-decisions.md
-
-  local_actions:
-    enabled: true
-    require_relative_prefix: "./"
-    forbid_parent_traversal: true
-    required_path_regex: '^\.\/(?!.*\.\.\/).+'
 
 allowlist:
   # ---------------------------------------------------------------------------
@@ -110,11 +96,7 @@ validation_notes:
   # Validator expectations:
   # - External uses must match: owner/name@<40-hex-sha>
   # - owner/name must appear in allowlist.repo
-  # - Tags/branches are forbidden by policy regardless of allowlist
-  # - Local uses must start with "./" (if enabled) and must not traverse parent dirs
+  # - Pinning and local action rules are enforced in their own policies
   validator_requirements:
     - ensure_allowlisted_repo_for_external_actions
-    - ensure_full_length_sha_for_external_actions
-    - forbid_tags_and_branches_for_external_actions
-    - enforce_local_action_prefix_and_no_traversal
     - enforce_unique_allowlist_entries

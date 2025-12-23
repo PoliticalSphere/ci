@@ -1,0 +1,25 @@
+# ==============================================================================
+# Political Sphere — Runner Hardening Policy
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Require hardened runners and restrict first-step behavior in workflows.
+# ==============================================================================
+
+meta:
+  version: 1.0.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-21
+  review_interval_days: 180
+
+rule:
+  require_harden_runner: true
+  allowed_first_steps:
+    - ./.github/actions/ps-harden-runner
+    - ./.github/actions/ps-setup
+    - ./.github/actions/ps-hardened-checkout
+    - step-security/harden-runner@
+  harden_runner_action_allowlist:
+    - step-security/harden-runner
+    - ./.github/actions/ps-harden-runner
+  require_egress_policy_when_supported: true

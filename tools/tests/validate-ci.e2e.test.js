@@ -67,6 +67,7 @@ function runValidateCi({ cwd, label, extraEnv = {} }) {
         ...process.env,
         CI: '1',
         PS_PLATFORM_ROOT: repoRoot,
+        PS_VALIDATE_CI_VERIFY_REMOTE: '0',
         PS_VALIDATE_CI_QUIET: '1',
         FORCE_COLOR: '1',
         ...extraEnv,
@@ -129,7 +130,11 @@ section('e2e', 'validate-ci end-to-end tests');
   const combined = `${stdout}\n${stderr}`;
 
   if (status === 0) {
-    fail('validate-ci unexpectedly succeeded (expected failure)', stdout, stderr);
+    fail(
+      'validate-ci unexpectedly succeeded (expected failure)',
+      stdout,
+      stderr,
+    );
   }
 
   // Tight(er) expectations:

@@ -52,8 +52,10 @@ export function createRemoteVerifier({
     if (networkChecked) return networkAvailable;
     networkChecked = true;
     const controller =
-      typeof AbortController === 'function' ? new AbortController() : null;
-    const timeout = setTimeout(() => controller?.abort(), 5000);
+      typeof globalThis.AbortController === 'function'
+        ? new globalThis.AbortController()
+        : null;
+    const timeout = globalThis.setTimeout(() => controller?.abort(), 5000);
     try {
       await fetchImpl('https://api.github.com/', {
         method: 'GET',
@@ -74,7 +76,7 @@ export function createRemoteVerifier({
       }
       return false;
     } finally {
-      clearTimeout(timeout);
+      globalThis.clearTimeout(timeout);
     }
   }
 
@@ -134,7 +136,7 @@ export function createRemoteVerifier({
               : response.status === 429
                 ? 'rate_limited'
                 : 'unexpected_status';
-        result = { ok: !isCIImpl(), error };
+        result = { ok: false, error };
       }
     } catch {
       logApiUnreachable(repo, ref);
@@ -149,11 +151,6 @@ export function createRemoteVerifier({
     if (!verifyRemoteShas) {
       return { ok: true, error: 'verification_disabled' };
     }
-    if (!(await checkNetworkAvailable())) {
-      return isCIImpl()
-        ? { ok: false, error: 'api_unreachable' }
-        : { ok: true, error: 'api_unreachable_local_skip' };
-    }
     if (!action || !ref) {
       return { ok: true, error: 'missing_action_or_ref' };
     }
@@ -166,6 +163,12 @@ export function createRemoteVerifier({
 
     const normalizedRepo = normalizeActionToRepo(action);
     if (!normalizedRepo) return { ok: false, error: 'invalid_action_ref' };
+
+    if (!(await checkNetworkAvailable())) {
+      return isCIImpl()
+        ? { ok: false, error: 'api_unreachable' }
+        : { ok: true, error: 'api_unreachable_local_skip' };
+    }
 
     return fetchCommit(normalizedRepo, ref);
   };

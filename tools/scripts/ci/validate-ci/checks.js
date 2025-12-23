@@ -118,25 +118,24 @@ async function checkUsesReference({
     }
     if (!ok) {
       let reason = 'remote lookup failed';
-        if (result?.error === 'ref_not_found') {
-          reason = 'ref not found';
-        } else if (result?.error === 'api_unreachable') {
-          reason = 'GitHub API unreachable';
-        } else if (result?.error === 'api_unreachable_local_skip') {
-          reason = 'GitHub API unreachable (local skip)';
-        } else if (result?.error === 'unauthorized') {
-          reason = 'unauthorized';
-        } else if (result?.error === 'forbidden_or_rate_limited') {
-          reason = 'forbidden or rate limited';
-        } else if (result?.error === 'rate_limited') {
-          reason = 'rate limited';
-        } else if (result?.error === 'unexpected_status') {
-          reason = 'unexpected status';
-        } else if (result?.error === 'invalid_action_ref') {
-          reason = 'invalid action reference';
-        }
-      const weight =
-        result?.error === 'invalid_action_ref' ? 3 : 2;
+      if (result?.error === 'ref_not_found') {
+        reason = 'ref not found';
+      } else if (result?.error === 'api_unreachable') {
+        reason = 'GitHub API unreachable';
+      } else if (result?.error === 'api_unreachable_local_skip') {
+        reason = 'GitHub API unreachable (local skip)';
+      } else if (result?.error === 'unauthorized') {
+        reason = 'unauthorized';
+      } else if (result?.error === 'forbidden_or_rate_limited') {
+        reason = 'forbidden or rate limited';
+      } else if (result?.error === 'rate_limited') {
+        reason = 'rate limited';
+      } else if (result?.error === 'unexpected_status') {
+        reason = 'unexpected status';
+      } else if (result?.error === 'invalid_action_ref') {
+        reason = 'invalid action reference';
+      }
+      const weight = result?.error === 'invalid_action_ref' ? 3 : 2;
       violations.push(
         makeViolation(
           rel,
@@ -346,12 +345,15 @@ async function checkStepUses({
   unsafePatterns,
   unsafeAllowlist,
   validateRemoteAction,
+  localActions,
 }) {
   const violations = [];
   const uses = step.uses;
   if (!uses) return violations;
 
+  const localActionsEnabled = localActions?.enabled !== false;
   if (isLocalAction(uses)) {
+    if (!localActionsEnabled) return violations;
     const violationsLocal = [];
     const normalized = uses.startsWith('./') ? uses : `./${uses}`;
     const resolved = path.resolve(workspaceRoot, normalized);
@@ -709,6 +711,7 @@ export async function scanWorkflows({
   validateRemoteAction,
   requireSectionHeaders,
   allowedFirstSteps,
+  localActions,
   quiet = false,
 }) {
   const violations = [];
@@ -768,6 +771,7 @@ export async function scanWorkflows({
           unsafePatterns,
           unsafeAllowlist,
           validateRemoteAction,
+          localActions,
         });
         violations.push(...stepViolations);
         violations.push(

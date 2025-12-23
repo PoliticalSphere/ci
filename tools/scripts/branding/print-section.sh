@@ -47,7 +47,7 @@ echo
 if ps_supports_color; then
   C_RESET="\033[0m"
   C_BOLD="\033[1m"
-  C_DIM="\033[2m"
+  C_DIM="\033[90m"
   C_CYAN="\033[36m"
   C_GREEN="\033[32m"
   printf "%b%s%b %b%s%b %s %b%s%b\n" \

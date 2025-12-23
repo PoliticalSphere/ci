@@ -19,82 +19,80 @@ meta:
   classification: internal
   last_reviewed: 2025-12-19
   review_interval_days: 180
+  governance_doc: docs/ci-policy-governance.md
+
+rule_defaults: &rule_defaults
+  enabled: true
+  mode: enforce
 
 rules:
   sha_pinning:
-    enabled: true
-    mode: enforce
-    require_full_length: true
-    disallow_tags: true
-    disallow_branches: true
+    <<: *rule_defaults
+    config_file: configs/ci/policies/action-pinning.yml
     # Default deny: all third-party actions must be explicitly allowlisted.
-    allowlist_file: configs/ci/exceptions/actions-allowlist.yml
+    allowlist_file: configs/ci/policies/allowed-actions.yml
     exceptions:
       require_risk_decision: true
       risk_decisions_file: docs/risk-decisions.md
 
   permissions:
-    enabled: true
-    mode: enforce
-    require_workflow_permissions: true
-    require_job_permissions: true
+    <<: *rule_defaults
     baseline_file: configs/ci/policies/permissions-baseline.yml
-    require_inline_justification_on_elevation: true
-    forbid_write_permissions_on_pr_from_fork: true
+    config_file: configs/ci/policies/permissions-baseline.yml
 
   triggers_and_context:
-    enabled: true
-    mode: enforce
-    # Explicitly block high-risk triggers unless allowlisted.
-    disallow_by_default:
-      - pull_request_target
-      - repository_dispatch
-      - workflow_run
-      - issue_comment
-    allowlist_file: configs/ci/exceptions/high-risk-triggers-allowlist.yml
-    require_safe_checkout_ref: true
+    <<: *rule_defaults
+    config_file: configs/ci/policies/high-risk-triggers.yml
+    allowlist_file: configs/ci/policies/high-risk-triggers.yml
 
   runner_hardening:
-    enabled: true
-    mode: enforce
-    require_harden_runner: true
-    allowed_first_steps:
-      - ./.github/actions/ps-harden-runner
-      - ./.github/actions/ps-setup
-      - ./.github/actions/ps-hardened-checkout
-      - step-security/harden-runner@
-    harden_runner_action_allowlist:
-      - step-security/harden-runner
-      - ./.github/actions/ps-harden-runner
-    require_egress_policy_when_supported: true
+    <<: *rule_defaults
+    config_file: configs/ci/policies/harden-runner.yml
 
   unsafe_patterns:
-    enabled: true
-    mode: enforce
+    <<: *rule_defaults
     patterns_file: configs/ci/policies/unsafe-patterns.yml
+    allowlist_file: configs/ci/policies/unsafe-patterns-allowlist.yml
 
   inline_bash:
-    enabled: true
-    mode: enforce
-    prefer_composite_actions: true
-    max_inline_lines: 15
-    allowlist_file: configs/ci/exceptions/inline-bash-allowlist.yml
-    require_set_euo_pipefail_in_scripts: true
+    <<: *rule_defaults
+    config_file: configs/ci/policies/inline-bash.yml
+    allowlist_file: configs/ci/policies/inline-bash.yml
 
   secrets_handling:
-    enabled: true
-    mode: enforce
-    forbid_plaintext_secrets: true
-    forbid_echo_secrets: true
-    forbid_debug_xtrace_with_secrets: true
-    require_no_secrets_in_artifacts: true
+    <<: *rule_defaults
+    config_file: configs/ci/policies/secrets-handling.yml
+
+  local_actions:
+    <<: *rule_defaults
+    config_file: configs/ci/policies/local-actions.yml
 
   outputs_and_artifacts:
-    enabled: true
-    mode: enforce
-    require_section_headers: true
+    <<: *rule_defaults
+    config_file: configs/ci/policies/section-headers.yml
     artifact_policy_file: configs/ci/policies/artifact-policy.yml
-    require_sarif_upload_when_available: true
+
+  remote_sha_verify:
+    <<: *rule_defaults
+    config_file: configs/ci/policies/remote-sha-verify.yml
+
+rule_groups:
+  supply_chain:
+    description: Action allowlisting, pinning, and verification guardrails.
+    contains:
+      - sha_pinning
+      - remote_sha_verify
+      - local_actions
+  scripting:
+    description: Shared guardrails for inline scripts, unsafe patterns, and secrets hygiene.
+    contains:
+      - inline_bash
+      - unsafe_patterns
+      - secrets_handling
+  artifacts:
+    description: Controls artifacts/exported data expectations.
+    contains:
+      - outputs_and_artifacts
 
 enforcement:
   fail_on_violation: true

@@ -14,6 +14,10 @@
 // =============================================================================
 
 import js from '@eslint/js';
+import importPlugin from 'eslint-plugin-import';
+import security from 'eslint-plugin-security';
+import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
 import tseslint from 'typescript-eslint';
 
 export default [
@@ -41,6 +45,14 @@ export default [
   // TypeScript-aware linting (recommended)
   // ---------------------------------------------------------------------------
   ...tseslint.configs.recommended,
+
+  // ---------------------------------------------------------------------------
+  // Plugin recommendations (specialist rule sets)
+  // ---------------------------------------------------------------------------
+  importPlugin.configs.recommended,
+  security.configs.recommended,
+  sonarjs.configs.recommended,
+  unicorn.configs.recommended,
 
   // ---------------------------------------------------------------------------
   // Project rules (applies to JS + TS)

@@ -33,26 +33,46 @@ bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
 # Prefer staged/affected operation inside each tool script where possible.
 # ------------------------------------------------------------------------------
 
-run_step "lint.biome" "Biome lint" "Formatting and correctness checks" \
+# Run lint steps (aggregated summary: Waiting -> Running -> PASS/FAIL/SKIPPED)
+run_lint_step "lint.biome" "Biome" "Formatting and correctness checks" \
   bash "${PS_LINT_SCRIPTS}/biome.sh"
 
-run_step "lint.eslint" "ESLint" "Specialist linting and TS-aware rules" \
+run_lint_step "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" \
   bash "${PS_LINT_SCRIPTS}/eslint.sh"
 
-run_step "lint.yamllint" "YAML lint" "YAML validity and formatting" \
+run_lint_step "lint.yamllint" "YAMLLINT" "YAML validity and formatting" \
   bash "${PS_LINT_SCRIPTS}/yamllint.sh"
 
-run_step "lint.actionlint" "Actionlint" "GitHub Actions workflow validation" \
+run_lint_step "lint.actionlint" "ACTIONLINT" "GitHub Actions workflow validation" \
   bash "${PS_LINT_SCRIPTS}/actionlint.sh"
 
-run_step "lint.hadolint" "Hadolint" "Dockerfile security and quality" \
+run_lint_step "lint.hadolint" "HADOLINT" "Dockerfile security and quality" \
   bash "${PS_LINT_SCRIPTS}/hadolint.sh"
 
-run_step "lint.shellcheck" "ShellCheck" "Shell script safety checks" \
+run_lint_step "lint.shellcheck" "SHELLCHECK" "Shell script safety checks" \
   bash "${PS_LINT_SCRIPTS}/shellcheck.sh"
 
-run_step "lint.markdown" "Markdown lint" "Markdown quality checks" \
+run_lint_step "lint.markdown" "MARKDOWN" "Markdown quality checks" \
   bash "${PS_LINT_SCRIPTS}/markdownlint.sh"
+
+run_lint_step "lint.cspell" "CSPELL" "Spelling checks" \
+  bash "${PS_LINT_SCRIPTS}/cspell.sh"
+
+run_lint_step "lint.knip" "KNIP" "Dependency audit (knip)" \
+  bash "${PS_LINT_SCRIPTS}/knip.sh"
+
+# Type checking is part of the lint block (runs as part of Lint & Type Check)
+run_lint_step "lint.typecheck" "TYPECHECK" "Type checking (tsc)" \
+  bash "${PS_TASKS_SCRIPTS}/typecheck.sh"
+
+# If any lint/typecheck failed, abort further steps
+if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
+  bash "${PS_BRANDING_SCRIPTS}/print-section.sh" \
+    "gate.failed" \
+    "${GATE_NAME} gate failed" \
+    "One or more lint checks failed"
+  exit 1
+fi
 
 run_step "naming.checks" "Naming conventions" "Repository naming policy checks" \
   bash "${PS_NAMING_SCRIPTS}/naming-checks.sh"

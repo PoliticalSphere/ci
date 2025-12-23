@@ -404,7 +404,90 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+  # ---------------------------------------------------------------------------
+  # SonarCloud analysis (baseline)
+  # - Non-blocking by default (continue-on-error), only runs when SONAR_TOKEN is
+  #   configured as a repository secret. This gathers baseline findings for tuning
+  #   before enabling a blocking Quality Gate.
+  # ---------------------------------------------------------------------------
+  sonar:
+    name: SonarCloud (baseline)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci, test, typecheck]
+    permissions:
+      contents: read
+      checks: write
+    timeout-minutes: 30
+    env:
+      PS_FULL_SCAN: "1"
+    if: ${{ secrets.SONAR_TOKEN != '' }}
+    continue-on-error: true
+    steps:
+      - name: Harden runner (PS)
+        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+        env:
+          HOME: ${{ runner.temp }}
+        with:
+          egress-policy: audit
 
+      - name: Checkout repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          fetch-depth: ${{ inputs.fetch_depth }}
+
+      - name: Checkout platform repository
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+        with:
+          repository: PoliticalSphere/ci
+          ref: ${{ inputs.platform_ref }}
+          path: .ps-platform
+          fetch-depth: 1
+
+      - name: Point HOME at workspace temp
+        shell: bash
+        run: |
+          set -euo pipefail
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "runner.home" "Prepare HOME directory"
+          mkdir -p "${GITHUB_WORKSPACE}/.home"
+          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+
+      - name: Setup (PS)
+        uses: ./.github/actions/ps-setup
+        with:
+          node_version: ${{ inputs.node_version }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+          skip_checkout: "1"
+          skip_harden: "1"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+      - name: Install dependencies (npm ci)
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm ci --no-audit --no-fund
+
+      - name: SonarCloud Scan
+        uses: sonarsource/sonarcloud-github-action@v2.1.0
+        with:
+          args: >-
+            -Dsonar.sources=.
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
+            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: Upload artifacts
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: pr-gates-sonar
+          path: reports/**
+          if_no_files_found: "ignore"
+          retention_days: ${{ inputs.retention_days }}
   jscpd:
     name: Duplication
     runs-on: ${{ inputs.runner }}

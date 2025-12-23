@@ -1,0 +1,21 @@
+# ==============================================================================
+# Political Sphere — Tooling Versions Policy
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Enforce pinned tool versions and checksum verification for installers.
+# ==============================================================================
+
+meta:
+  version: 1.0.0
+  owner: political-sphere
+  classification: internal
+  last_reviewed: 2025-12-21
+  review_interval_days: 180
+
+rule:
+  enabled: false
+  require_pinned_versions: true
+  require_checksums: true
+
+notes:
+  enforcement_status: "documented only; not yet wired into validate-ci"

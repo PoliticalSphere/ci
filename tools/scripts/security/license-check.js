@@ -137,7 +137,10 @@ function matchDetails(list, regexes, value) {
 
 function evaluateSimpleLicense(policy, license) {
   // Trim outer parentheses and whitespace
-  const tokens = String(license).trim().replace(/^\(+|\)+$/g, '').trim();
+  const tokens = String(license)
+    .trim()
+    .replace(/^\(+|\)+$/g, '')
+    .trim();
   if (!tokens) return { ok: false, reason: 'missing-license', match: null };
 
   if (/^SEE LICENSE IN/i.test(tokens)) {
@@ -181,7 +184,12 @@ function evaluateLicense(policy, license) {
       const parts = expr.split(/\s+OR\s+/i).map((p) => p.trim());
       for (const part of parts) {
         const res = evaluateSimpleLicense(policy, part);
-        if (res.ok) return { ok: true, reason: 'allowlisted-expression', match: res.match };
+        if (res.ok)
+          return {
+            ok: true,
+            reason: 'allowlisted-expression',
+            match: res.match,
+          };
       }
       return { ok: false, reason: 'not-allowlisted', match: null };
     }
@@ -191,7 +199,8 @@ function evaluateLicense(policy, license) {
       const parts = expr.split(/\s+AND\s+/i).map((p) => p.trim());
       for (const part of parts) {
         const res = evaluateSimpleLicense(policy, part);
-        if (!res.ok) return { ok: false, reason: 'not-allowlisted', match: null };
+        if (!res.ok)
+          return { ok: false, reason: 'not-allowlisted', match: null };
       }
       return { ok: true, reason: 'allowlisted-expression', match: null };
     }
@@ -353,10 +362,9 @@ const summaryLines = [
 if (violations.length > 0) {
   summaryLines.push('', 'Violations:');
   for (const v of violations) {
-    const matchInfo =
-      v.match?.matched
-        ? ` [match: ${v.match.type} ${v.match.pattern}]`
-        : '';
+    const matchInfo = v.match?.matched
+      ? ` [match: ${v.match.type} ${v.match.pattern}]`
+      : '';
     summaryLines.push(
       `- ${v.name}@${v.version || 'unknown'}: ${v.license} (${v.reason})${matchInfo}`,
     );
@@ -391,10 +399,9 @@ if (violations.length > 0) {
     `Total violations: ${violations.length}`,
   );
   for (const v of violations) {
-    const matchInfo =
-      v.match?.matched
-        ? ` [match: ${v.match.type} ${v.match.pattern}]`
-        : '';
+    const matchInfo = v.match?.matched
+      ? ` [match: ${v.match.type} ${v.match.pattern}]`
+      : '';
     bullet(
       `${v.name}@${v.version || 'unknown'}: ${v.license} (${v.reason})${matchInfo}`,
     );

@@ -53,8 +53,11 @@ if [[ "${full_scan}" == "1" ]]; then
     done < <(find "${repo_root}/.github/workflows" -type f \( -name "*.yml" -o -name "*.yaml" \) -print0)
   fi
 else
-  mapfile -t staged < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
-  for f in "${staged[@]}"; do
+  staged=()
+  while IFS= read -r f; do
+    staged+=("${f}")
+  done < <(git diff --cached --name-only --diff-filter=ACMR -z | tr '\0' '\n')
+  for f in ${staged[@]+"${staged[@]}"}; do
     case "${f}" in
       .github/workflows/*.yml|.github/workflows/*.yaml)
         targets+=("${repo_root}/${f}")
