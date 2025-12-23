@@ -51,6 +51,8 @@
     "eslint-plugin-sonarjs": "^0.18.0",
     "eslint-plugin-unicorn": "^50.6.0",
     "eslint-plugin-import": "^2.28.0",
-    "knip": "^0.8.0"
+    "knip": "^0.8.0",
+    "@typescript-eslint/eslint-plugin": "8.50.0",
+    "@typescript-eslint/parser": "8.50.0"
   }
 }

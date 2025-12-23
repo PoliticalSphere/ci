@@ -250,6 +250,15 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
+      - name: Install dev dependencies (npm ci)
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+        run: |
+          set -euo pipefail
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "lint.deps" "Install dev dependencies (npm ci)"
+          npm ci --no-audit --no-fund || true
+
       - name: Install lint tools (PS)
         uses: ./.github/actions/ps-lint-tools
 
@@ -419,7 +428,6 @@ jobs:
     timeout-minutes: 30
     env:
       PS_FULL_SCAN: "1"
-    if: secrets.SONAR_TOKEN != ''
     continue-on-error: true
     steps:
       - name: Harden runner (PS)
@@ -465,10 +473,13 @@ jobs:
       - name: Install dependencies (npm ci)
         shell: bash
         run: |
-          set -euo pipefail          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "sonar.deps" "Install dependencies (npm ci)"          npm ci --no-audit --no-fund
+          set -euo pipefail
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "sonar.deps" "Install dependencies (npm ci)"
+          npm ci --no-audit --no-fund
 
       - name: SonarCloud Scan
-        uses: sonarsource/sonarcloud-github-action@e2a1ee7c31ee491f1e09c74535b1c0d3e9f5cd82
+        if: ${{ secrets.SONAR_TOKEN != '' }}
+        uses: sonarsource/sonarcloud-github-action@v2.1.0
         with:
           args: >-
             -Dsonar.sources=.
