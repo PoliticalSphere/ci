@@ -63,6 +63,16 @@ DETAIL_INDENT="${PS_FMT_DETAIL_INDENT:-  }"
 ID_CASE="${PS_FMT_SECTION_ID_CASE:-upper}"
 SPACING="${PS_SECTION_SPACING:-1}"
 
+# ANSI formatting defaults (in case format.sh wasn't present or didn't define them)
+PS_FMT_RESET="${PS_FMT_RESET:-$'\033[0m'}"
+PS_FMT_DIM="${PS_FMT_DIM:-$'\033[2m'}"
+PS_FMT_BOLD="${PS_FMT_BOLD:-$'\033[1m'}"
+PS_FMT_CYAN="${PS_FMT_CYAN:-$'\033[36m'}"
+PS_FMT_GREEN="${PS_FMT_GREEN:-$'\033[32m'}"
+PS_FMT_YELLOW="${PS_FMT_YELLOW:-$'\033[33m'}"
+PS_FMT_RED="${PS_FMT_RED:-$'\033[31m'}"
+PS_FMT_GRAY="${PS_FMT_GRAY:-$'\033[90m'}"
+
 # Normalise ID for machine readability.
 case "${ID_CASE}" in
   upper) section_id="$(tr '[:lower:]' '[:upper:]' <<< "${id}")" ;;
