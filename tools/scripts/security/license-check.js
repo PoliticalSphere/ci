@@ -169,7 +169,8 @@ function evaluateOrExpression(policy, expr) {
   const parts = expr.split(/\s+OR\s+/i).map((p) => p.trim());
   for (const part of parts) {
     const res = evaluateSimpleLicense(policy, part);
-    if (res.ok) return { ok: true, reason: 'allowlisted-expression', match: res.match };
+    if (res.ok)
+      return { ok: true, reason: 'allowlisted-expression', match: res.match };
   }
   return { ok: false, reason: 'not-allowlisted', match: null };
 }

@@ -4,15 +4,13 @@ import path from 'node:path';
 import YAML from 'yaml';
 
 // Reuse console helpers from Validate-CI to avoid duplication across the repo.
-import {
+export {
+  section,
+  info,
   detail,
   getRepoRoot,
-  info,
   isCI,
-  section,
 } from '../scripts/ci/validate-ci/console.js';
-
-export { section, info, detail, getRepoRoot, isCI };
 
 export function fail(message) {
   console.error(`ERROR: ${message}`);
