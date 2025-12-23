@@ -48,7 +48,7 @@
     "yaml": "^2.8.2",
     "@cspell/cspell": "^6.21.0",
     "eslint-plugin-security": "^1.7.0",
-    "eslint-plugin-sonarjs": "^0.18.0",
+    "eslint-plugin-sonarjs": "^0.20.0",
     "eslint-plugin-unicorn": "^50.6.0",
     "eslint-plugin-import": "^2.28.0",
     "knip": "^0.8.0",
