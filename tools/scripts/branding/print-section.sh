@@ -6,9 +6,8 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 # Usage:
 #   print-section <id> <title> [description]
-#
-# Example:
-#   print-section "lint.biome" "Biome lint" "Formatting and correctness checks"
+# Env:
+#   PS_SECTION_SPACING=1  Print a blank line before the section (default 1)
 # ==============================================================================
 
 id="${1:-}"
@@ -21,46 +20,38 @@ if [[ -z "${id}" || -z "${title}" ]]; then
 fi
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-format_sh="${script_dir}/format.sh"
 # shellcheck source=tools/scripts/branding/format.sh
-. "${format_sh}"
+. "${script_dir}/format.sh"
 
-ICON="${PS_FMT_ICON}"
-SEPARATOR="${PS_FMT_SEPARATOR}"
-DETAIL_INDENT="${PS_FMT_DETAIL_INDENT}"
-ID_CASE="${PS_FMT_SECTION_ID_CASE}"
+ICON="${PS_FMT_ICON:-▶}"
+SEPARATOR="${PS_FMT_SEPARATOR:-—}"
+DETAIL_INDENT="${PS_FMT_DETAIL_INDENT:-  }"
+ID_CASE="${PS_FMT_SECTION_ID_CASE:-upper}"
+SPACING="${PS_SECTION_SPACING:-1}"
 
 # Normalise ID for machine readability.
 case "${ID_CASE}" in
-  upper)
-    section_id="$(tr '[:lower:]' '[:upper:]' <<< "${id}")"
-    ;;
-  lower)
-    section_id="$(tr '[:upper:]' '[:lower:]' <<< "${id}")"
-    ;;
-  *)
-    section_id="${id}"
-    ;;
+  upper) section_id="$(tr '[:lower:]' '[:upper:]' <<< "${id}")" ;;
+  lower) section_id="$(tr '[:upper:]' '[:lower:]' <<< "${id}")" ;;
+  *)     section_id="${id}" ;;
 esac
 
-echo
+if [[ "${SPACING}" == "1" ]]; then
+  printf "\n"
+fi
+
 if ps_supports_color; then
-  C_RESET="\033[0m"
-  C_BOLD="\033[1m"
-  C_DIM="\033[90m"
-  C_CYAN="\033[36m"
-  C_GREEN="\033[32m"
   printf "%b%s%b %b%s%b %s %b%s%b\n" \
-    "${C_GREEN}" "${ICON}" "${C_RESET}" \
-    "${C_BOLD}${C_CYAN}" "${section_id}" "${C_RESET}" \
-    "${SEPARATOR}" "${C_BOLD}" "${title}" "${C_RESET}"
+    "${PS_FMT_GREEN}" "${ICON}" "${PS_FMT_RESET}" \
+    "${PS_FMT_BOLD}${PS_FMT_CYAN}" "${section_id}" "${PS_FMT_RESET}" \
+    "${SEPARATOR}" "${PS_FMT_BOLD}" "${title}" "${PS_FMT_RESET}"
 else
   printf '%s\n' "${ICON} ${section_id} ${SEPARATOR} ${title}"
 fi
 
 if [[ -n "${description}" ]]; then
   if ps_supports_color; then
-    printf "%b%s%s%b\n" "${C_DIM}" "${DETAIL_INDENT}" "${description}" "${C_RESET}"
+    printf "%b%s%s%b\n" "${PS_FMT_GRAY}" "${DETAIL_INDENT}" "${description}" "${PS_FMT_RESET}"
   else
     printf '%s\n' "${DETAIL_INDENT}${description}"
   fi
