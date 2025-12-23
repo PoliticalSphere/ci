@@ -83,6 +83,10 @@ runs:
 
     - name: Validate repo state
       shell: bash
+      env:
+        PS_NODE_VERSION_INPUT: ${{ inputs.node_version }}
+        PS_CACHE_INPUT: ${{ inputs.cache }}
+        PS_INSTALL_DEP_INPUT: ${{ inputs.install_dependencies }}
       run: |
         set -euo pipefail
 
@@ -99,14 +103,14 @@ runs:
         . "${validate_sh}"
 
         # Validate inputs early
-        if ! require_number "inputs.node_version" "${{ inputs.node_version }}"; then
-          echo "ERROR: inputs.node_version must be a number (major version). Got '${{ inputs.node_version }}'." >&2
+        if ! require_number "inputs.node_version" "${PS_NODE_VERSION_INPUT}"; then
+          echo "ERROR: inputs.node_version must be a number (major version). Got '${PS_NODE_VERSION_INPUT}'." >&2
           exit 1
         fi
-        require_enum "inputs.cache" "${{ inputs.cache }}" "1" "0" || exit 1
-        require_enum "inputs.install_dependencies" "${{ inputs.install_dependencies }}" "1" "0" || exit 1
+        require_enum "inputs.cache" "${PS_CACHE_INPUT}" "1" "0" || exit 1
+        require_enum "inputs.install_dependencies" "${PS_INSTALL_DEP_INPUT}" "1" "0" || exit 1
 
-        if [[ "${{ inputs.install_dependencies }}" == "1" ]]; then
+        if [[ "${PS_INSTALL_DEP_INPUT}" == "1" ]]; then
           if [[ ! -f "${workspace_root}/package.json" ]]; then
             echo "ERROR: package.json not found at ${workspace_root}/package.json" >&2
             echo "HINT: ensure actions/checkout ran and the repo root is the workspace." >&2
@@ -120,9 +124,9 @@ runs:
           fi
         fi
 
-        echo "PS.NODE_BOOTSTRAP: node_version=${{ inputs.node_version }}"
-        echo "PS.NODE_BOOTSTRAP: cache=${{ inputs.cache }}"
-        echo "PS.NODE_BOOTSTRAP: install_dependencies=${{ inputs.install_dependencies }}"
+        echo "PS.NODE_BOOTSTRAP: node_version=${PS_NODE_VERSION_INPUT}"
+        echo "PS.NODE_BOOTSTRAP: cache=${PS_CACHE_INPUT}"
+        echo "PS.NODE_BOOTSTRAP: install_dependencies=${PS_INSTALL_DEP_INPUT}"
 
     - name: Setup Node (cached)
       if: ${{ inputs.cache == '1' }}
