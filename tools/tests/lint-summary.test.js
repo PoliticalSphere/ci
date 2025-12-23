@@ -6,7 +6,10 @@ import { fail, getRepoRoot } from './test-utils.js';
 const repoRoot = getRepoRoot();
 
 // Run the lint summary printing twice in a non-TTY context (stdout piped)
-const cmd = `bash -lc 'source tools/scripts/gates/gate-common.sh; lint_init || true; print_lint_summary; print_lint_summary'`;
+// Simulate CI logs where color may be enabled but cursor movement in logs
+// should be avoided. Export CI=1 so the guard above treats this as non-TTY
+// CI-like output.
+const cmd = `bash -lc 'export CI=1; source tools/scripts/gates/gate-common.sh; lint_init || true; print_lint_summary; print_lint_summary'`;
 let out = '';
 try {
   out = execSync(cmd, { encoding: 'utf8', cwd: repoRoot });

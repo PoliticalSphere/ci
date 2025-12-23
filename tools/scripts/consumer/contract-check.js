@@ -358,6 +358,71 @@ function checkWorkflows({
   }
 }
 
+function checkClaimTools(
+  claim,
+  deps,
+  failOnMissing,
+  toolMissingAllow,
+  violations,
+) {
+  const requiredToolsClaim = claim.requires_tools || [];
+  for (const tool of requiredToolsClaim) {
+    if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
+      violations.push({
+        code: 'doc-claim-tool-missing',
+        message: `doc claim '${claim.contains}' requires tool: ${tool}`,
+        path: claim.path,
+      });
+    }
+  }
+}
+
+function checkClaimScripts(
+  claim,
+  packageJson,
+  failOnMissing,
+  scriptMissingAllow,
+  violations,
+) {
+  const requiredScriptsClaim = claim.requires_scripts || [];
+  for (const script of requiredScriptsClaim) {
+    if (
+      failOnMissing &&
+      !packageJson.scripts?.[script] &&
+      !scriptMissingAllow.has(script)
+    ) {
+      violations.push({
+        code: 'doc-claim-script-missing',
+        message: `doc claim '${claim.contains}' requires script: ${script}`,
+        path: claim.path,
+      });
+    }
+  }
+}
+
+function checkClaimFiles(
+  claim,
+  repoRoot,
+  failOnMissing,
+  fileMissingAllow,
+  violations,
+) {
+  const requiredFilesClaim = claim.requires_files || [];
+  for (const file of requiredFilesClaim) {
+    if (
+      failOnMissing &&
+      !fs.existsSync(resolvePath(repoRoot, file)) &&
+      !fileMissingAllow.has(file)
+    ) {
+      violations.push({
+        code: 'doc-claim-file-missing',
+        message: `doc claim '${claim.contains}' requires file: ${file}`,
+        path: claim.path,
+      });
+    }
+  }
+}
+
 function checkDocsClaims({
   policy,
   repoRoot,
@@ -373,70 +438,6 @@ function checkDocsClaims({
     ? policy.docs_claims
     : [];
   section('docs.claims', 'Doc claims', `${docsClaims.length} rule(s)`);
-  function checkClaimTools(
-    claim,
-    deps,
-    failOnMissing,
-    toolMissingAllow,
-    violations,
-  ) {
-    const requiredToolsClaim = claim.requires_tools || [];
-    for (const tool of requiredToolsClaim) {
-      if (failOnMissing && !deps[tool] && !toolMissingAllow.has(tool)) {
-        violations.push({
-          code: 'doc-claim-tool-missing',
-          message: `doc claim '${claim.contains}' requires tool: ${tool}`,
-          path: claim.path,
-        });
-      }
-    }
-  }
-
-  function checkClaimScripts(
-    claim,
-    packageJson,
-    failOnMissing,
-    scriptMissingAllow,
-    violations,
-  ) {
-    const requiredScriptsClaim = claim.requires_scripts || [];
-    for (const script of requiredScriptsClaim) {
-      if (
-        failOnMissing &&
-        !packageJson.scripts?.[script] &&
-        !scriptMissingAllow.has(script)
-      ) {
-        violations.push({
-          code: 'doc-claim-script-missing',
-          message: `doc claim '${claim.contains}' requires script: ${script}`,
-          path: claim.path,
-        });
-      }
-    }
-  }
-
-  function checkClaimFiles(
-    claim,
-    repoRoot,
-    failOnMissing,
-    fileMissingAllow,
-    violations,
-  ) {
-    const requiredFilesClaim = claim.requires_files || [];
-    for (const file of requiredFilesClaim) {
-      if (
-        failOnMissing &&
-        !fs.existsSync(resolvePath(repoRoot, file)) &&
-        !fileMissingAllow.has(file)
-      ) {
-        violations.push({
-          code: 'doc-claim-file-missing',
-          message: `doc claim '${claim.contains}' requires file: ${file}`,
-          path: claim.path,
-        });
-      }
-    }
-  }
 
   for (const claim of docsClaims) {
     const docPath = resolvePath(repoRoot, claim.path || '');
@@ -506,6 +507,97 @@ function checkLockfileAndPackageManager({
   }
 }
 
+function checkUnresolvedImports(
+  imports,
+  rel,
+  importAllow,
+  failOnMissing,
+  violations,
+) {
+  for (const item of imports) {
+    if (item.resolved) continue;
+    const key = `${rel}:${item.target}`;
+    if (importAllow.has(key) || importAllow.has(item.target)) {
+      continue;
+    }
+    if (failOnMissing) {
+      violations.push({
+        code: 'import-unresolved',
+        message: `unresolved import '${item.target}' in ${rel}`,
+        path: rel,
+      });
+    }
+  }
+}
+
+function processDirectoryForIntegrity(
+  current,
+  repoRoot,
+  ignore,
+  exts,
+  importAllow,
+  failOnMissing,
+  violations,
+) {
+  const entries = fs.readdirSync(current, { withFileTypes: true });
+  for (const entry of entries) {
+    const full = path.join(current, entry.name);
+    const rel = path.relative(repoRoot, full);
+    
+    if (shouldIgnorePath(rel, ignore)) continue;
+    
+    if (entry.isDirectory()) {
+      continue; // Will be processed separately
+    }
+    
+    if (!entry.isFile()) continue;
+    if (!exts.includes(path.extname(entry.name))) continue;
+
+    const imports = scanRelativeImports(full, exts);
+    checkUnresolvedImports(
+      imports,
+      rel,
+      importAllow,
+      failOnMissing,
+      violations,
+    );
+  }
+}
+
+function processDirectoryStack(
+  absRoot,
+  repoRoot,
+  ignore,
+  exts,
+  importAllow,
+  failOnMissing,
+  violations,
+) {
+  const stack = [absRoot];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    
+    // Process files in current directory
+    processDirectoryForIntegrity(
+      current,
+      repoRoot,
+      ignore,
+      exts,
+      importAllow,
+      failOnMissing,
+      violations,
+    );
+    
+    // Add subdirectories to stack for later processing
+    const entries = fs.readdirSync(current, { withFileTypes: true });
+    for (const entry of entries) {
+      if (entry.isDirectory()) {
+        stack.push(path.join(current, entry.name));
+      }
+    }
+  }
+}
+
 function checkPathIntegrity({
   policy,
   repoRoot,
@@ -514,69 +606,31 @@ function checkPathIntegrity({
   violations,
 }) {
   const pathIntegrity = policy.path_integrity || {};
-  if (pathIntegrity.enabled === true) {
-    const roots = Array.isArray(pathIntegrity.roots) ? pathIntegrity.roots : [];
-    const ignore = Array.isArray(pathIntegrity.ignore)
-      ? pathIntegrity.ignore
-      : [];
-    const exts = Array.isArray(pathIntegrity.extensions)
-      ? pathIntegrity.extensions
-      : ['.ts', '.tsx', '.js', '.jsx'];
+  if (pathIntegrity.enabled !== true) return;
 
-    section('imports.integrity', 'Path integrity', `${roots.length} root(s)`);
-    for (const root of roots) {
-      const absRoot = resolvePath(repoRoot, root);
-      if (!fs.existsSync(absRoot)) continue;
+  const roots = Array.isArray(pathIntegrity.roots) ? pathIntegrity.roots : [];
+  const ignore = Array.isArray(pathIntegrity.ignore)
+    ? pathIntegrity.ignore
+    : [];
+  const exts = Array.isArray(pathIntegrity.extensions)
+    ? pathIntegrity.extensions
+    : ['.ts', '.tsx', '.js', '.jsx'];
 
-      const stack = [absRoot];
-      while (stack.length > 0) {
-        const current = stack.pop();
-        const entries = fs.readdirSync(current, { withFileTypes: true });
-        for (const entry of entries) {
-          const full = path.join(current, entry.name);
-          const rel = path.relative(repoRoot, full);
-          if (shouldIgnorePath(rel, ignore)) continue;
-          if (entry.isDirectory()) {
-            stack.push(full);
-            continue;
-          }
-          if (!entry.isFile()) continue;
-          if (!exts.includes(path.extname(entry.name))) continue;
+  section('imports.integrity', 'Path integrity', `${roots.length} root(s)`);
+  
+  for (const root of roots) {
+    const absRoot = resolvePath(repoRoot, root);
+    if (!fs.existsSync(absRoot)) continue;
 
-          function checkUnresolvedImports(
-            imports,
-            rel,
-            importAllow,
-            failOnMissing,
-            violations,
-          ) {
-            for (const item of imports) {
-              if (item.resolved) continue;
-              const key = `${rel}:${item.target}`;
-              if (importAllow.has(key) || importAllow.has(item.target)) {
-                continue;
-              }
-              if (failOnMissing) {
-                violations.push({
-                  code: 'import-unresolved',
-                  message: `unresolved import '${item.target}' in ${rel}`,
-                  path: rel,
-                });
-              }
-            }
-          }
-
-          const imports = scanRelativeImports(full, exts);
-          checkUnresolvedImports(
-            imports,
-            rel,
-            importAllow,
-            failOnMissing,
-            violations,
-          );
-        }
-      }
-    }
+    processDirectoryStack(
+      absRoot,
+      repoRoot,
+      ignore,
+      exts,
+      importAllow,
+      failOnMissing,
+      violations,
+    );
   }
 }
 

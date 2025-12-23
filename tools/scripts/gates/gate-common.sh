@@ -104,10 +104,11 @@ lint_init() {
 
 # Print a compact, single LINT block and update in-place when possible
 print_lint_summary() {
-  # Erase previous block if present (only when attached to a real TTY).
-  # Note: CI environments often set COLOR hints (via CI/FORCE_COLOR) but do not
-  # provide a real TTY; emitting cursor control sequences in those logs will
-  # cause duplicated printed blocks. Use -t 1 to verify an actual TTY.
+  # Erase previous block only when attached to a real interactive TTY.
+  # We only rely on -t 1 here — if stdout is a real terminal we can safely
+  # perform in-place cursor movement. CI environment variables (e.g. CI=1)
+  # should not be used to override TTY detection as they can be set in
+  # interactive developer environments (causing unexpected behavior).
   if [[ -t 1 ]] && [[ "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
     local n=${LINT_SUMMARY_LINES}
     # Move cursor up n lines and clear them reliably (portable across terminals)
@@ -120,12 +121,10 @@ print_lint_summary() {
     printf '\033[%dA' "$n"
   fi
 
-  # If not attached to a TTY and we've already printed the summary once,
-  # avoid re-printing it — repeated prints clutter CI logs where control
-  # sequences (cursor movement) do not behave as expected even if colors
-  # are enabled by CI variables. Check the actual TTY rather than color
-  # support, which can be forced in CI environments.
-  if [[ ! -t 1 ]] && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
+  # If the current process will not do interactive in-place updates (no
+  # real TTY OR running inside CI) and we've already printed the summary
+  # once, avoid re-printing it — repeated prints clutter CI logs.
+  if { [[ ! -t 1 ]] || [[ "${CI:-0}" == "1" ]]; } && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
     return 0
   fi
 
