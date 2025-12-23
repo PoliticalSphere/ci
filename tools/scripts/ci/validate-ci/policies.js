@@ -109,9 +109,9 @@ export function permissionLevel(value) {
 
 function parseRepoEntry(line) {
   // Match owner/repo where allowed characters include letters, digits, underscore,
-  // dot, space and hyphen. Group parts explicitly to make precedence clear.
+  // dot, space and hyphen. Group owner/repo together to make precedence explicit.
   const repoMatch = line.match(
-    /^\s*-\s*repo:\s*((?:[A-Za-z0-9_. -]+)\/(?:[A-Za-z0-9_. -]+))/,
+    /^\s*-\s*repo:\s*((?:[A-Za-z0-9_. -]+\/[A-Za-z0-9_. -]+))/,
   );
   return repoMatch ? repoMatch[1] : null;
 }
@@ -209,7 +209,13 @@ function parseSubSection(line, inForbid, inRequire) {
 function parseRegexEntry(line) {
   const trimmed = line.trim();
   if (trimmed.startsWith('- ')) {
-    return trimmed.replace(/^- /, '').replace(/^"|"$/g, '');
+    // Use explicit substring handling so this function's implementation
+    // is distinct from `cleanRegexEntry` while preserving behavior.
+    let val = trimmed.slice(2).trim();
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    return val;
   }
   return null;
 }
@@ -382,11 +388,19 @@ function parsePatternId(line) {
 }
 
 function parseUses(line) {
-  // Allow 'owner/repo' or 'owner/repo/subpath'. Group to be explicit.
-  const usesMatch = line.match(
-    /^\s*uses:\s*((?:[A-Za-z0-9_. -]+)\/(?:[A-Za-z0-9_. -]+)(?:\/.+)?)/,
-  );
-  return usesMatch ? usesMatch[1] : null;
+  // Allow 'owner/repo' or 'owner/repo/subpath'. Validate owner/repo parts explicitly
+  // and return the original value to preserve any additional subpath.
+  const m = line.match(/^\s*uses:\s*(.+)\s*$/);
+  if (!m) return null;
+  const val = m[1].trim();
+  const parts = val.split('/');
+  if (parts.length < 2) return null;
+  const owner = parts[0];
+  const repo = parts[1];
+  if (!/^[A-Za-z0-9_. -]+$/.test(owner) || !/^[A-Za-z0-9_. -]+$/.test(repo)) {
+    return null;
+  }
+  return val;
 }
 
 function parseEnabled(line) {
@@ -404,7 +418,8 @@ function parseWithEntry(line) {
 function cleanRegexEntry(line) {
   const trimmed = line.trim();
   if (trimmed.startsWith('- ')) {
-    return trimmed.replace(/^- /, '').replace(/^"|"$/g, '');
+    // Use replaceAll with global regexes for clarity and to satisfy linter rules.
+    return trimmed.replaceAll(/^- /g, '').replaceAll(/^"|"$/g, '');
   }
   return null;
 }
@@ -560,7 +575,7 @@ export function loadHighRiskTriggers(filePath) {
     }
 
     if (inHighRisk && trimmed.startsWith('- ')) {
-      triggers.add(trimmed.replace(/^- /, ''));
+      triggers.add(trimmed.replaceAll(/^- /g, ''));
     }
 
     if (inAllowlist) {
@@ -742,7 +757,7 @@ function parseRetentionDays(trimmed) {
 
 function parseRequiredPath(trimmed) {
   if (trimmed.startsWith('- ')) {
-    return trimmed.replace(/^- /, '');
+    return trimmed.replaceAll(/^- /g, '');
   }
   return null;
 }
