@@ -23,6 +23,40 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/branding/format.sh
 . "${script_dir}/format.sh"
 
+# Fallback: when `format.sh` isn't available or doesn't define the helper
+# (e.g., invoked in odd environments), provide a minimal `ps_supports_color`
+# so the printer won't fail with "command not found".
+if ! declare -F ps_supports_color >/dev/null 2>&1; then
+  ps_supports_color() {
+    # NO_COLOR: any non-empty value except "0" disables
+    if [[ -n "${NO_COLOR:-}" && "${NO_COLOR}" != "0" ]]; then
+      return 1
+    fi
+
+    # TERM=dumb disables
+    if [[ -z "${TERM:-}" || "${TERM}" == "dumb" ]]; then
+      return 1
+    fi
+
+    # FORCE_COLOR enables
+    if [[ "${FORCE_COLOR:-0}" != "0" ]]; then
+      return 0
+    fi
+
+    # TTY enables
+    if [[ -t 1 ]]; then
+      return 0
+    fi
+
+    # CI often supports ANSI escapes in logs
+    if [[ "${CI:-0}" != "0" ]]; then
+      return 0
+    fi
+
+    return 1
+  }
+fi
+
 ICON="${PS_FMT_ICON:-▶}"
 SEPARATOR="${PS_FMT_SEPARATOR:-—}"
 DETAIL_INDENT="${PS_FMT_DETAIL_INDENT:-  }"
