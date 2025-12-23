@@ -420,7 +420,7 @@ jobs:
     timeout-minutes: 30
     env:
       PS_FULL_SCAN: "1"
-    if: ${{ secrets.SONAR_TOKEN != '' }}
+    if: secrets.SONAR_TOKEN != ''
     continue-on-error: true
     steps:
       - name: Harden runner (PS)
