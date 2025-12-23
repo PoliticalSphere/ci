@@ -68,16 +68,16 @@ runs:
 
         if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
           scripts_root="${platform_root}"
-          echo "PS.INSTALL_TOOLS: scripts_root=PS_PLATFORM_ROOT (${scripts_root})"
+          printf 'PS.INSTALL_TOOLS: scripts_root=PS_PLATFORM_ROOT (%s)\n' "${scripts_root}"
         elif [[ -n "${workspace_root}" && -d "${workspace_root}" ]]; then
           scripts_root="${workspace_root}"
-          echo "PS.INSTALL_TOOLS: scripts_root=GITHUB_WORKSPACE (${scripts_root})"
+          printf 'PS.INSTALL_TOOLS: scripts_root=GITHUB_WORKSPACE (%s)\n' "${scripts_root}"
         else
-          echo "ERROR: neither PS_PLATFORM_ROOT nor GITHUB_WORKSPACE is available" >&2
+          printf 'ERROR: neither PS_PLATFORM_ROOT nor GITHUB_WORKSPACE is available\n' >&2
           exit 1
         fi
 
-        echo "PS_SCRIPTS_ROOT=${scripts_root}" >> "${GITHUB_ENV}"
+        printf 'PS_SCRIPTS_ROOT=%s\n' "${scripts_root}" >> "${GITHUB_ENV}"
 
     - name: Validate inputs
       shell: bash
@@ -91,10 +91,10 @@ runs:
 
         validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
-          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
           exit 1
         fi
-
+        
         # shellcheck source=/dev/null
         . "${validate_sh}"
 
@@ -127,9 +127,7 @@ runs:
         fi
 
         for tool in "${tools_arr[@]}"; do
-          tool="$(echo "${tool}" | xargs)"
-          if [[ -z "${tool}" ]]; then
-            v_error "inputs.tools contains an empty tool name"
+          tool="$(printf '%s' "${tool}" | xargs)"
             exit 1
           fi
           require_enum \
@@ -153,7 +151,7 @@ runs:
 
         installer="${scripts_root}/tools/scripts/ci/install-tools.sh"
         if [[ ! -f "${installer}" ]]; then
-          echo "ERROR: install-tools.sh not found at ${installer}" >&2
+          printf 'ERROR: install-tools.sh not found at %s\n' "${installer}" >&2
           exit 1
         fi
 

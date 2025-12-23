@@ -86,19 +86,19 @@ runs:
           val="${line#*=}"
 
           if [[ "${key}" == "${line}" ]]; then
-            echo "ERROR: invalid results entry '${line}' (expected key=value)." >&2
+            printf "ERROR: invalid results entry '%s' (expected key=value).\n" "${line}" >&2
             exit 1
           fi
 
           if [[ ! "${key}" =~ ^[A-Za-z0-9_-]+$ ]]; then
-            echo "ERROR: invalid result key '${key}'." >&2
+            printf "ERROR: invalid result key '%s'.\n" "${key}" >&2
             exit 1
           fi
 
           case "${val}" in
             success|failure|cancelled|skipped) ;;
             *)
-              echo "ERROR: invalid result value '${val}' for '${key}'." >&2
+              printf "ERROR: invalid result value '%s' for '%s'.\n" "${val}" "${key}" >&2
               exit 1
               ;;
           esac
@@ -128,6 +128,6 @@ runs:
         json+="}}"
 
         printf '%s\n' "${json}" > "${output_path}"
-        echo "PS.SUMMARY: workflow=${workflow}"
-        echo "PS.SUMMARY: output=${output_path}"
-        echo "PS.SUMMARY: status=${overall}"
+        printf 'PS.SUMMARY: workflow=%s\n' "${workflow}"
+        printf 'PS.SUMMARY: output=%s\n' "${output_path}"
+        printf 'PS.SUMMARY: status=%s\n' "${overall}"

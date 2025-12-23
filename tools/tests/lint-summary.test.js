@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
@@ -14,7 +14,6 @@ const repoRoot = getRepoRoot();
 // variables from the test runner. We set `CI=1` explicitly via the `env`
 // option below rather than exporting it in the shell command, and we also set a
 // short timeout to avoid long-running or stuck processes.
-const cmd = `bash -lc 'source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary; print_lint_summary'`;
 let out = '';
 try {
   const env = {
@@ -25,7 +24,15 @@ try {
     USER: process.env.USER,
     TERM: 'dumb',
   };
-  out = execSync(cmd, {
+
+  // Safer: execute the bash binary directly with execFileSync so we avoid
+  // spawning an intermediate shell via the node exec helpers. We still run
+  // a controlled shell command string (needed to `source` the gate script),
+  // but passing it as an argument to the bash binary via execFileSync
+  // prevents accidental injection from untrusted input and avoids going
+  // through a shell interpreter provided by exec()/execSync.
+  const commandString = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary; print_lint_summary`;
+  out = execFileSync('bash', ['-lc', commandString], {
     encoding: 'utf8',
     cwd: repoRoot,
     env,

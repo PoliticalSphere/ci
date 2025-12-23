@@ -78,13 +78,13 @@ runs:
 
         if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
           scripts_root="${platform_root}"
-          echo "PS.PR_COMMENT: scripts_root=PS_PLATFORM_ROOT (${scripts_root})"
+          printf 'PS.PR_COMMENT: scripts_root=PS_PLATFORM_ROOT (%s)\n' "${scripts_root}"
         else
           scripts_root="${workspace_root}"
-          echo "PS.PR_COMMENT: scripts_root=GITHUB_WORKSPACE (${scripts_root})"
+          printf 'PS.PR_COMMENT: scripts_root=GITHUB_WORKSPACE (%s)\n' "${scripts_root}"
         fi
 
-        echo "PS_SCRIPTS_ROOT=${scripts_root}" >> "${GITHUB_ENV}"
+        printf 'PS_SCRIPTS_ROOT=%s\n' "${scripts_root}" >> "${GITHUB_ENV}"
 
     - name: Validate inputs
       shell: bash
@@ -101,7 +101,7 @@ runs:
 
         validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
-          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
           echo "HINT: ensure PS_PLATFORM_ROOT is set to the platform checkout OR vendor scripts into the repo." >&2
           exit 1
         fi

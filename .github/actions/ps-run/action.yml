@@ -102,7 +102,7 @@ runs:
         platform_root="${PS_PLATFORM_ROOT}"
 
         if [[ ! -d "${platform_root}" ]]; then
-          echo "ERROR: PS_PLATFORM_ROOT directory not found: ${platform_root}" >&2
+          printf 'ERROR: PS_PLATFORM_ROOT directory not found: %s\n' "${platform_root}" >&2
           exit 1
         fi
 
@@ -118,28 +118,28 @@ runs:
         done
 
         if [[ -z "${section_script}" ]]; then
-          echo "ERROR: print-section.sh not found." >&2
-          echo "Tried: ${platform_root}/tools/scripts/branding/print-section.sh" >&2
-          echo "Tried: ${workspace_root}/tools/scripts/branding/print-section.sh" >&2
+          printf 'ERROR: print-section.sh not found.\n' >&2
+          printf 'Tried: %s\n' "${platform_root}/tools/scripts/branding/print-section.sh" >&2
+          printf 'Tried: %s\n' "${workspace_root}/tools/scripts/branding/print-section.sh" >&2
           exit 1
         fi
 
         rel_script="${PS_REL_SCRIPT:-}"
         if [[ -z "${rel_script}" ]]; then
-          echo "ERROR: inputs.script is required" >&2
+          printf 'ERROR: inputs.script is required\n' >&2
           exit 1
         fi
 
         # Disallow absolute paths and traversal.
         if [[ "${rel_script}" = /* ]] || [[ "${rel_script}" == *".."* ]]; then
-          echo "ERROR: inputs.script must be a relative path within the platform repo (no traversal)." >&2
-          echo "Got: ${rel_script}" >&2
+          printf 'ERROR: inputs.script must be a relative path within the platform repo (no traversal).\n' >&2
+          printf 'Got: %s\n' "${rel_script}" >&2
           exit 1
         fi
 
         target="${platform_root}/${rel_script}"
         if [[ ! -f "${target}" ]]; then
-          echo "ERROR: script not found: ${target}" >&2
+          printf 'ERROR: script not found: %s\n' "${target}" >&2
           exit 1
         fi
 
@@ -149,14 +149,14 @@ runs:
         fi
 
         if [[ "${rel_wd}" = /* ]] || [[ "${rel_wd}" == *".."* ]]; then
-          echo "ERROR: inputs.working-directory must be a relative path within the workspace (no traversal)." >&2
-          echo "Got: ${rel_wd}" >&2
+          printf 'ERROR: inputs.working-directory must be a relative path within the workspace (no traversal).\n' >&2
+          printf 'Got: %s\n' "${rel_wd}" >&2
           exit 1
         fi
 
         wd="${workspace_root}/${rel_wd}"
         if [[ ! -d "${wd}" ]]; then
-          echo "ERROR: working directory does not exist: ${wd}" >&2
+          printf 'ERROR: working directory does not exist: %s\n' "${wd}" >&2
           exit 1
         fi
 
@@ -166,21 +166,21 @@ runs:
 
         # Validate id/title and persist for downstream steps
         if [[ -z "${PS_ID:-}" ]]; then
-          echo "ERROR: inputs.id is required" >&2
+          printf 'ERROR: inputs.id is required\n' >&2
           exit 1
         fi
         if ! [[ "${PS_ID}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-          echo "ERROR: inputs.id must match ^[A-Za-z0-9._-]+$" >&2
+          printf 'ERROR: inputs.id must match ^[A-Za-z0-9._-]+$\n' >&2
           exit 1
         fi
         if [[ -z "${PS_TITLE:-}" ]]; then
-          echo "ERROR: inputs.title is required" >&2
+          printf 'ERROR: inputs.title is required\n' >&2
           exit 1
         fi
 
-        echo "PS_RUN_ID=${PS_ID}" >> "${GITHUB_ENV}"
-        echo "PS_RUN_TITLE=${PS_TITLE}" >> "${GITHUB_ENV}"
-        echo "PS_RUN_DESCRIPTION=${PS_DESCRIPTION}" >> "${GITHUB_ENV}"
+        printf 'PS_RUN_ID=%s\n' "${PS_ID}" >> "${GITHUB_ENV}"
+        printf 'PS_RUN_TITLE=%s\n' "${PS_TITLE}" >> "${GITHUB_ENV}"
+        printf 'PS_RUN_DESCRIPTION=%s\n' "${PS_DESCRIPTION}" >> "${GITHUB_ENV}"
 
         bash "${section_script}" "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"
 
@@ -196,4 +196,4 @@ runs:
           bash "${target}"
         fi
 
-        echo "PS.RUN: OK"
+        printf 'PS.RUN: OK\n'

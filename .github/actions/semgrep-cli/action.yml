@@ -87,14 +87,14 @@ runs:
         # Resolve platform root deterministically.
         platform_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}/.ps-platform}"
         if [[ ! -d "${platform_root}" ]]; then
-          echo "ERROR: platform_root not found: ${platform_root}" >&2
-          echo "HINT: export PS_PLATFORM_ROOT or checkout platform into .ps-platform." >&2
+          printf 'ERROR: platform_root not found: %s\n' "${platform_root}" >&2
+          printf 'HINT: export PS_PLATFORM_ROOT or checkout platform into .ps-platform.\n' >&2
           exit 1
         fi
 
         validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
-          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
           exit 1
         fi
         # shellcheck source=/dev/null
@@ -176,11 +176,11 @@ runs:
         # 0 = no findings
         # 1 = findings
         # >1 = error
-        echo "${semgrep_exit}" > "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt"
+        printf '%s\n' "${semgrep_exit}" > "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt"
 
         if [[ ! -f "${out}" ]]; then
-          echo "ERROR: SARIF output not found at '${out}'." >&2
-          echo "HINT: semgrep exited with code ${semgrep_exit} and did not produce SARIF." >&2
+          printf "ERROR: SARIF output not found at '%s'.\n" "${out}" >&2
+          printf "HINT: semgrep exited with code %s and did not produce SARIF.\n" "${semgrep_exit}" >&2
           exit 1
         fi
 
@@ -203,14 +203,14 @@ runs:
         semgrep_exit="$(cat "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt" 2>/dev/null || echo 2)"
 
         if [[ "${semgrep_exit}" -gt 1 ]]; then
-          echo "ERROR: Semgrep failed with exit code ${semgrep_exit}." >&2
+          printf "ERROR: Semgrep failed with exit code %s\n" "${semgrep_exit}" >&2
           exit "${semgrep_exit}"
         fi
 
         if [[ "${semgrep_exit}" -eq 1 && "${SEMGREP_FAIL_ON_FINDINGS_INPUT:-}" == "true" ]]; then
-          echo "ERROR: Semgrep reported findings (exit 1)." >&2
+          printf "ERROR: Semgrep reported findings (exit 1).\n" >&2
           exit 1
         fi
 
-        echo "PS.SEMGREP: completed (exit ${semgrep_exit})."
-        echo "PS.SEMGREP: OK"
+        printf 'PS.SEMGREP: completed (exit %s).\n' "${semgrep_exit}"
+        printf 'PS.SEMGREP: OK\n' 

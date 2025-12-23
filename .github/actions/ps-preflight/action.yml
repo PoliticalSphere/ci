@@ -107,7 +107,7 @@ runs:
 
           while IFS= read -r line; do
             local item
-            item="$(echo "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            item="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
             if [[ -z "${item}" ]]; then
               continue
             fi

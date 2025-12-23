@@ -41,6 +41,8 @@ LINT_SUMMARY_LINES=0
 # re-printing the block in non-interactive logs where terminal control
 # sequences don't behave as expected).
 LINT_SUMMARY_INITIALIZED=0
+# Environment toggle: set PS_LINT_INLINE=0 to disable in-place updates entirely
+PS_LINT_INLINE="${PS_LINT_INLINE:-1}"
 
 # Simple color helpers
 ps_supports_color() {
@@ -104,12 +106,12 @@ lint_init() {
 
 # Print a compact, single LINT block and update in-place when possible
 print_lint_summary() {
-  # Erase previous block only when attached to a real interactive TTY.
-  # We only rely on -t 1 here — if stdout is a real terminal we can safely
-  # perform in-place cursor movement. CI environment variables (e.g. CI=1)
-  # should not be used to override TTY detection as they can be set in
-  # interactive developer environments (causing unexpected behavior).
-  if [[ -t 1 ]] && [[ "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
+  # Erase previous block only when attached to a real interactive TTY and
+  # in-place updates are enabled (PS_LINT_INLINE=1). Some environments may
+  # present a pseudo-TTY that does not support cursor movement reliably; in
+  # those cases users can disable in-place updates by setting
+  # PS_LINT_INLINE=0 in their environment.
+  if [[ "${PS_LINT_INLINE:-1}" == "1" && -t 1 && "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
     local n=${LINT_SUMMARY_LINES}
     # Move cursor up n lines and clear them reliably (portable across terminals)
     printf '\033[%dA' "$n"
@@ -121,11 +123,11 @@ print_lint_summary() {
     printf '\033[%dA' "$n"
   fi
 
-  # If the current process will not do interactive in-place updates (no
-  # real TTY) and we've already printed the summary once, avoid re-printing
-  # it — repeated prints clutter non-interactive logs where cursor movement
-  # isn't available.
-  if [[ ! -t 1 ]] && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
+  # If in-place updates are disabled, or the current process will not do
+  # interactive in-place updates (no real TTY), and we've already printed
+  # the summary once, avoid re-printing it — repeated prints clutter
+  # non-interactive logs where cursor movement isn't available.
+  if { [[ "${PS_LINT_INLINE:-1}" != "1" ]] || [[ ! -t 1 ]]; } && [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 1 ]]; then
     return 0
   fi
 

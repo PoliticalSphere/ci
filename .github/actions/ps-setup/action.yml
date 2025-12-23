@@ -90,12 +90,12 @@ runs:
         printf 'PS.SETUP: node_version=%q\n' "$PS_NODE_VERSION"
         printf 'PS.SETUP: fetch_depth=%q\n' "$PS_FETCH_DEPTH"
         if [[ -n "${PS_REF_INPUT}" ]]; then
-          echo "PS.SETUP: ref=${PS_REF_INPUT}"
+          printf 'PS.SETUP: ref=%s\n' "${PS_REF_INPUT}"
         else
-          echo "PS.SETUP: ref=<default>"
+          printf 'PS.SETUP: ref=<default>\n'
         fi
-        echo "PS.SETUP: cache=${PS_CACHE}"
-        echo "PS.SETUP: install_dependencies=${PS_INSTALL_DEPS}"
+        printf 'PS.SETUP: cache=%s\n' "${PS_CACHE}"
+        printf 'PS.SETUP: install_dependencies=%s\n' "${PS_INSTALL_DEPS}"
 
     - name: Node setup (PS)
       uses: ./.github/actions/ps-node-setup
@@ -110,4 +110,4 @@ runs:
     - name: Setup complete
       shell: bash
       run: |
-        echo "PS.SETUP: OK"
+        printf 'PS.SETUP: OK\n'

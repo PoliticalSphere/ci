@@ -72,14 +72,14 @@ runs:
 
         if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
           scripts_root="${platform_root}"
-          echo "PS.NODE_BOOTSTRAP: scripts_root=PS_PLATFORM_ROOT (${scripts_root})"
+          printf 'PS.NODE_BOOTSTRAP: scripts_root=PS_PLATFORM_ROOT (%s)\n' "${scripts_root}"
         else
           scripts_root="${workspace_root}"
-          echo "PS.NODE_BOOTSTRAP: scripts_root=GITHUB_WORKSPACE (${scripts_root})"
+          printf 'PS.NODE_BOOTSTRAP: scripts_root=GITHUB_WORKSPACE (%s)\n' "${scripts_root}"
         fi
 
-        echo "PS_SCRIPTS_ROOT=${scripts_root}" >> "${GITHUB_ENV}"
-        echo "PS_WORKSPACE_ROOT=${workspace_root}" >> "${GITHUB_ENV}"
+        printf 'PS_SCRIPTS_ROOT=%s\n' "${scripts_root}" >> "${GITHUB_ENV}"
+        printf 'PS_WORKSPACE_ROOT=%s\n' "${workspace_root}" >> "${GITHUB_ENV}"
 
     - name: Validate repo state
       shell: bash
@@ -95,7 +95,7 @@ runs:
 
         validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
         if [[ ! -f "${validate_sh}" ]]; then
-          echo "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
           echo "HINT: ensure PS_PLATFORM_ROOT points at the platform checkout, or vendor scripts into the repo." >&2
           exit 1
         fi
@@ -104,7 +104,7 @@ runs:
 
         # Validate inputs early
         if ! require_number "inputs.node_version" "${PS_NODE_VERSION_INPUT}"; then
-          echo "ERROR: inputs.node_version must be a number (major version). Got '${PS_NODE_VERSION_INPUT}'." >&2
+          printf "ERROR: inputs.node_version must be a number (major version). Got '%s'.\n" "${PS_NODE_VERSION_INPUT}" >&2
           exit 1
         fi
         require_enum "inputs.cache" "${PS_CACHE_INPUT}" "1" "0" || exit 1
@@ -112,20 +112,20 @@ runs:
 
         if [[ "${PS_INSTALL_DEP_INPUT}" == "1" ]]; then
           if [[ ! -f "${workspace_root}/package.json" ]]; then
-            echo "ERROR: package.json not found at ${workspace_root}/package.json" >&2
-            echo "HINT: ensure actions/checkout ran and the repo root is the workspace." >&2
+            printf 'ERROR: package.json not found at %s\n' "${workspace_root}/package.json" >&2
+            printf 'HINT: ensure actions/checkout ran and the repo root is the workspace.\n' >&2
             exit 1
           fi
 
           if [[ ! -f "${workspace_root}/package-lock.json" ]]; then
-            echo "ERROR: package-lock.json not found (npm ci requires a lockfile for determinism)." >&2
-            echo "HINT: commit package-lock.json or set install_dependencies=0 (and handle installs elsewhere)." >&2
+            printf 'ERROR: package-lock.json not found (npm ci requires a lockfile for determinism).\n' >&2
+            printf 'HINT: commit package-lock.json or set install_dependencies=0 (and handle installs elsewhere).\n' >&2
             exit 1
           fi
         fi
 
         # Persist validated node version for downstream steps
-        echo "PS_NODE_VERSION_VALIDATED=${PS_NODE_VERSION_INPUT}" >> "${GITHUB_ENV}"
+        printf 'PS_NODE_VERSION_VALIDATED=%s\n' "${PS_NODE_VERSION_INPUT}" >> "${GITHUB_ENV}"
 
         printf 'PS.NODE_BOOTSTRAP: node_version=%q\n' "$PS_NODE_VERSION_INPUT"
         printf 'PS.NODE_BOOTSTRAP: cache=%q\n' "$PS_CACHE_INPUT"
@@ -151,7 +151,7 @@ runs:
         set -euo pipefail
         cd "${PS_WORKSPACE_ROOT}"
         npm ci --no-audit --no-fund
-        echo "PS.NODE_BOOTSTRAP: OK"
+        printf 'PS.NODE_BOOTSTRAP: OK\n'
 
     - name: Node bootstrap complete (no install)
       if: ${{ inputs.install_dependencies != '1' }}

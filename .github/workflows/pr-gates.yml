@@ -479,11 +479,16 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
+      # -------------------------------------------------------------------------
+      # Check if SonarCloud is configured
+      # -------------------------------------------------------------------------
       - name: Check SonarCloud configuration
         shell: bash
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         run: |
           set -euo pipefail
-          if [[ -n "${{ secrets.SONAR_TOKEN }}" ]]; then
+          if [[ -n "${SONAR_TOKEN:-}" ]]; then
             echo "SONAR_ENABLED=true" >> "$GITHUB_ENV"
           else
             echo "SONAR_ENABLED=false" >> "$GITHUB_ENV"
@@ -497,7 +502,7 @@ jobs:
           npm ci --no-audit --no-fund
 
       - name: SonarCloud Scan
-        uses: sonarsource/sonarcloud-github-action@v5.0.0
+        uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8  # v5.0.0
         with:
           args: >-
             -Dsonar.sources=.
