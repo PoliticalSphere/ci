@@ -160,9 +160,9 @@ runs:
           exit 1
         fi
 
-        echo "PS.RUN: platform_root=${platform_root}"
-        echo "PS.RUN: script=${rel_script}"
-        echo "PS.RUN: working_directory=${rel_wd}"
+        printf 'PS.RUN: platform_root=%q\n' "$platform_root"
+        printf 'PS.RUN: script=%q\n' "$rel_script"
+        printf 'PS.RUN: working_directory=%q\n' "$rel_wd"
 
         bash "${section_script}" "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"
 

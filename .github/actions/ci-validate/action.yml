@@ -85,8 +85,8 @@ runs:
           exit 1
         fi
 
-        echo "PS.CI_VALIDATE: platform_root=${platform_root}"
-        echo "PS.CI_VALIDATE: config_path=${config_path}"
+        printf 'PS.CI_VALIDATE: platform_root=%q\n' "$platform_root"
+        printf 'PS.CI_VALIDATE: config_path=%q\n' "$config_path"
 
         # ----------------------------------------------------------------------
         # Step: Execute

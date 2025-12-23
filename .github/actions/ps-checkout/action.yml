@@ -85,9 +85,9 @@ runs:
 
         require_number "fetch_depth" "${depth}"
 
-        echo "PS.CHECKOUT: fetch_depth=${depth}"
+        printf 'PS.CHECKOUT: fetch_depth=%q\n' "$depth"
         if [[ -n "${ref}" ]]; then
-          echo "PS.CHECKOUT: ref=${ref}"
+          printf 'PS.CHECKOUT: ref=%q\n' "$ref"
         else
           echo "PS.CHECKOUT: ref=<default>"
         fi

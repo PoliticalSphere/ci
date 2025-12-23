@@ -124,9 +124,9 @@ runs:
           fi
         fi
 
-        echo "PS.NODE_BOOTSTRAP: node_version=${PS_NODE_VERSION_INPUT}"
-        echo "PS.NODE_BOOTSTRAP: cache=${PS_CACHE_INPUT}"
-        echo "PS.NODE_BOOTSTRAP: install_dependencies=${PS_INSTALL_DEP_INPUT}"
+        printf 'PS.NODE_BOOTSTRAP: node_version=%q\n' "$PS_NODE_VERSION_INPUT"
+        printf 'PS.NODE_BOOTSTRAP: cache=%q\n' "$PS_CACHE_INPUT"
+        printf 'PS.NODE_BOOTSTRAP: install_dependencies=%q\n' "$PS_INSTALL_DEP_INPUT"
 
     - name: Setup Node (cached)
       if: ${{ inputs.cache == '1' }}

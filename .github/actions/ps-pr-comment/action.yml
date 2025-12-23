@@ -130,7 +130,7 @@ runs:
             "Expected a full-length 40-char commit SHA." || exit 1
         fi
 
-        echo "PS.PR_COMMENT: pr_number=${PS_PR_NUMBER}"
+        printf 'PS.PR_COMMENT: pr_number=%q\n' "$PS_PR_NUMBER"
         echo "PS.PR_COMMENT: body_length=${#PS_BODY}"
 
     - name: Validate PR refs

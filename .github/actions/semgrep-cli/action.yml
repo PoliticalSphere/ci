@@ -116,11 +116,11 @@ runs:
         out="${SEMGREP_OUTPUT_INPUT:-}"
         require_nonempty "inputs.output" "${out}" || exit 1
 
-        echo "PS.SEMGREP: version=${version}"
-        echo "PS.SEMGREP: config=${SEMGREP_CONFIG_INPUT:-}"
-        echo "PS.SEMGREP: path=${SEMGREP_PATH_INPUT:-}"
-        echo "PS.SEMGREP: output=${out}"
-        echo "PS.SEMGREP: fail_on_findings=${fail_on_findings}"
+        printf 'PS.SEMGREP: version=%q\n' "$version"
+        printf 'PS.SEMGREP: config=%q\n' "${SEMGREP_CONFIG_INPUT:-}"
+        printf 'PS.SEMGREP: path=%q\n' "${SEMGREP_PATH_INPUT:-}"
+        printf 'PS.SEMGREP: output=%q\n' "$out"
+        printf 'PS.SEMGREP: fail_on_findings=%q\n' "$fail_on_findings"
 
     - name: Install Semgrep (pinned, venv)
       shell: bash
@@ -184,8 +184,8 @@ runs:
           exit 1
         fi
 
-        echo "PS.SEMGREP: sarif=${out}"
-        echo "PS.SEMGREP: exit=${semgrep_exit}"
+        printf 'PS.SEMGREP: sarif=%q\n' "$out"
+        printf 'PS.SEMGREP: exit=%q\n' "$semgrep_exit"
 
     - name: Upload SARIF to code scanning
       # NOTE: Ensure this SHA is valid upstream; your validate-ci is correctly failing when it isn't.

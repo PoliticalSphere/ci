@@ -26,9 +26,9 @@ runs:
         script="${platform_root}/tools/scripts/branding/print-banner.sh"
         banner="${platform_root}/branding/ps-banner.txt"
 
-        echo "PS.BANNER: platform_root=${platform_root}"
-        echo "PS.BANNER: script=${script}"
-        echo "PS.BANNER: banner=${banner}"
+        printf 'PS.BANNER: platform_root=%q\n' "$platform_root"
+        printf 'PS.BANNER: script=%q\n' "$script"
+        printf 'PS.BANNER: banner=%q\n' "$banner"
 
         if [[ ! -d "${platform_root}" ]]; then
           echo "ERROR: PS_PLATFORM_ROOT directory not found: ${platform_root}" >&2

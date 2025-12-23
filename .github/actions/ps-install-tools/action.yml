@@ -138,8 +138,8 @@ runs:
             actionlint shellcheck hadolint yamllint gitleaks trivy || exit 1
         done
 
-        echo "PS.INSTALL_TOOLS: install_dir=${install_dir}"
-        echo "PS.INSTALL_TOOLS: tools=${tools_raw}"
+        printf 'PS.INSTALL_TOOLS: install_dir=%q\n' "$install_dir"
+        printf 'PS.INSTALL_TOOLS: tools=%q\n' "$tools_raw"
 
     - name: Install tools (pinned)
       shell: bash

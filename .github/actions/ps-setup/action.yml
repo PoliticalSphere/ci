@@ -87,8 +87,8 @@ runs:
         PS_INSTALL_DEPS: ${{ inputs.install_dependencies }}
       run: |
         set -euo pipefail
-        echo "PS.SETUP: node_version=${PS_NODE_VERSION}"
-        echo "PS.SETUP: fetch_depth=${PS_FETCH_DEPTH}"
+        printf 'PS.SETUP: node_version=%q\n' "$PS_NODE_VERSION"
+        printf 'PS.SETUP: fetch_depth=%q\n' "$PS_FETCH_DEPTH"
         if [[ -n "${PS_REF_INPUT}" ]]; then
           echo "PS.SETUP: ref=${PS_REF_INPUT}"
         else

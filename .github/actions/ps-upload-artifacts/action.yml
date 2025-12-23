@@ -122,9 +122,9 @@ runs:
         # Validate if_no_files_found
         require_enum "inputs.if_no_files_found" "${nofiles}" warn error ignore || exit 1
 
-        echo "PS.ARTIFACTS: name=${name}"
-        echo "PS.ARTIFACTS: retention_days=${retention}"
-        echo "PS.ARTIFACTS: if_no_files_found=${nofiles}"
+        printf 'PS.ARTIFACTS: name=%q\n' "$name"
+        printf 'PS.ARTIFACTS: retention_days=%q\n' "$retention"
+        printf 'PS.ARTIFACTS: if_no_files_found=%q\n' "$nofiles"
 
     - name: Upload artifacts
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
