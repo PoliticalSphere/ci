@@ -20,14 +20,14 @@ const defaultFetch =
 const defaultTokenProvider = () =>
   process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
 
-function normalizeActionToRepo(action) {
+export function normalizeActionToRepo(action) {
   const noAt = String(action).split('@')[0];
   const parts = noAt.split('/').filter(Boolean);
   if (parts.length < 2) return null;
   return `${parts[0]}/${parts[1]}`;
 }
 
-function mapStatusToInfo(status) {
+export function mapStatusToInfo(status) {
   // Map problematic statuses to human-readable reason and internal error code.
   switch (status) {
     case 401:
