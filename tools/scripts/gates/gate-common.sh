@@ -156,7 +156,7 @@ on_error() {
       "${GATE_NAME} gate failed" \
       "Failed at: ${CURRENT_STEP_ID} — ${CURRENT_STEP_TITLE} (exit ${exit_code})"
   else
-    echo "ERROR: ${GATE_NAME} gate failed (exit ${exit_code})" >&2
+    printf 'ERROR: %s gate failed (exit %s)\n' "${GATE_NAME}" "${exit_code}" >&2
   fi
   exit "${exit_code}"
 }

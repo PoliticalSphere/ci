@@ -33,10 +33,10 @@ ID_CASE="${PS_FMT_SECTION_ID_CASE}"
 # Normalise ID for machine readability.
 case "${ID_CASE}" in
   upper)
-    section_id="$(echo "${id}" | tr '[:lower:]' '[:upper:]')"
+    section_id="$(tr '[:lower:]' '[:upper:]' <<< "${id}")"
     ;;
   lower)
-    section_id="$(echo "${id}" | tr '[:upper:]' '[:lower:]')"
+    section_id="$(tr '[:upper:]' '[:lower:]' <<< "${id}")"
     ;;
   *)
     section_id="${id}"
@@ -55,13 +55,13 @@ if ps_supports_color; then
     "${C_BOLD}${C_CYAN}" "${section_id}" "${C_RESET}" \
     "${SEPARATOR}" "${C_BOLD}" "${title}" "${C_RESET}"
 else
-  echo "${ICON} ${section_id} ${SEPARATOR} ${title}"
+  printf '%s\n' "${ICON} ${section_id} ${SEPARATOR} ${title}"
 fi
 
 if [[ -n "${description}" ]]; then
   if ps_supports_color; then
     printf "%b%s%s%b\n" "${C_DIM}" "${DETAIL_INDENT}" "${description}" "${C_RESET}"
   else
-    echo "${DETAIL_INDENT}${description}"
+    printf '%s\n' "${DETAIL_INDENT}${description}"
   fi
 fi

@@ -28,8 +28,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 format_sh="${script_dir}/format.sh"
 
 if [[ ! -f "${format_sh}" ]]; then
-  echo "ERROR: format.sh not found at: ${format_sh}" >&2
-  echo "HINT: ensure tools/scripts/branding/format.sh exists and is committed." >&2
+  printf 'ERROR: %s\n' "format.sh not found at: ${format_sh}" >&2
+  printf '%s\n' "HINT: ensure tools/scripts/branding/format.sh exists and is committed." >&2
   exit 1
 fi
 

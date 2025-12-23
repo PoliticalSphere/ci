@@ -61,7 +61,7 @@ output="$(run_knip 2>&1)" || true
 status=$?
 if [[ -n "${output}" ]]; then
   # Filter empty lines
-  filtered="$(echo "${output}" | grep -Ev '^\s*$' || true)"
+  filtered="$(printf '%s\n' "${output}" | grep -Ev '^\s*$' || true)"
   if [[ -n "${filtered}" ]]; then
     printf '%s\n' "${filtered}"
   fi

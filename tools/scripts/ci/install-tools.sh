@@ -82,9 +82,9 @@ install_dir="${PS_INSTALL_DIR:-${GITHUB_WORKSPACE:-$(pwd)}/.tooling/bin}"
 mkdir -p "${install_dir}"
 
 if [[ -n "${GITHUB_PATH:-}" ]]; then
-  echo "${install_dir}" >> "${GITHUB_PATH}"
+  printf '%s\n' "${install_dir}" >> "${GITHUB_PATH}"
   # For pip --user installs (yamllint)
-  echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+  printf '%s\n' "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 else
   export PATH="${install_dir}:${HOME}/.local/bin:${PATH}"
 fi
@@ -102,7 +102,7 @@ install_actionlint() {
   require_var ACTIONLINT_SHA256
   curl -fsSL -o "${_tmpdir}/actionlint.tar.gz" \
     "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-  echo "${ACTIONLINT_SHA256}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
+  printf '%s\n' "${ACTIONLINT_SHA256}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/actionlint.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/actionlint" "${install_dir}/actionlint"
 }
@@ -115,7 +115,7 @@ install_shellcheck() {
   require_var SHELLCHECK_SHA256
   curl -fsSL -o "${_tmpdir}/shellcheck.tar.xz" \
     "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-  echo "${SHELLCHECK_SHA256}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
+  printf '%s\n' "${SHELLCHECK_SHA256}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
   tar -xJf "${_tmpdir}/shellcheck.tar.xz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${install_dir}/shellcheck"
 }
@@ -128,7 +128,7 @@ install_hadolint() {
   require_var HADOLINT_SHA256
   curl -fsSL -o "${_tmpdir}/hadolint" \
     "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
-  echo "${HADOLINT_SHA256}  ${_tmpdir}/hadolint" | sha256sum -c -
+  printf '%s\n' "${HADOLINT_SHA256}  ${_tmpdir}/hadolint" | sha256sum -c -
   install -m 0755 "${_tmpdir}/hadolint" "${install_dir}/hadolint"
 }
 
@@ -158,7 +158,7 @@ install_yamllint() {
     error "failed to download yamllint wheel from PyPI."
     exit 1
   fi
-  echo "${YAMLLINT_SHA256}  ${wheel_path}" | sha256sum -c -
+  printf '%s\n' "${YAMLLINT_SHA256}  ${wheel_path}" | sha256sum -c -
 
   python3 -m pip install \
     --disable-pip-version-check \
@@ -177,7 +177,7 @@ install_gitleaks() {
   require_var GITLEAKS_SHA256
   curl -fsSL -o "${_tmpdir}/gitleaks.tar.gz" \
     "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-  echo "${GITLEAKS_SHA256}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
+  printf '%s\n' "${GITLEAKS_SHA256}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/gitleaks.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/gitleaks" "${install_dir}/gitleaks"
 }
@@ -190,7 +190,7 @@ install_trivy() {
   require_var TRIVY_SHA256
   curl -fsSL -o "${_tmpdir}/trivy.tar.gz" \
     "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-  echo "${TRIVY_SHA256}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
+  printf '%s\n' "${TRIVY_SHA256}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/trivy.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/trivy" "${install_dir}/trivy"
 }
