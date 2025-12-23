@@ -5,8 +5,8 @@
 //   Apply policy checks to workflows and composite actions.
 // ==============================================================================
 
-import { createRequire } from 'node:module';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import path from 'node:path';
 
 import { section } from './console.js';
