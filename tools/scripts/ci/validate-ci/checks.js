@@ -5,9 +5,22 @@
 //   Apply policy checks to workflows and composite actions.
 // ==============================================================================
 
+import { createRequire } from 'node:module';
 import fs from 'node:fs';
 import path from 'node:path';
-import { createRequire } from 'node:module';
+
+import { section } from './console.js';
+import {
+  extractUploadPaths,
+  isActionUpload,
+  isDockerAction,
+  isLocalAction,
+  parseActionRef,
+  parseWorkflow,
+  repoFromAction,
+  workflowKeyFromPath,
+} from './parser.js';
+import { permissionLevel } from './policies.js';
 
 // Optionally use the RE2 engine (if available) to protect against
 // catastrophic backtracking. We try to require it at load time and fall
@@ -25,19 +38,6 @@ let regexEngineOverride = null;
 export function setRegexEngineForTest(engine) {
   regexEngineOverride = engine;
 }
-
-import { section } from './console.js';
-import {
-  extractUploadPaths,
-  isActionUpload,
-  isDockerAction,
-  isLocalAction,
-  parseActionRef,
-  parseWorkflow,
-  repoFromAction,
-  workflowKeyFromPath,
-} from './parser.js';
-import { permissionLevel } from './policies.js';
 
 function isAllowlisted(allowlist, workflowPath, jobId, step) {
   for (const entry of allowlist) {
