@@ -165,10 +165,7 @@ jobs:
         '1' }}
       artifact_name: security-scheduled-validate-ci
       retention_days: 7
-      platform_ref: >-
-        ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-        (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-        'main' }}
+      platform_ref: 'main'
 
   secrets:
     name: Secrets scan (full history)
@@ -198,10 +195,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
@@ -254,20 +248,14 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
       - name: Initialize CodeQL
         uses: github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
         with:
-          languages: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.codeql_languages) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.codeql_languages) ||
-            'javascript' }}
+          languages: 'javascript'
 
       - name: Autobuild
         uses: github/codeql-action/autobuild@5d4e8d1aca955e8d8589aabd499c5cae939e33c7  # v4.31.9
@@ -314,10 +302,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
@@ -367,10 +352,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
@@ -425,10 +407,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
@@ -483,10 +462,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
@@ -542,10 +518,7 @@ jobs:
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
         with:
           repository: PoliticalSphere/ci
-          ref: >-
-            ${{ (github.event_name == 'workflow_call' && inputs.platform_ref) ||
-            (github.event_name == 'workflow_dispatch' && github.event.inputs.platform_ref) ||
-            'main' }}
+          ref: 'main'
           path: .ps-platform
           fetch-depth: 1
 
