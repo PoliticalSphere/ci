@@ -475,7 +475,6 @@ async function checkRemoteActionStep({
 
   return violations;
 }
-}
 
 function checkInlineRun({
   rel,
@@ -736,6 +735,81 @@ function checkArtifactPolicy({
   return violations;
 }
 
+async function processStep({
+  rel,
+  jobId,
+  step,
+  workspaceRoot,
+  allowedActions,
+  unsafePatterns,
+  unsafeAllowlist,
+  validateRemoteAction,
+  localActions,
+  inlineAllowlist,
+  inlineConstraints,
+  inlineMaxLines,
+  requireSectionHeaders,
+  uploadNames,
+  uploadPaths,
+}) {
+  const violations = [];
+
+  const stepViolations = await checkStepUses({
+    rel,
+    jobId,
+    step,
+    workspaceRoot,
+    allowedActions,
+    unsafePatterns,
+    unsafeAllowlist,
+    validateRemoteAction,
+    localActions,
+  });
+  violations.push(...stepViolations);
+
+  violations.push(
+    ...checkInlineRun({
+      rel,
+      jobId,
+      step,
+      inlineAllowlist,
+      inlineConstraints,
+      inlineMaxLines,
+      unsafePatterns,
+      unsafeAllowlist,
+    }),
+  );
+
+  violations.push(
+    ...checkSecretsHandling({
+      rel,
+      jobId,
+      step,
+    }),
+  );
+
+  if (requireSectionHeaders) {
+    violations.push(
+      ...checkSectionHeaders({
+        rel,
+        jobId,
+        step,
+      }),
+    );
+  }
+
+  if (step.uses && isActionUpload(step.uses)) {
+    if (step.with.name) {
+      uploadNames.push(String(step.with.name).replaceAll('"', ''));
+    }
+    for (const p of extractUploadPaths(step)) {
+      uploadPaths.push(p);
+    }
+  }
+
+  return violations;
+}
+
 export async function scanWorkflows({
   workflows,
   workspaceRoot,
@@ -802,7 +876,7 @@ export async function scanWorkflows({
       );
 
       for (const step of job.steps) {
-        const stepViolations = await checkStepUses({
+        const stepViolations = await processStep({
           rel,
           jobId,
           step,
@@ -812,45 +886,14 @@ export async function scanWorkflows({
           unsafeAllowlist,
           validateRemoteAction,
           localActions,
+          inlineAllowlist,
+          inlineConstraints,
+          inlineMaxLines,
+          requireSectionHeaders,
+          uploadNames,
+          uploadPaths,
         });
         violations.push(...stepViolations);
-        violations.push(
-          ...checkInlineRun({
-            rel,
-            jobId,
-            step,
-            inlineAllowlist,
-            inlineConstraints,
-            inlineMaxLines,
-            unsafePatterns,
-            unsafeAllowlist,
-          }),
-        );
-        violations.push(
-          ...checkSecretsHandling({
-            rel,
-            jobId,
-            step,
-          }),
-        );
-        if (requireSectionHeaders) {
-          violations.push(
-            ...checkSectionHeaders({
-              rel,
-              jobId,
-              step,
-            }),
-          );
-        }
-
-        if (step.uses && isActionUpload(step.uses)) {
-          if (step.with.name) {
-            uploadNames.push(String(step.with.name).replaceAll('"', ''));
-          }
-          for (const p of extractUploadPaths(step)) {
-            uploadPaths.push(p);
-          }
-        }
       }
     }
 
