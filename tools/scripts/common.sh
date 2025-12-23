@@ -16,6 +16,7 @@ set_repo_root() {
   if [[ -z "${repo_root}" ]]; then
     repo_root="$(pwd)"
   fi
+  return 0
 }
 
 load_format() {
@@ -28,11 +29,13 @@ load_format() {
     . "${format_sh}"
   fi
   format_loaded=1
+  return 0
 }
 
 init_repo_context() {
   set_repo_root
   load_format
+  return 0
 }
 
 detail() {
@@ -41,6 +44,7 @@ detail() {
   else
     echo "$*"
   fi
+  return 0
 }
 
 detail_err() {
@@ -49,6 +53,7 @@ detail_err() {
   else
     echo "$*" >&2
   fi
+  return 0
 }
 
 error() {
@@ -57,6 +62,7 @@ error() {
   else
     echo "ERROR: $*" >&2
   fi
+  return 0
 }
 
 # retry_cmd <retries> <sleep_seconds> <command...>
