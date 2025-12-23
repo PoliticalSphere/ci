@@ -418,8 +418,8 @@ function parseWithEntry(line) {
 function cleanRegexEntry(line) {
   const trimmed = line.trim();
   if (trimmed.startsWith('- ')) {
-    // Use replaceAll with global regexes for clarity and to satisfy linter rules.
-    return trimmed.replaceAll(/^- /g, '').replaceAll(/^"|"$/g, '');
+    // Use replaceAll with grouped alternation to make operator precedence explicit.
+    return trimmed.replaceAll(/^- /g, '').replaceAll(/(^"|"$)/g, '');
   }
   return null;
 }
