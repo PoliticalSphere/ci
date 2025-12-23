@@ -65,3 +65,10 @@ if [[ -n "${description}" ]]; then
     printf '%s\n' "${DETAIL_INDENT}${description}"
   fi
 fi
+
+# If sourced, return; if executed, exit normally.
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  return 0
+else
+  exit 0
+fi
