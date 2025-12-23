@@ -36,7 +36,10 @@ for (const dir of actionDirs) {
       for (let j = i + 1; j < lines.length; j++) {
         const l = lines[j];
         if (/^\s*-\s+name\s*:\s*/.test(l)) break;
-        // detect raw GitHub expressions inside run blocks
+        // skip comments
+        if (/^\s*#/.test(l)) continue;
+
+        // detect raw GitHub expressions inside run blocks (e.g. '${{ inputs.xxx }}')
         if (/\{\{\s*inputs\./.test(l) || /\$\{\{/.test(l)) {
           violations.push({ file: ymlPath, line: j + 1, text: l.trim() });
         }
