@@ -1,10 +1,12 @@
 #!/usr/bin/env node
 
-import { fail, section } from './test-utils.js';
 import {
   compileRegex,
   setRegexEngineForTest,
 } from '../scripts/ci/validate-ci/checks.js';
+import { fail, section } from './test-utils.js';
+
+
 
 function assert(condition, message) {
   if (!condition) fail(message);
@@ -16,7 +18,7 @@ try {
   let threw = false;
   try {
     compileRegex('(.+)+');
-  } catch (err) {
+  } catch {
     threw = true;
   }
   assert(threw, "expected compileRegex to reject '(.+)+'");
@@ -25,7 +27,7 @@ try {
   threw = false;
   try {
     compileRegex('(\\.[0-9]+){0,2}$');
-  } catch (err) {
+  } catch {
     threw = true;
   }
   assert(!threw, "expected compileRegex to accept '(\\.[0-9]+){0,2}$'");
