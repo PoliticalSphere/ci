@@ -84,31 +84,35 @@ lint_init() {
 
   # Show initial compact summary block (no extra banner)
   print_lint_summary
-}
+  return 0
+} 
 
 # Print a compact, single LINT block and update in-place when possible
 print_lint_summary() {
   # Erase previous block if present (TTY)
   if ps_supports_color && [[ "${LINT_SUMMARY_LINES:-0}" -gt 0 ]]; then
     local n=${LINT_SUMMARY_LINES}
+    # Move cursor up n lines and clear them reliably (portable across terminals)
     printf '\033[%dA' "$n"
     for ((i=0;i<n;i++)); do
-      printf '\033[2K\033[1E'
+      # Use carriage return before clearing line to ensure cursor at line start
+      printf '\r\033[2K\033[1E'
     done
+    # Return cursor to original top position
     printf '\033[%dA' "$n"
   fi
 
   # Header
-  local C_RESET="" C_BOLD="" C_DIM="" C_CYAN="" C_GREEN="" C_RED="" C_YELLOW=""
+  local c_reset="" c_bold="" c_dim="" c_cyan="" c_green="" c_red="" c_yellow=""
   if ps_supports_color; then
-    C_RESET="\033[0m"; C_BOLD="\033[1m"; C_DIM="\033[90m"; C_CYAN="\033[36m"; C_GREEN="\033[32m"; C_RED="\033[31m"; C_YELLOW="\033[33m"
-    printf "%b%s%b %b%s%b\n" "${C_GREEN}" "${PS_FMT_ICON:-▶}" "${C_RESET}" "${C_BOLD}${C_CYAN}" "LINT & TYPE CHECK" "${C_RESET}"
+    c_reset="\033[0m"; c_bold="\033[1m"; c_dim="\033[90m"; c_cyan="\033[36m"; c_green="\033[32m"; c_red="\033[31m"; c_yellow="\033[33m"
+    printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT" "${c_reset}"
   else
     printf "%s %s\n" "${PS_FMT_ICON:-▶}" "LINT & TYPE CHECK"
   fi
 
   # Indentation for lint rows (align with start of "LINT" header)
-  local LINT_INDENT="  "
+  local lint_indent="  " 
 
   # Column width for labels
   local pad=24
@@ -125,22 +129,22 @@ print_lint_summary() {
     if ps_supports_color; then
         case "$status" in
         PASS)
-          printf "%s%s %b%-7s%b   %b%b%b\n" "${LINT_INDENT}" "${padded}" "${C_GREEN}${C_BOLD}" "PASS" "${C_RESET}" "${C_CYAN}${C_BOLD}" "Findings Log" "${C_RESET} ${C_DIM}(${log})${C_RESET}" ;;
+          printf "%s%s %b%-7s%b   %b%b%b\n" "${lint_indent}" "${padded}" "${c_green}${c_bold}" "PASS" "${c_reset}" "${c_cyan}${c_bold}" "Findings Log" "${c_reset} ${c_dim}(${log})${c_reset}" ;;
 
         FAIL)
-          printf "%s%s %b%-7s%b   %b%b%b\n" "${LINT_INDENT}" "${padded}" "${C_RED}${C_BOLD}" "FAIL" "${C_RESET}" "${C_CYAN}${C_BOLD}" "Findings Log" "${C_RESET} ${C_DIM}(${log})${C_RESET}" ;;
+          printf "%s%s %b%-7s%b   %b%b%b\n" "${lint_indent}" "${padded}" "${c_red}${c_bold}" "FAIL" "${c_reset}" "${c_cyan}${c_bold}" "Findings Log" "${c_reset} ${c_dim}(${log})${c_reset}" ;;
 
         SKIPPED)
-          printf "%s%s %b%-7s%b   %b%b%b\n" "${LINT_INDENT}" "${padded}" "${C_YELLOW}${C_BOLD}" "SKIPPED" "${C_RESET}" "${C_CYAN}${C_BOLD}" "Findings Log" "${C_RESET} ${C_DIM}(${log})${C_RESET}" ;;
+          printf "%s%s %b%-7s%b   %b%b%b\n" "${lint_indent}" "${padded}" "${c_yellow}${c_bold}" "SKIPPED" "${c_reset}" "${c_cyan}${c_bold}" "Findings Log" "${c_reset} ${c_dim}(${log})${c_reset}" ;;
         Running*)
-          printf "%s%s %b%s%b\n" "${LINT_INDENT}" "${padded}" "${C_CYAN}" "Running..." "${C_RESET}" ;;
+          printf "%s%s %b%s%b\n" "${lint_indent}" "${padded}" "${c_cyan}" "Running..." "${c_reset}" ;;
         Waiting)
-          printf "%s%s %b%s%b\n" "${LINT_INDENT}" "${padded}" "${C_DIM}" "Waiting..." "${C_RESET}" ;;
+          printf "%s%s %b%s%b\n" "${lint_indent}" "${padded}" "${c_dim}" "Waiting..." "${c_reset}" ;;
         *)
           printf "    %s %s\n" "${padded}" "${status}" ;;
       esac
     else
-      printf "%s%s %s\n" "${LINT_INDENT}" "${padded}" "${status}"
+      printf "%s%s %s\n" "${lint_indent}" "${padded}" "${status}"
     fi
   done
 
@@ -167,6 +171,7 @@ on_error() {
 run_lint_step() {
   local id="$1"
   local title="$2"
+  # shellcheck disable=SC2034
   local description="$3"
   shift 3
 
@@ -246,6 +251,7 @@ run_lint_step() {
 run_step() {
   local id="$1"
   local title="$2"
+  # shellcheck disable=SC2034
   local description="$3"
   shift 3
 
