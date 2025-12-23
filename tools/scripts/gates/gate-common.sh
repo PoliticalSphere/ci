@@ -129,9 +129,11 @@ print_lint_summary() {
   # the '▶ LINT' banner multiple times in logs.
   local c_reset="" c_bold="" c_dim="" c_cyan="" c_green="" c_red="" c_yellow=""
   if [[ "${LINT_SUMMARY_INITIALIZED:-0}" -eq 0 ]]; then
-    if ps_supports_color; then
+    # If NO_COLOR is explicitly set, print a plain header; otherwise print
+    # a colored header for visibility in CI logs.
+    if [[ -z "${NO_COLOR:-}" ]]; then
       c_reset="\033[0m"; c_bold="\033[1m"; c_dim="\033[90m"; c_cyan="\033[36m"; c_green="\033[32m"; c_red="\033[31m"; c_yellow="\033[33m"
-      printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT" "${c_reset}"
+      printf "%b%s%b %b%s%b\n" "${c_green}" "${PS_FMT_ICON:-▶}" "${c_reset}" "${c_bold}${c_cyan}" "LINT & TYPE CHECK" "${c_reset}"
     else
       printf "%s %s\n" "${PS_FMT_ICON:-▶}" "LINT & TYPE CHECK"
     fi
