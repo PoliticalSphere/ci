@@ -38,3 +38,45 @@ export function assertContains(text, needle, rel, hint) {
     fail(`${rel}: missing required content: ${needle}\nHINT: ${hint}`);
   }
 }
+
+import { execFileSync } from 'node:child_process';
+import { getRepoRoot } from '../scripts/ci/validate-ci/console.js';
+export function runLintSummary(envOverrides = {}) {
+  const repoRoot = getRepoRoot();
+  const env = {
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    TERM: 'dumb',
+    ...envOverrides,
+  };
+  const commandString = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary; print_lint_summary`;
+  let out = '';
+  try {
+    out = execFileSync('bash', ['-lc', commandString], {
+      encoding: 'utf8',
+      cwd: repoRoot,
+      env,
+      timeout: 30_000,
+    });
+  } catch (err) {
+    out = (err.stdout || '') + (err.stderr || '');
+  }
+  return out;
+}
+
+export function assertLintSummaryOnce(out, rel = 'lint summary') {
+  const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
+  if (headerCount !== 1) {
+    fail(
+      `Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`,
+    );
+  }
+
+  const biomeCount = (out.match(/BIOME/g) || []).length;
+  if (biomeCount !== 1) {
+    fail(
+      `Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${out}`,
+    );
+  }
+}
