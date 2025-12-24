@@ -43,6 +43,9 @@ is_shell_script() {
       '#!'*'env sh'*|'#!'*'env bash'*|'#!'*'/sh'*|'#!'*'bash'*)
         return 0
         ;;
+      *)
+        return 1
+        ;;
     esac
   fi
 
@@ -58,6 +61,8 @@ if [[ "${full_scan}" == "1" ]]; then
       */node_modules/*|*/dist/*|*/build/*|*/coverage/*|*/reports/*|*/.git/hooks/*)
         continue
         ;;
+      *)
+        ;; # default: do nothing
     esac
     if is_shell_script "${f}"; then
       files+=("${f}")
@@ -75,6 +80,7 @@ else
     [[ -f "${local_path}" ]] || continue
     case "${rel}" in
       .git/hooks/*) continue ;;
+      *) ;; # default: do nothing
     esac
     if is_shell_script "${local_path}"; then
       files+=("${local_path}")
