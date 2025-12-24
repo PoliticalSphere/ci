@@ -77,7 +77,6 @@ Risky changes require an explicit, documented decision.
 Baseline building blocks:
 
 - `ps-run`: standard banner + section wrapper for script execution
-- `ps-hardened-checkout`: harden runner + checkout in one step
 - `ps-preflight`: shared preflight checks for common requirements
 - `ps-upload-artifacts`: artifact upload with input validation
 - `ps-pr-comment`: post PR comments with input validation
@@ -87,10 +86,8 @@ Baseline building blocks:
 Node toolchain:
 
 
-- `ps-job-setup`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, bootstraps the platform, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools (replaces `ps-job-bootstrap` + `ps-setup`)
-- `ps-job-bootstrap`: (deprecated) replaced by `ps-job-setup`. Use `ps-job-setup` as the single job entrypoint.
+- `ps-job-setup`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, bootstraps the platform, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools.
 - `ps-node-setup`: checkout + setup Node.js toolchain with optional deterministic installs (cache, npm ci)
-- `ps-setup`: (deprecated) replaced by `ps-job-setup`. Use `ps-job-setup` as the single job entrypoint.
 
 Example: use `ps-job-setup` to run lint with installs/tools:
 
