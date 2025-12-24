@@ -676,7 +676,10 @@ jobs:
           skip_checkout: "1"
 
       - name: Secrets scan (PR)
-        uses: ./.github/actions/secret-scan-pr
+        uses: ./.github/actions/ps-tools
+        with:
+          bundle: security
+          run_security_scans: "1"
 
       - name: Upload artifacts — secrets
         if: always()

@@ -117,7 +117,7 @@ Security:
 - `ci-validate`: enforce CI policy validation
 - `consumer-contract`: validate consumer repositories against contract policy
 - `license-check`: license compliance against policy allowlists
-- `secret-scan-pr`: fast gitleaks scan for PRs
+
 - `semgrep-cli`: run Semgrep CLI and upload SARIF
 
 ---

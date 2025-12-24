@@ -9,7 +9,7 @@ set -euo pipefail
 #
 # Contract:
 #   - Must be run from anywhere; script will resolve repo root and run from there.
-#   - Does NOT install dependencies (handled upstream by ps-node-setup).
+#   - Does NOT install dependencies (handled upstream by ps-job-setup).
 #
 # Policy:
 #   - In CI: a lockfile MUST exist and package.json MUST define scripts.build.

@@ -43,6 +43,11 @@ inputs:
     required: false
     default: ""
 
+  run_security_scans:
+    description: "Run fast PR-oriented security scans after installing tools (1 = run, 0 = skip). Requires security bundle or tools providing gitleaks."
+    required: false
+    default: "0"
+
 runs:
   using: "composite"
   steps:
@@ -170,6 +175,22 @@ runs:
       with:
         install_dir: ${{ inputs.install_dir }}
         tools: ${{ env.PS_TOOLS }}
+
+    - name: Run secrets scan (PS)
+      if: ${{ inputs.run_security_scans == '1' }}
+      uses: ./.github/actions/ps-preflight
+      with:
+        require_files: |
+          tools/scripts/security/secret-scan-pr.sh
+
+    - name: Run secrets scan (PS)
+      if: ${{ inputs.run_security_scans == '1' }}
+      uses: ./.github/actions/ps-run
+      with:
+        id: "secrets.fast"
+        title: "Secrets scan (fast)"
+        description: "Fast PR secret detection"
+        script: "tools/scripts/security/secret-scan-pr.sh"
 
     - name: Done
       shell: bash

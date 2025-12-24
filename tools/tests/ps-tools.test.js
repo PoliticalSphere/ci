@@ -48,6 +48,13 @@ try {
     assert(yml.includes('tools: ""') || yml.includes('tools:'), 'action declares tools input');
   }
 
+  // Test 4: secrets scan integration input exists and references secret-scan script
+  {
+    const yml = readFileSync(`${repoRoot}/.github/actions/ps-tools/action.yml`, 'utf8');
+    assert(yml.includes('run_security_scans') , 'action declares run_security_scans input');
+    assert(yml.includes('secret-scan-pr.sh'), 'action references secret-scan-pr.sh script');
+  }
+
   console.log('OK: ps-tools action YML has expected inputs and bundle semantics (smoke)');
   process.exit(0);
 } catch (err) {
