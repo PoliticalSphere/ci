@@ -73,6 +73,7 @@ export function assertLintSummaryOnce(out, rel = 'lint summary') {
     fail(
       `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`,
     );
+  }
 
   const biomeCount = (out.match(/BIOME/g) || []).length;
   if (biomeCount !== 1) {
