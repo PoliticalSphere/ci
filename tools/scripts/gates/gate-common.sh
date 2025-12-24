@@ -49,6 +49,7 @@ _ps_resolve_repo_root() {
   else
     printf '%s' "${root}"
   fi
+  return 0
 }
 
 repo_root="$(_ps_resolve_repo_root)"
@@ -184,6 +185,7 @@ _short_log_ref() {
     return 0
   fi
   basename -- "${p}"
+  return 0
 }
 
 _ps_erase_inline_block() {
@@ -197,6 +199,7 @@ _ps_erase_inline_block() {
     printf '\r\033[2K\033[1E'
   done
   printf '\033[%dA' "$n"
+  return 0
 }
 
 _ps_should_print_summary_now() {
@@ -312,7 +315,7 @@ print_lint_summary() {
   fi
 
   local buf=""
-  _append() { buf+="$1"$'\n'; }
+  _append() { local line="$1"; buf+="${line}"$'\n'; return 0; }
 
   local icon="${PS_FMT_ICON:-▶}"
   local rule="${PS_FMT_RULE:-────────────────────────────────────────}"
@@ -358,6 +361,7 @@ print_lint_summary() {
   # 2 header lines + N rows
   LINT_SUMMARY_LINES=$(( 2 + ${#LINT_IDS[@]} ))
   LINT_SUMMARY_EVER_PRINTED=1
+  return 0
 }
 
 lint_print_final() {
@@ -365,6 +369,7 @@ lint_print_final() {
   PS_LINT_PRINT_MODE="first"
   print_lint_summary
   PS_LINT_PRINT_MODE="${prev}"
+  return 0
 }
 
 # ==============================================================================
@@ -471,14 +476,12 @@ run_lint_step() {
     status="FAIL"
 
     # Scoped SKIPPED heuristics (only eslint by default)
-    if [[ "${id}" == "lint.eslint" ]]; then
-      if grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
-        status="SKIPPED"
-        {
-          printf "\nNote: ESLint dependencies/registry access appear missing.\n"
-          printf "Fix: npm ci (or install missing eslint plugins) then re-run.\n"
-        } >> "${log_file}" || true
-      fi
+    if [[ "${id}" == "lint.eslint" ]] && grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
+      status="SKIPPED"
+      {
+        printf "\nNote: ESLint dependencies/registry access appear missing.\n"
+        printf "Fix: npm ci (or install missing eslint plugins) then re-run.\n"
+      } >> "${log_file}" || true
     fi
 
     if [[ "${status}" == "FAIL" ]]; then
@@ -517,6 +520,7 @@ run_step() {
 
   bash "${branding_scripts}/print-section.sh" "${id}" "${title}" "${description}"
   "$@"
+  return 0
 }
 
 print_success() {
@@ -526,4 +530,5 @@ print_success() {
     "gate.ok" \
     "${GATE_NAME:-Gate} gate passed" \
     "All checks completed successfully"
+  return 0
 }
