@@ -17,6 +17,7 @@ try {
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'xterm',
+    PS_LINT_INLINE: '0', // force immediate printed summary in non-TTY test contexts
   };
 
   // Ensure no previous header files remain
