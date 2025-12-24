@@ -71,14 +71,13 @@ export function assertLintSummaryOnce(out, rel = 'lint summary') {
   const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
   if (headerCount !== 1) {
     fail(
-      `Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`,
+      `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`,
     );
-  }
 
   const biomeCount = (out.match(/BIOME/g) || []).length;
   if (biomeCount !== 1) {
     fail(
-      `Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${out}`,
+      `${rel}: Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${out}`,
     );
   }
 }
