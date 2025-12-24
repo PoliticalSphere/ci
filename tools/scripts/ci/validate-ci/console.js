@@ -159,7 +159,7 @@ export function getRepoRoot() {
     const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
-      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin' },
+      env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin' },
     });
     if (r && r.status === 0) return String(r.stdout || '').trim();
     return process.cwd();
