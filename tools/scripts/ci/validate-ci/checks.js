@@ -93,8 +93,45 @@ function compileRegex(reStr) {
   // IMPORTANT: perform detection using a linear, hand-written scanner (no
   // regular expressions) to avoid exposing this check to the very vulnerabilities
   // it is intended to detect.
+  // Helper: parse a brace quantifier starting at index i (where str[i] === '{')
+  // Returns { isQuantifier, isUnbounded, endIndex }
+  function _parseBraceQuantifier(str, i) {
+    const len = str.length;
+    let j = i + 1;
+    // skip whitespace
+    while (j < len && /\s/.test(str[j])) j++;
+
+    // collect digits (may be empty)
+    let digitsBefore = '';
+    while (j < len && /\d/.test(str[j])) {
+      digitsBefore += str[j++];
+    }
+
+    // skip whitespace
+    while (j < len && /\s/.test(str[j])) j++;
+
+    if (j < len && str[j] === ',') {
+      j++;
+      // skip whitespace
+      while (j < len && /\s/.test(str[j])) j++;
+      // if immediate '}', unbounded
+      if (j < len && str[j] === '}') return { isQuantifier: true, isUnbounded: true, endIndex: j };
+      // digits after comma (may be empty)
+      let digitsAfter = '';
+      while (j < len && /\d/.test(str[j])) {
+        digitsAfter += str[j++];
+      }
+      while (j < len && /\s/.test(str[j])) j++;
+      if (j < len && str[j] === '}') {
+        return { isQuantifier: true, isUnbounded: digitsAfter.length === 0, endIndex: j };
+      }
+    }
+    return { isQuantifier: false, isUnbounded: false, endIndex: i };
+  }
+
+  // Move helper out so it can be tested independently and reduce nested
+  // function complexity in `compileRegex`.
   function _hasUnboundedQuantifierIn(str) {
-    // Scan string for unescaped + or * or unbounded `{n,}` quantifiers.
     let i = 0;
     const len = str.length;
     while (i < len) {
@@ -122,112 +159,60 @@ function compileRegex(reStr) {
       }
       if (ch === '+' || ch === '*') return true;
       if (ch === '{') {
-        // Attempt to parse a quantifier: '{' digits? '\s*' ',' \s* (digits?) '}'
-        let j = i + 1;
-        // skip whitespace
-        while (j < len && /\s/.test(str[j])) j++;
-        // must have at least one digit for a quantifier
-        while (j < len && /[0-9]/.test(str[j])) {
-          j++;
-        }
-        // skip whitespace
-        while (j < len && /\s/.test(str[j])) j++;
-        if (j < len && str[j] === ',') {
-          j++;
-          // skip whitespace
-          while (j < len && /\s/.test(str[j])) j++;
-          // if next non-space is '}', this is an unbounded upper (e.g., '{1,}')
-          if (j < len && str[j] === '}') return true;
-          // if there are digits after the comma, it's bounded (e.g., '{1,2}')
-          let digitsAfter = '';
-          while (j < len && /[0-9]/.test(str[j])) {
-            digitsAfter += str[j++];
-          }
-          // skip whitespace
-          while (j < len && /\s/.test(str[j])) j++;
-          if (j < len && str[j] === '}') {
-            if (digitsAfter.length === 0) return true; // '{n,}' (no upper bound)
-            // else bounded; not an unbounded quantifier
-          }
-        }
+        const q = _parseBraceQuantifier(str, i);
+        if (q.isQuantifier && q.isUnbounded) return true;
       }
       i++;
     }
     return false;
   }
 
+  // Refactored nested detection to use small helpers to keep cognitive
+  // complexity low and make the logic clearer.
   function _detectNestedUnbounded(pat) {
     const len = pat.length;
     let i = 0;
+
+    function skipCharClass(idx) {
+      idx++;
+      while (idx < len) {
+        if (pat[idx] === '\\') { idx += 2; continue; }
+        if (pat[idx] === ']') { idx++; break; }
+        idx++;
+      }
+      return idx;
+    }
+
+    function skipGroup(idx) {
+      let depth = 1;
+      let j = idx + 1;
+      while (j < len && depth > 0) {
+        if (pat[j] === '\\') { j += 2; continue; }
+        if (pat[j] === '[') { j = skipCharClass(j); continue; }
+        if (pat[j] === '(') { depth++; }
+        else if (pat[j] === ')') { depth--; }
+        j++;
+      }
+      if (depth !== 0) return -1; // unbalanced
+      return j - 1; // return index of matching ')'
+    }
+
     while (i < len) {
       const ch = pat[i];
-      if (ch === '\\') {
-        i += 2; // skip escaped char
-        continue;
-      }
-      if (ch === '[') {
-        // skip character class
-        i++;
-        while (i < len) {
-          if (pat[i] === '\\') { i += 2; continue; }
-          if (pat[i] === ']') { i++; break; }
-          i++;
-        }
-        continue;
-      }
+      if (ch === '\\') { i += 2; continue; }
+      if (ch === '[') { i = skipCharClass(i); continue; }
       if (ch === '(') {
-        // find matching ')'
-        let depth = 1;
-        let j = i + 1;
-        while (j < len && depth > 0) {
-          if (pat[j] === '\\') { j += 2; continue; }
-          if (pat[j] === '[') {
-            // skip char class inside group
-            j++;
-            while (j < len) {
-              if (pat[j] === '\\') { j += 2; continue; }
-              if (pat[j] === ']') { j++; break; }
-              j++;
-            }
-            continue;
-          }
-          if (pat[j] === '(') { depth++; }
-          else if (pat[j] === ')') { depth--; }
-          j++;
-        }
-        if (depth !== 0) {
-          // unbalanced; bail conservatively (reject to be safe)
-          return true;
-        }
-        const end = j - 1; // index of ')'
+        const end = skipGroup(i);
+        if (end === -1) return true; // unbalanced; conservative reject
         const inner = pat.slice(i + 1, end);
-        // Check inner for unbounded quantifier (e.g., '+', '*', '{n,}')
         if (_hasUnboundedQuantifierIn(inner)) {
-          // Check for outer unbounded quantifier after the group
+          // look for outer quantifier
           let k = end + 1;
-          // skip whitespace
           while (k < len && /\s/.test(pat[k])) k++;
           if (k < len && (pat[k] === '+' || pat[k] === '*')) return true;
           if (k < len && pat[k] === '{') {
-            // parse brace quantifier similarly to _hasUnboundedQuantifierIn
-            let j2 = k + 1;
-            while (j2 < len && /\s/.test(pat[j2])) j2++;
-            // digits
-            while (j2 < len && /[0-9]/.test(pat[j2])) j2++;
-            while (j2 < len && /\s/.test(pat[j2])) j2++;
-            if (j2 < len && pat[j2] === ',') {
-              j2++;
-              while (j2 < len && /\s/.test(pat[j2])) j2++;
-              if (j2 < len && pat[j2] === '}') return true;
-              // digits after comma -> bounded
-              while (j2 < len && /[0-9]/.test(pat[j2])) j2++;
-              while (j2 < len && /\s/.test(pat[j2])) j2++;
-              if (j2 < len && pat[j2] === '}' && pat.slice(k, j2 + 1).includes(',')) {
-                // outer quantifier is {n,} if no digits after comma
-                // but we've already checked for the immediate '}' case
-                // so do not flag here
-              }
-            }
+            const q = _parseBraceQuantifier(pat, k);
+            if (q.isQuantifier && q.isUnbounded) return true;
           }
         }
         i = end + 1;
