@@ -35,14 +35,14 @@
 # ------------------------------------------------------------------------------
 # - Deterministic and non-interactive execution
 # - Least privilege (contents: read)
-# - Hardened runner via ps-job-setup (canonical bootstrap)
+# - Hardened runner via ps-bootstrap (canonical bootstrap)
 # - SHA-pinned external actions (enforced by Validate-CI itself)
 # - Evidence artifacts always uploaded (best-effort)
 #
 #
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
-# - ./.github/actions/ps-job-setup
+# - ./.github/actions/ps-bootstrap
 # - ./.github/actions/ci-validate
 # - ./.github/actions/ps-upload-artifacts
 # - tools/scripts/branding/print-section.sh (platform)
@@ -230,7 +230,7 @@ jobs:
 
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           # checkout & platform
           fetch_depth: ${{ inputs.fetch_depth }}
@@ -248,7 +248,7 @@ jobs:
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
 
-          # ps-job-setup performs checkout; do not double-checkout.
+          # ps-bootstrap performs checkout; do not double-checkout.
           skip_checkout: "0"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
@@ -258,14 +258,12 @@ jobs:
         run: |
           set -euo pipefail
 
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "ci.platform" "Install platform dependencies" 2>/dev/null || true
+
           if [[ -z "${PS_PLATFORM_ROOT:-}" || ! -d "${PS_PLATFORM_ROOT}" ]]; then
             echo "ERROR: PS_PLATFORM_ROOT not found at '${PS_PLATFORM_ROOT:-<unset>}'" >&2
             exit 1
-          fi
-
-          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
-            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-              "ci.platform" "Install platform dependencies"
           fi
 
           cd "${PS_PLATFORM_ROOT}"

@@ -23,7 +23,7 @@ graph TB
     end
 
     subgraph "Platform Actions"
-        JOB_SETUP[ps-job-setup<br/>Canonical Bootstrap]
+        JOB_SETUP[ps-bootstrap<br/>Canonical Bootstrap]
         CI_VALIDATE[ci-validate<br/>Policy Validation]
         UPLOAD_ARTIFACTS[ps-upload-artifacts<br/>Evidence Collection]
         PS_RUN[ps-run<br/>Script Execution]
@@ -505,7 +505,7 @@ gantt
 ```mermaid
 graph TD
     WORKFLOW[Any Workflow Job]
-    JOB_SETUP[ps-job-setup Action<br/>Single Entry Point]
+    JOB_SETUP[ps-bootstrap Action<br/>Single Entry Point]
     EXECUTE[Execute Job Logic]
     UPLOAD[ps-upload-artifacts<br/>Evidence Collection]
 

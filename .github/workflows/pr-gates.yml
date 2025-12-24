@@ -40,7 +40,7 @@
 # - Deterministic, non-interactive execution
 # - Least privilege at workflow and job level
 # - Validate-CI MUST pass before any gate job executes
-# - Single canonical bootstrap path (ps-job-setup)
+# - Single canonical bootstrap path (ps-bootstrap)
 # - Internal actions are repository-controlled
 # - External actions (if used) must be SHA-pinned
 # - Artifacts and summary are produced best-effort, even on failure
@@ -297,7 +297,7 @@ jobs:
       PS_SKIP_SECRETS_SCAN: "1"
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -346,7 +346,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -395,7 +395,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -465,7 +465,7 @@ jobs:
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -514,7 +514,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -563,7 +563,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -614,7 +614,7 @@ jobs:
       pull-requests: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -656,6 +656,18 @@ jobs:
       contents: read
     continue-on-error: true
     steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap
+        with:
+          skip_checkout: "1"
+          install_dependencies: "0"
+          install_tools: "0"
+          egress_policy: audit
+          fetch_depth: ${{ inputs.fetch_depth }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          home_dir: ".home"
+
       - name: Detect Sonar configuration
         id: sonar_cfg
         run: |
@@ -672,7 +684,7 @@ jobs:
 
       - name: Job setup (PS)
         if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -736,7 +748,7 @@ jobs:
       pull-requests: write
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -797,7 +809,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}

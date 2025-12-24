@@ -40,7 +40,7 @@
 # - Deterministic, non-interactive execution
 # - Least privilege at workflow and job level
 # - Validate-CI MUST pass before any build executes
-# - Single canonical bootstrap path for build (ps-job-setup)
+# - Single canonical bootstrap path for build (ps-bootstrap)
 # - Evidence-first: artifacts + summary best-effort even on failure
 #
 # ==============================================================================
@@ -214,7 +214,7 @@ jobs:
 
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -260,18 +260,16 @@ jobs:
         if: always()
         shell: bash
         run: |
-          set -uo pipefail
+          set -euo pipefail
+
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+            "${PS_BRAND_KEY}" "Build artifacts complete" 2>/dev/null || true
 
           ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
           build_outcome="${{ steps.build.outcome }}"
           upload_outcome="${{ steps.upload.outcome }}"
 
           echo "PS.${PS_WORKFLOW_ID}: completed_at=${ts} build=${build_outcome} upload=${upload_outcome}"
-
-          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
-            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-              "${PS_BRAND_KEY}" "Build artifacts complete"
-          fi
 
           # Provide actionable hints on failure
           if [[ "${build_outcome}" != "success" ]]; then
@@ -309,13 +307,20 @@ jobs:
       contents: read
     timeout-minutes: 10
 
+    # Note: we intentionally checkout the consumer repository here so that
+    # local composite actions under `./.github/actions` (e.g., `ps-write-summary`)
+    # are available. `ps-write-summary` still creates the output directory
+    # (e.g. `reports/summary/`) and writes the summary file.
     steps:
-      - name: Harden runner (audit)
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76 # v2.1.4
-        env:
-          HOME: ${{ runner.temp }}
+      - name: Job setup (Security Only)
+        uses: ./.github/actions/ps-bootstrap
         with:
-          egress-policy: audit
+          skip_checkout: "1"          # Don't pull the source
+          install_dependencies: "0"   # No npm ci
+          install_tools: "0"          # No extra binaries
+          egress_policy: block
+          home_dir: ${{ runner.temp }}
+
 
       - name: Checkout repository
         uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11

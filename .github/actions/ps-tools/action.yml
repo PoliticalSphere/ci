@@ -96,6 +96,19 @@ runs:
         tools_raw="${PS_TOOLS_INPUT:-}"
         if [[ -n "${tools_raw}" ]]; then
           require_nonempty "inputs.tools" "${tools_raw}" || exit 1
+          # Validate explicit tools input: enforce same pattern as extra_tools
+          tools_trimmed="$(printf '%s' "${tools_raw}" | sed 's/^\s*//; s/\s*$//')"
+          while IFS= read -r t; do
+            t_trim="$(printf '%s' "${t}" | sed 's/^\s*//; s/\s*$//')"
+            if [[ -z "${t_trim}" ]]; then
+              continue
+            fi
+            if ! printf '%s' "${t_trim}" | grep -Eq '^[a-z0-9-]+$'; then
+              v_error "invalid tool id in inputs.tools: ${t_trim} (allowed: lowercase letters, digits, hyphen)"
+              exit 1
+            fi
+          done <<< "${tools_trimmed}"
+
           printf 'PS.TOOLS: using explicit tools input\n'
           printf 'PS.TOOLS_INPUT=%q\n' "${tools_raw}" >> "${GITHUB_ENV}"
           exit 0
@@ -106,9 +119,15 @@ runs:
 
         # Extra tools can be empty; when provided ensure each id is lowercase letters, digits or hyphen
         extra_trimmed="$(printf '%s' "${PS_EXTRA_INPUT}" | sed 's/^\s*//; s/\s*$//')"
+
+        # Early exit: if bundle=none and no extras provided, fail fast (saves runner time)
+        if [[ "${PS_BUNDLE_INPUT}" == "none" && -z "${extra_trimmed}" ]]; then
+          v_error "no tools selected (bundle=none and extra_tools empty). If you intended to provide explicit tools, use the 'tools' input."
+          exit 1
+        fi
+
         if [[ -n "${extra_trimmed}" ]]; then
-          mapfile -t extras_arr <<< "${extra_trimmed}"
-          for ex in "${extras_arr[@]}"; do
+          while IFS= read -r ex; do
             ex_trim="$(printf '%s' "${ex}" | sed 's/^\s*//; s/\s*$//')"
             if [[ -z "${ex_trim}" ]]; then
               continue
@@ -117,7 +136,7 @@ runs:
               v_error "invalid tool id in inputs.extra_tools: ${ex_trim} (allowed: lowercase letters, digits, hyphen)"
               exit 1
             fi
-          done
+          done <<< "${extra_trimmed}"
         fi
 
     - name: Assemble tool list
@@ -143,23 +162,18 @@ runs:
           tools_list=$'gitleaks'
         fi
 
-        # Append extra_tools if present (newline-separated)
+        # 3. Append Extras with deduplication
         PS_EXTRA_INPUT_TRIMMED="$(printf '%s' "${PS_EXTRA_INPUT}" | sed 's/^\s*//; s/\s*$//')"
-        if [[ -n "${PS_EXTRA_INPUT_TRIMMED}" ]]; then
-          mapfile -t extras_arr <<< "${PS_EXTRA_INPUT_TRIMMED}"
-          for ex in "${extras_arr[@]}"; do
-            ex_trim="$(printf '%s' "${ex}" | sed 's/^\s*//; s/\s*$//')"
-            if [[ -z "${ex_trim}" ]]; then
-              continue
+        if [[ -n "${PS_EXTRA_INPUT_TRIMMED// }" ]]; then
+          while IFS= read -r tool || [[ -n "${tool:-}" ]]; do
+            tool_trim="$(printf '%s' "${tool}" | xargs)"
+            [[ -z "${tool_trim}" ]] && continue
+
+            # Use grep -F (fixed strings) and -x (exact line) for safety when checking duplicates
+            if ! printf '%s\n' "${tools_list}" | grep -Fxq "${tool_trim}"; then
+              tools_list="${tools_list:+$tools_list$'\n'}${tool_trim}"
             fi
-            # avoid duplicates
-            if ! printf '%s' "${tools_list}" | grep -Fxq "${ex_trim}"; then
-              if [[ -n "${tools_list}" ]]; then
-                tools_list+=$'\n'
-              fi
-              tools_list+="${ex_trim}"
-            fi
-          done
+          done <<< "${PS_EXTRA_INPUT_TRIMMED}"
         fi
 
         if [[ -z "${tools_list}" ]]; then

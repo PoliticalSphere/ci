@@ -161,7 +161,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: 0
           platform_ref: ${{ inputs.platform_ref || 'main' }}
@@ -203,7 +203,7 @@ jobs:
       security-events: write
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: 1
           platform_ref: ${{ inputs.platform_ref || 'main' }}
@@ -246,7 +246,7 @@ jobs:
       security-events: write
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: 1
           platform_ref: ${{ inputs.platform_ref || 'main' }}
@@ -283,7 +283,7 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: 1
           platform_ref: ${{ inputs.platform_ref || 'main' }}

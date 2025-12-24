@@ -238,7 +238,7 @@ jobs:
       PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -262,6 +262,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.plan" "Compute release plan (no mutation)" 2>/dev/null || true
 
           version="${PS_RELEASE_VERSION}"
           if [[ -z "${version}" ]]; then
@@ -347,7 +349,7 @@ jobs:
       PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
@@ -371,6 +373,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
+            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.validate" "Validate release inputs (publish)"
+          fi
+
           version="${PS_RELEASE_VERSION}"
           if [[ -z "${version}" ]]; then
             echo "ERROR: release_version is required" >&2
@@ -391,6 +398,10 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+
+          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
+            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.notes" "Prepare release notes mode"
+          fi
 
           mode="none"
           if [[ -n "${PS_RELEASE_NOTES_INLINE}" ]]; then
@@ -487,7 +498,7 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: 1
           platform_ref: ${{ inputs.platform_ref }}

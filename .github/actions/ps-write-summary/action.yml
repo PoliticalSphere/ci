@@ -106,9 +106,12 @@ runs:
           keys+=("${key}")
           vals+=("${val}")
 
+          # Determine overall status with precedence: failure > skipped > cancelled > success
           if [[ "${val}" == "failure" ]]; then
             overall="failure"
-          elif [[ "${val}" == "cancelled" && "${overall}" != "failure" ]]; then
+          elif [[ "${val}" == "skipped" && "${overall}" != "failure" ]]; then
+            overall="skipped"
+          elif [[ "${val}" == "cancelled" && "${overall}" != "failure" && "${overall}" != "skipped" ]]; then
             overall="cancelled"
           fi
         done <<< "${results_block}"

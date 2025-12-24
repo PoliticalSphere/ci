@@ -340,16 +340,28 @@ function checkJobPermissions({
   return violations;
 }
 
-function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps }) {
+function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps, hardenRunnerActionAllowlist }) {
   const violations = [];
   if (job.steps.length === 0) return violations;
   const first = job.steps[0];
   const uses = first.uses || '';
   const allowlist = Array.isArray(allowedFirstSteps) ? allowedFirstSteps : [];
+  const actionAllowlist = Array.isArray(hardenRunnerActionAllowlist) ? hardenRunnerActionAllowlist : [];
+
+  // Combined allowlist: explicit allowed-first-steps (e.g. ps-bootstrap) and
+  // explicitly permitted harden-runner actions (local paths or repo names).
+  const combinedAllowlist = [...allowlist, ...actionAllowlist];
+
   const isHardenStep = (value) =>
-    allowlist.some((entry) =>
-      entry.endsWith('@') ? value.startsWith(entry) : value === entry,
-    ) || value.startsWith('step-security/harden-runner@');
+    combinedAllowlist.some((entry) => {
+      // If entry is a prefix pattern (ends with @), allow prefix matches
+      if (entry.endsWith('@')) return value.startsWith(entry);
+      // If entry looks like an owner/repo (contains '/' but not a local path),
+      // allow repo@sha references (e.g., step-security/harden-runner@...)
+      if (entry.includes('/') && !entry.startsWith('./')) return value.startsWith(entry + '@') || value === entry;
+      // Otherwise, do an exact match (useful for local paths like './.github/actions/ps-harden-runner')
+      return value === entry;
+    }) || value.startsWith('step-security/harden-runner@');
 
   const isCheckoutStep = (value) => value.startsWith('actions/checkout@');
 
@@ -892,6 +904,7 @@ export async function scanWorkflows({
   validateRemoteAction,
   requireSectionHeaders,
   allowedFirstSteps,
+  hardenRunnerActionAllowlist,
   localActions,
   quiet = false,
 }) {
@@ -939,7 +952,7 @@ export async function scanWorkflows({
         }),
       );
       violations.push(
-        ...checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps }),
+        ...checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps, hardenRunnerActionAllowlist }),
       );
 
       for (const step of job.steps) {

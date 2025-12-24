@@ -112,6 +112,8 @@ const requireSectionHeaders =
   config.rules?.outputs_and_artifacts?.require_section_headers === true;
 const allowedFirstSteps =
   config.rules?.runner_hardening?.allowed_first_steps || [];
+const hardenRunnerActionAllowlist =
+  config.rules?.runner_hardening?.harden_runner_action_allowlist || [];
 const localActions = config.rules?.local_actions || {};
 const scoreFailThreshold =
   typeof config.enforcement?.score_fail_threshold === 'number'
@@ -376,6 +378,7 @@ const workflowViolations = await scanWorkflows({
   validateRemoteAction,
   requireSectionHeaders,
   allowedFirstSteps,
+  hardenRunnerActionAllowlist,
   localActions,
   quiet,
 });

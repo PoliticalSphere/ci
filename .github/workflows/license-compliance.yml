@@ -36,7 +36,7 @@
 # - Deterministic, non-interactive execution
 # - Least privilege at workflow and job level
 # - Validate-CI MUST pass before checks execute
-# - Single canonical bootstrap path (ps-job-setup)
+# - Single canonical bootstrap path (ps-bootstrap)
 # - External actions (if used) must be SHA-pinned
 #
 #
@@ -237,7 +237,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
 
@@ -252,7 +252,7 @@ jobs:
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
 
-          # ps-job-setup should checkout the repo by default.
+          # ps-bootstrap should checkout the repo by default.
           skip_checkout: "0"
 
       - name: License compliance (PS)

@@ -101,42 +101,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Preflight (job setup)
-      shell: bash
-      env:
-        PS_FETCH_DEPTH_INPUT: ${{ inputs.fetch_depth }}
-        PS_EGRESS_POLICY_INPUT: ${{ inputs.egress_policy }}
-        PS_SKIP_PLATFORM_CHECKOUT_INPUT: ${{ inputs.skip_platform_checkout }}
-        PS_PLATFORM_PATH_INPUT: ${{ inputs.platform_path }}
-      run: |
-        set -euo pipefail
-
-        # Normalize inputs
-        if ! printf '%s' "${PS_FETCH_DEPTH_INPUT:-}" | grep -Eq '^[0-9]+$'; then
-          printf 'ERROR: fetch_depth must be a non-negative integer. Got: %s\n' "${PS_FETCH_DEPTH_INPUT:-}" >&2
-          exit 1
-        fi
-
-        egress_lc="$(printf '%s' "${PS_EGRESS_POLICY_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
-        if [[ "${egress_lc}" != "audit" && "${egress_lc}" != "block" ]]; then
-          printf 'ERROR: egress_policy must be one of audit|block. Got: %s\n' "${PS_EGRESS_POLICY_INPUT:-}" >&2
-          exit 1
-        fi
-
-        skip_norm=$(printf '%s' "${PS_SKIP_PLATFORM_CHECKOUT_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)
-        if [[ "${skip_norm}" == "1" || "${skip_norm}" == "true" || "${skip_norm}" == "yes" ]]; then
-          SKIP_PLATFORM=1
-        else
-          SKIP_PLATFORM=0
-        fi
-
-        printf '%q\n' "PS.JOB_SETUP: fetch_depth=%s" "${PS_FETCH_DEPTH_INPUT}"
-        printf '%q\n' "PS.JOB_SETUP: egress_policy=%s" "${egress_lc}"
-        if [[ "${SKIP_PLATFORM}" -eq 1 ]]; then
-          printf '%q\n' "PS.JOB_SETUP: skip_platform_checkout=true"
-        else
-          printf '%q\n' "PS.JOB_SETUP: skip_platform_checkout=false"
-        fi
 
     - name: Harden runner (PS)
       if: ${{ inputs.skip_harden != '1' }}
@@ -176,11 +140,13 @@ runs:
         platform_root: ${{ github.workspace }}/${{ inputs.platform_path }}
         home_dir: ${{ inputs.home_dir }}
 
-    - name: Validate remaining inputs (PS)
+    - name: Bootstrap & Validate (PS)
       shell: bash
       env:
         PS_PLATFORM_ROOT: ${{ env.PS_PLATFORM_ROOT }}
         PS_FETCH_DEPTH_INPUT: ${{ inputs.fetch_depth }}
+        PS_EGRESS_POLICY_INPUT: ${{ inputs.egress_policy }}
+        PS_SKIP_PLATFORM_CHECKOUT_INPUT: ${{ inputs.skip_platform_checkout }}
         PS_SKIP_CHECKOUT_INPUT: ${{ inputs.skip_checkout }}
         PS_CACHE_INPUT: ${{ inputs.cache }}
         PS_INSTALL_DEP_INPUT: ${{ inputs.install_dependencies }}
@@ -189,6 +155,33 @@ runs:
         PS_WORKING_DIR_INPUT: ${{ inputs.working_directory }}
       run: |
         set -euo pipefail
+
+        # Normalize and validate basic inputs
+        if ! printf '%s' "${PS_FETCH_DEPTH_INPUT:-}" | grep -Eq '^[0-9]+$'; then
+          printf 'ERROR: fetch_depth must be a non-negative integer. Got: %s\n' "${PS_FETCH_DEPTH_INPUT:-}" >&2
+          exit 1
+        fi
+
+        egress_lc="$(printf '%s' "${PS_EGRESS_POLICY_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)"
+        if [[ "${egress_lc}" != "audit" && "${egress_lc}" != "block" ]]; then
+          printf 'ERROR: egress_policy must be one of audit|block. Got: %s\n' "${PS_EGRESS_POLICY_INPUT:-}" >&2
+          exit 1
+        fi
+
+        skip_norm=$(printf '%s' "${PS_SKIP_PLATFORM_CHECKOUT_INPUT:-}" | tr '[:upper:]' '[:lower:]' | xargs)
+        if [[ "${skip_norm}" == "1" || "${skip_norm}" == "true" || "${skip_norm}" == "yes" ]]; then
+          SKIP_PLATFORM=1
+        else
+          SKIP_PLATFORM=0
+        fi
+
+        printf '%q\n' "PS.JOB_SETUP: fetch_depth=%s" "${PS_FETCH_DEPTH_INPUT}"
+        printf '%q\n' "PS.JOB_SETUP: egress_policy=%s" "${egress_lc}"
+        if [[ "${SKIP_PLATFORM}" -eq 1 ]]; then
+          printf '%q\n' "PS.JOB_SETUP: skip_platform_checkout=true"
+        else
+          printf '%q\n' "PS.JOB_SETUP: skip_platform_checkout=false"
+        fi
 
         # Validate working directory (repo-relative, not absolute, no traversal)
         wd="${PS_WORKING_DIR_INPUT:-}"
@@ -357,6 +350,7 @@ runs:
       with:
         node-version: ${{ env.PS_NODE_VERSION_VALIDATED }}
         cache: npm
+        cache-dependency-path: ${{ env.PS_WORKSPACE_ROOT }}/${{ env.PS_WORKING_DIRECTORY }}/package-lock.json
 
     - name: Setup Node (no cache)
       if: ${{ inputs.cache != '1' }}
@@ -369,7 +363,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        cd "${PS_WORKSPACE_ROOT}/${PS_WORKING_DIRECTORY}"
+
+        target_dir="${PS_WORKSPACE_ROOT}/${PS_WORKING_DIRECTORY}"
+        if [[ ! -d "${target_dir}" ]]; then
+          printf 'ERROR: working directory not found: %s\n' "${target_dir}" >&2
+          printf 'HINT: ensure the repository was checked out and inputs.working_directory is correct.\n' >&2
+          exit 1
+        fi
+
+        cd "${target_dir}" || { printf 'ERROR: failed to cd into %s\n' "${target_dir}" >&2; exit 1; }
         npm ci --no-audit --no-fund
         printf 'PS.NODE_SETUP: OK\n'
 
@@ -394,14 +396,8 @@ runs:
       run: |
         set -euo pipefail
 
-        validate_sh="${PS_PLATFORM_ROOT}/tools/scripts/branding/validate-inputs.sh"
-        if [[ ! -f "${validate_sh}" ]]; then
-          printf 'ERROR: validate-inputs.sh not found at %s; cannot validate tools.\n' "${validate_sh}" >&2
-          exit 1
-        fi
-
         # shellcheck source=/dev/null
-        . "${validate_sh}"
+        . "${PS_PLATFORM_ROOT}/tools/scripts/branding/validate-inputs.sh"
 
         require_enum "inputs.tools_bundle" "${PS_TOOLS_BUNDLE_INPUT}" "lint" "security" "none" || exit 1
 
@@ -414,8 +410,9 @@ runs:
 
         PS_TOOLS_EXTRA_INPUT_TRIMMED="$(printf '%s' "${PS_TOOLS_EXTRA_INPUT}" | sed 's/^\s*//; s/\s*$//')"
         if [[ -n "${PS_TOOLS_EXTRA_INPUT_TRIMMED}" ]]; then
-          mapfile -t extras_arr <<< "${PS_TOOLS_EXTRA_INPUT_TRIMMED}"
-          for ex in "${extras_arr[@]}"; do
+          OLD_IFS="$IFS"
+          IFS=$'\n'
+          for ex in ${PS_TOOLS_EXTRA_INPUT_TRIMMED}; do
             ex_trim="$(printf '%s' "${ex}" | sed 's/^\s*//; s/\s*$//')"
             if [[ -z "${ex_trim}" ]]; then
               continue
@@ -431,6 +428,7 @@ runs:
               tools_list+="${ex_trim}"
             fi
           done
+          IFS="${OLD_IFS}"
         fi
 
         if [[ -z "${tools_list}" ]]; then
@@ -450,4 +448,4 @@ runs:
     - name: Setup complete
       shell: bash
       run: |
-        printf 'PS.JOB_SETUP: OK\n'
+        printf 'PS.BOOTSTRAP: OK\n'

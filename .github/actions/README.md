@@ -87,13 +87,13 @@ Baseline building blocks:
 Node toolchain:
 
 
-- `ps-job-setup`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, bootstraps the platform, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools (node setup merged into this action).
+- `ps-bootstrap`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools (node setup merged into this action).
 
-Example: use `ps-job-setup` to run lint with installs/tools:
+Example: use `ps-bootstrap` to run lint with installs/tools:
 
 ```yaml
 - name: Job setup (PS)
-  uses: ./.github/actions/ps-job-setup
+  uses: ./.github/actions/ps-bootstrap
   with:
     node_version: ${{ inputs.node_version }}
     fetch_depth: ${{ inputs.fetch_depth }}
@@ -104,6 +104,19 @@ Example: use `ps-job-setup` to run lint with installs/tools:
     skip_checkout: "1"
     skip_harden: "1"
 ```
+
+Security-only bootstrap example:
+
+```yaml
+- name: Job setup (Security Only)
+  uses: ./.github/actions/ps-bootstrap
+  with:
+    skip_checkout: "1"          # Don't pull the consumer repo
+    install_dependencies: "0"   # No npm ci
+    install_tools: "0"          # No extra binaries
+    egress_policy: block         # Still perform hardening
+```
+
 
 Lint + quality:
 

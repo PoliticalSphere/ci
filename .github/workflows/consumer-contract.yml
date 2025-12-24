@@ -157,7 +157,7 @@ jobs:
           fetch-depth: ${{ inputs.fetch_depth }}
 
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-job-setup
+        uses: ./.github/actions/ps-bootstrap
         with:
           # We already hardened the runner above; skip internal hardening and checkout
           node_version: ${{ inputs.node_version }}

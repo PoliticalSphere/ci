@@ -19,7 +19,8 @@ try {
   };
 
   // Ensure no previous header files remain
-  execFileSync('bash', ['-lc', `rm -f ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* || true`]);
+  // Remove any previous per-run markers used by different versions of the helper to avoid flakes
+  execFileSync('bash', ['-lc', `rm -rf ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* ${repoRoot}/logs/lint/.summary_printed_${env.GITHUB_RUN_ID}* || true`]);
 
   // Run the helper twice in separate shells to simulate separate steps
   const cmd = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary`;

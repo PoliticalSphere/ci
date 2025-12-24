@@ -25,7 +25,7 @@ set -euo pipefail
 #   - Invoke repository-defined `npm run build` in a hardened, non-interactive way
 #
 # DOES NOT:
-#   - Install dependencies (handled by ps-job-setup)
+#   - Install dependencies (handled by ps-bootstrap)
 #   - Run tests or quality gates
 #
 # DESIGN PRINCIPLES
