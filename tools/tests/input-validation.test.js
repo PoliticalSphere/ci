@@ -34,4 +34,17 @@ if (r.status === 0 && r.stdout.includes('OK')) {
   fail('require_number accepted non-number');
 }
 
+
+// 4) explicit tools input must validate tool ids (lowercase letters, digits and hyphen)
+let r2 = runShell("source tools/scripts/branding/validate-inputs.sh; tools_raw='badTool!'; tools_trimmed=\"$(printf '%s' \"$tools_raw\" | sed 's/^\\s*//; s/\\s*$//')\"; while IFS= read -r t; do t_trim=\"$(printf '%s' \"$t\" | sed 's/^\\s*//; s/\\s*$//')\"; if [[ -z \"$t_trim\" ]]; then continue; fi; if ! printf '%s' \"$t_trim\" | grep -Eq '^[a-z0-9-]+$'; then v_error \"invalid tool id in inputs.tools: $t_trim (allowed: lowercase letters, digits, hyphen)\"; exit 1; fi; done <<< \"$tools_trimmed\"; echo OK")
+if (r2.status === 0 && r2.stdout.includes('OK')) {
+  fail('explicit inputs.tools allowed invalid tool id');
+}
+
+// 5) bundle=none + extra_tools empty should error early
+let r3 = runShell("source tools/scripts/branding/validate-inputs.sh; PS_BUNDLE_INPUT=none; extra_trimmed=''; if [[ \"${PS_BUNDLE_INPUT}\" == \"none\" && -z \"${extra_trimmed}\" ]]; then v_error \"no tools selected (bundle=none and extra_tools empty). If you intended to provide explicit tools, use the 'tools' input.\"; exit 1; fi; echo OK")
+if (r3.status === 0 && r3.stdout.includes('OK')) {
+  fail('bundle=none + extra_tools empty did not error');
+}
+
 process.exit(0);
