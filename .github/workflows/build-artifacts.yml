@@ -259,6 +259,10 @@ jobs:
       - name: Build artifacts complete
         if: always()
         shell: bash
+        env:
+          BUILD_SCRIPT: ${{ inputs.build_script }}
+          ARTIFACT_PATHS: ${{ inputs.artifact_paths }}
+          RETENTION_DAYS: ${{ inputs.retention_days }}
         run: |
           set -euo pipefail
 
@@ -274,14 +278,15 @@ jobs:
           # Provide actionable hints on failure
           if [[ "${build_outcome}" != "success" ]]; then
             echo "ERROR: Build step failed (outcome=${build_outcome}). See logs for step 'Build (PS)'."
-            echo "Tip: review the 'Build (PS)' step logs and check the build script at: ${{ inputs.build_script }}"
+            # Do not interpolate raw user input in the run block; use pre-bound env vars
+            echo "Tip: review the 'Build (PS)' step logs and check the build script at: ${BUILD_SCRIPT}"
           fi
 
           if [[ "${upload_outcome}" != "success" ]]; then
             echo "WARN: Artifact upload did not succeed (outcome=${upload_outcome})."
             echo "Tip: confirm the artifact paths and that files exist:"
-            echo "  paths: ${{ inputs.artifact_paths }}"
-            echo "  retention_days: ${{ inputs.retention_days }}"
+            echo "  paths: ${ARTIFACT_PATHS}"
+            echo "  retention_days: ${RETENTION_DAYS}"
           fi
 
           # Final status line for easy machine parsing
