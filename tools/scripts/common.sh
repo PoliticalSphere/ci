@@ -15,7 +15,9 @@ set -euo pipefail
 #   - retry helper for transient failures
 #
 # Contract:
-#   - Exports / sets: REPO_ROOT (canonical); legacy variable $repo_root is also set for compatibility
+#   - EXPORTED: REPO_ROOT (canonical); legacy shell variable $repo_root is also set for
+#     backwards compatibility but is intentionally **not exported** as an environment
+#     variable to encourage use of the ALL_CAPS exported name.
 # ==============================================================================
 
 REPO_ROOT=""
@@ -46,9 +48,8 @@ set_repo_root() {
 
   [[ -n "${root}" ]] || root="$(pwd)"
   REPO_ROOT="$(_ps_realpath_dir "${root}")"
-  repo_root="$REPO_ROOT"  # legacy name kept for compatibility
+  repo_root="$REPO_ROOT"  # legacy name kept for compatibility (NOT exported)
   export REPO_ROOT
-  export repo_root
   return 0
 }
 
