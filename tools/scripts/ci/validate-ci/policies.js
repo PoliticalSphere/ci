@@ -110,7 +110,7 @@ export function permissionLevel(value) {
 function parseRepoEntry(line) {
   // Match owner/repo where allowed characters include letters, digits, underscore,
   // dot, space and hyphen. Use a simpler character class to reduce regex complexity.
-  const repoMatch = line.match(/^[\s]*-[\s]*repo:[\s]*([\w .-]+\/[\w .-]+)/);
+  const repoMatch = line.match(/^\s*-\s*repo:\s*([\w .-]+\/[\w .-]+)/);
   return repoMatch ? repoMatch[1] : null;
 }
 
