@@ -86,8 +86,7 @@ Baseline building blocks:
 Node toolchain:
 
 
-- `ps-job-setup`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, bootstraps the platform, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools.
-- `ps-node-setup`: checkout + setup Node.js toolchain with optional deterministic installs (cache, npm ci)
+- `ps-job-setup`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, bootstraps the platform, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools (node setup merged into this action).
 
 Example: use `ps-job-setup` to run lint with installs/tools:
 

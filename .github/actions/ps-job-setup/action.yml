@@ -266,15 +266,123 @@ runs:
           printf 'PS.JOB_SETUP: node_version=%s fetch_depth=%s ref=%s cache=%s install_dependencies=%s install_tools=%s tools_bundle=%s working_directory=%s\n' "${PS_NODE_VERSION}" "${PS_FETCH_DEPTH}" "${PS_REF_INPUT:-<default>}" "${PS_CACHE}" "${PS_INSTALL_DEPS}" "${PS_INSTALL_TOOLS}" "${PS_TOOLS_BUNDLE}" "${PS_WORKING_DIR}"
         fi
 
-    - name: Node setup (PS)
-      uses: ./.github/actions/ps-node-setup
+    - name: Resolve node & workspace roots (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
+
+        if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
+          scripts_root="${platform_root}"
+          printf 'PS.NODE_SETUP: scripts_root=PS_PLATFORM_ROOT (%s)\n' "${scripts_root}"
+        else
+          scripts_root="${workspace_root}"
+          printf 'PS.NODE_SETUP: scripts_root=GITHUB_WORKSPACE (%s)\n' "${scripts_root}"
+        fi
+
+        printf 'PS_SCRIPTS_ROOT=%s\n' "${scripts_root}" >> "${GITHUB_ENV}"
+        printf 'PS_WORKSPACE_ROOT=%s\n' "${workspace_root}" >> "${GITHUB_ENV}"
+
+    - name: Validate Node inputs (PS)
+      shell: bash
+      env:
+        PS_NODE_VERSION_INPUT: ${{ inputs.node_version }}
+        PS_CACHE_INPUT: ${{ inputs.cache }}
+        PS_INSTALL_DEP_INPUT: ${{ inputs.install_dependencies }}
+        PS_WORKING_DIR_INPUT: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
+        workspace_root="${PS_WORKSPACE_ROOT:?PS_WORKSPACE_ROOT not set}"
+
+        validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
+          echo "HINT: ensure PS_PLATFORM_ROOT points at the platform checkout, or vendor scripts into the repo." >&2
+          exit 1
+        fi
+        # shellcheck source=/dev/null
+        . "${validate_sh}"
+
+        # Validate inputs early
+        if ! require_number "inputs.node_version" "${PS_NODE_VERSION_INPUT}"; then
+          printf "ERROR: inputs.node_version must be a number (major version). Got '%s'.\n" "${PS_NODE_VERSION_INPUT}" >&2
+          exit 1
+        fi
+        require_enum "inputs.cache" "${PS_CACHE_INPUT}" "1" "0" || exit 1
+        require_enum "inputs.install_dependencies" "${PS_INSTALL_DEP_INPUT}" "1" "0" || exit 1
+
+        # Validate working_directory (repo-relative)
+        wd="${PS_WORKING_DIR_INPUT:-}"
+        if [[ -z "${wd}" ]]; then
+          wd='.'
+        fi
+        if [[ "${wd}" == /* ]]; then
+          printf 'ERROR: inputs.working_directory must be repo-relative (must not start with /)\n' >&2
+          exit 1
+        fi
+        if [[ "${wd}" == *".."* ]]; then
+          printf 'ERROR: inputs.working_directory must not contain .. path traversal\n' >&2
+          exit 1
+        fi
+
+        if [[ "${PS_INSTALL_DEP_INPUT}" == "1" ]]; then
+          if [[ ! -f "${workspace_root}/${wd}/package.json" ]]; then
+            printf 'ERROR: package.json not found at %s\n' "${workspace_root}/${wd}/package.json" >&2
+            printf 'HINT: ensure checkout ran and the package.json exists at the working directory.\n' >&2
+            exit 1
+          fi
+
+          if [[ ! -f "${workspace_root}/${wd}/package-lock.json" ]]; then
+            printf 'ERROR: package-lock.json not found (npm ci requires a lockfile for determinism).\n' >&2
+            printf 'HINT: commit package-lock.json or set install_dependencies=0 (and handle installs elsewhere).\n' >&2
+            exit 1
+          fi
+        fi
+
+        # Persist validated node version and working dir for downstream steps
+        printf 'PS_NODE_VERSION_VALIDATED=%s\n' "${PS_NODE_VERSION_INPUT}" >> "${GITHUB_ENV}"
+        printf 'PS_WORKING_DIRECTORY=%s\n' "${wd}" >> "${GITHUB_ENV}"
+
+        printf 'PS.NODE_SETUP: node_version=%q\n' "${PS_NODE_VERSION_INPUT}"
+        printf 'PS.NODE_SETUP: cache=%q\n' "${PS_CACHE_INPUT}"
+        printf 'PS.NODE_SETUP: install_dependencies=%q\n' "${PS_INSTALL_DEP_INPUT}"
+
+    - name: Setup Node (cached)
+      if: ${{ inputs.cache == '1' }}
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
       with:
-        node_version: ${{ inputs.node_version }}
-        ref: ${{ inputs.ref }}
-        fetch_depth: ${{ inputs.fetch_depth }}
-        skip_checkout: ${{ inputs.skip_checkout }}
-        cache: ${{ inputs.cache }}
-        install_dependencies: ${{ inputs.install_dependencies }}
+        node-version: ${{ env.PS_NODE_VERSION_VALIDATED }}
+        cache: npm
+
+    - name: Setup Node (no cache)
+      if: ${{ inputs.cache != '1' }}
+      uses: actions/setup-node@395ad3262231945c25e8478fd5baf05154b1d79f # v6.1.0
+      with:
+        node-version: ${{ env.PS_NODE_VERSION_VALIDATED }}
+
+    - name: Install dependencies (npm ci)
+      if: ${{ inputs.install_dependencies == '1' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        cd "${PS_WORKSPACE_ROOT}/${PS_WORKING_DIRECTORY}"
+        npm ci --no-audit --no-fund
+        printf 'PS.NODE_SETUP: OK\n'
+
+    - name: Node setup (no install)
+      if: ${{ inputs.install_dependencies != '1' }}
+      shell: bash
+      run: |
+        echo "PS.NODE_SETUP: OK (install skipped)"
+
+    - name: Node setup complete
+      shell: bash
+      run: |
+        echo "PS.NODE_SETUP: OK"
 
     - name: Prepare tools list (PS)
       if: ${{ inputs.install_tools == '1' }}

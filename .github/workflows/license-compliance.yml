@@ -151,7 +151,7 @@ jobs:
       contents: read
     timeout-minutes: 15
     steps:
-      - name: Job bootstrap (PS)
+      - name: Job setup (PS)
         uses: ./.github/actions/ps-job-setup
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
@@ -161,9 +161,6 @@ jobs:
           egress_policy: audit
           skip_platform_checkout: "false"
 
-      - name: Node runtime (PS)
-        uses: ./.github/actions/ps-node-setup
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
