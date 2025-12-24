@@ -50,6 +50,12 @@ name: Consumer Contract
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # Runtime & Environment Configuration
+    # --------------------------------------------------------------------------
+    # Controls runner selection, Node version, checkout depth, and caching
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
@@ -65,7 +71,7 @@ on:
 
       fetch_depth:
         description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
-        type: string
+        type: number
         required: false
         default: "1"
 

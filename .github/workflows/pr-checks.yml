@@ -1,46 +1,160 @@
 # ==============================================================================
-# Political Sphere — PR Checks (caller for PR Gates)
+# Political Sphere — PR Checks (Caller for PR Gates + License Compliance)
+# ==============================================================================
+#
+# PURPOSE
 # ------------------------------------------------------------------------------
-# Purpose:
-#   Trigger the reusable PR Gates workflow for pull requests in this repository so
-#   the full gate (lint / typecheck / tests / duplication / build) runs.
+# Provide a single, repo-local entrypoint that triggers Political Sphere’s
+# reusable CI gates on every pull request.
+#
+# This workflow exists because reusable workflows (`on: workflow_call`) do not
+# execute on their own. A caller workflow is required to bind repository events
+# (pull_request) to the reusable workflows (PR Gates, License Compliance).
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke the reusable PR Gates workflow for PR validation.
+#   - Invoke the reusable License Compliance workflow for OSS policy enforcement.
+#   - Pass PR context (number + base/head SHAs) to enable PR-scoped checks.
+#   - Apply least-privilege permissions and prevent unsafe PR comments on forks.
+#
+# DOES NOT:
+#   - Implement lint/test/build logic directly (delegated to reusable workflows).
+#   - Modify repository contents, deploy, publish, or release.
+#   - Attempt write operations on forked PRs (comments are disabled by default).
+#
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Least privilege by default; elevate per-job only when required
+# - Reuse platform workflows (single canonical source of truth)
+# - Fork-safe: avoid comment writes and secret use on untrusted PR contexts
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: pull_request
+# - Calls:
+#     - ./.github/workflows/pr-gates.yml
+#     - ./.github/workflows/license-compliance.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Default permissions are read-only.
+# - PR commenting requires `pull-requests: write` on the calling job.
+# - Secrets are NOT assumed. If required, prefer explicit pass-through or
+#   `secrets: inherit` only when you intentionally support it.
+#
+#
+# OPERATIONAL NOTES
+# ------------------------------------------------------------------------------
+# - Concurrency prevents redundant parallel runs per PR.
+# - License compliance is configured to always run (even if PR Gates fails),
+#   so you get a complete compliance picture per PR.
+#
 # ==============================================================================
 
 name: PR Checks
 
+# ==============================================================================
+# TRIGGER
+# ------------------------------------------------------------------------------
+# Run on key PR lifecycle events that affect code or CI signal.
+# - opened/reopened: initial gate execution
+# - synchronize: new commits pushed to the PR branch
+# ==============================================================================
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, reopened, synchronize]
 
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ------------------------------------------------------------------------------
+# Escalate only at job level when a called workflow needs it.
+# ==============================================================================
 permissions:
   contents: read
-  pull-requests: read
-  issues: write  # required by nested jobs in pr-gates.yml (dependency-review, notify)
+
+# ==============================================================================
+# CONCURRENCY CONTROL
+# ------------------------------------------------------------------------------
+# One run per PR; cancel older runs when new commits arrive.
+# ==============================================================================
+concurrency:
+  group: pr-checks-${{ github.repository }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
+  # ============================================================================
+  # QUALITY + POLICY GATES — PR GATES (REUSABLE)
+  # ----------------------------------------------------------------------------
+  # Purpose:
+  #   Run the full PR gate suite (Validate-CI, lint, typecheck, tests, etc.).
+  #
+  # Notes:
+  #   - PR number + base/head SHAs enable PR-scoped checks (diff-based tools,
+  #     dependency review, targeted validation).
+  #   - Commenting is disabled on forks by default for safety.
+  # ============================================================================
   pr-gates:
+    name: PR Gates
     uses: ./.github/workflows/pr-gates.yml
     with:
       pr_number: ${{ github.event.pull_request.number }}
       pr_is_fork: ${{ github.event.pull_request.head.repo.fork && 'true' || 'false' }}
       pr_base_ref: ${{ github.event.pull_request.base.sha }}
       pr_head_ref: ${{ github.event.pull_request.head.sha }}
-      # default node version can be overridden by callers
-      node_version: '22'
-      allow_pr_comments: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
-    permissions:
-      contents: read
-      pull-requests: read
-      issues: write
 
-  license-compliance:
-    uses: ./.github/workflows/license-compliance.yml
-    needs: [pr-gates]
-    if: ${{ always() }}
+      # Project defaults (caller may pin or override for this repository)
+      node_version: "22"
+
+      # Disable PR comments for forks (untrusted context)
+      allow_pr_comments: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
+
+    # Job-level permissions: only grant what pr-gates may require downstream.
+    # - contents: read is required for checkout and reads.
+    # - pull-requests: write is required only if notify/comments are enabled.
     permissions:
       contents: read
+      pull-requests: write
+
+    # Optional: enable only if your called workflows intentionally use secrets.
+    # If you do NOT want any secret propagation, remove this block.
+    secrets: inherit
+
+  # ============================================================================
+  # POLICY ENFORCEMENT — LICENSE COMPLIANCE (REUSABLE)
+  # ----------------------------------------------------------------------------
+  # Purpose:
+  #   Enforce OSS license policy using lockfile + platform policy rules.
+  #
+  # Execution:
+  #   - Runs regardless of PR Gates outcome to provide full compliance evidence.
+  #
+  # Optional sequencing:
+  #   - If you want license checks to run only after PR Gates completes,
+  #     uncomment `needs: [pr-gates]`.
+  # ============================================================================
+  license-compliance:
+    name: License Compliance
+    uses: ./.github/workflows/license-compliance.yml
+    if: ${{ always() }}
+
+    # Uncomment to strictly sequence after PR Gates (slower but ordered).
+    # needs: [pr-gates]
+
+    permissions:
+      contents: read
+
     with:
       runner: ubuntu-22.04
-      node_version: '22'
-      fetch_depth: '1'
-      platform_ref: 'main'
+      node_version: "22"
+      fetch_depth: 1
+      platform_ref: "main"
+
+    # Optional: enable only if license workflow needs secrets (e.g. private npm).
+    secrets: inherit

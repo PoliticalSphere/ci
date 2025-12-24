@@ -1,49 +1,70 @@
 # ==============================================================================
 # Political Sphere — Reusable Workflow: Validate CI
+# ==============================================================================
+#
+# PURPOSE
 # ------------------------------------------------------------------------------
-# Purpose:
-#   Run the Validate-CI policy gate and publish evidence artifacts.
+# Enforce CI policy compliance (Validate-CI) and publish evidence artifacts.
+# This workflow is designed to run FIRST in calling workflows as a policy gate.
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
 #
-# Scope & Responsibilities:
-#   - Does: enforce CI policy rules and upload validation logs.
-#   - Does NOT: run linting, tests, builds, or deep security scans.
+# METADATA
+# ------------------------------------------------------------------------------
+# Owner:        political-sphere
+# Created:      2025-12-20
+# Last updated: 2025-12-24
+# Classification: internal
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Least privilege with explicit permissions
-#   - SHA-pinned actions only
-#   - Hardened runner as the first step
 #
-# Dependencies:
-#   - ./.github/actions/ps-job-setup
-#   - ./.github/actions/ci-validate
-#   - ./.github/actions/ps-upload-artifacts
-#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-#   - tools/scripts/branding/print-section.sh
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Checkout target repository + platform repository (for shared scripts/config)
+#   - Optionally install dependencies in the target repo (for validation tooling)
+#   - Optionally install dependencies in the platform repo (for platform tooling)
+#   - Execute the Validate-CI policy gate
+#   - Upload reports/logs as CI evidence
 #
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#   - ./.github/workflows/build-artifacts.yml
-#   - ./.github/workflows/security-scheduled.yml
-#   - ./.github/workflows/release.yml
+# DOES NOT:
+#   - Run lint/typecheck/tests/build
+#   - Perform deep security scans (handled elsewhere)
+#   - Write to the repository or publish artifacts externally
 #
-# Execution Model:
-#   - Trigger: workflow_call
-#   - Reusable workflow (internal platform building block)
 #
-# Security & Policy Notes:
-#   - Secrets: optional NODE_AUTH_TOKEN for npm installs only
-#   - Permissions: contents: read (workflow + job)
-#   - Constraints: must run before any other jobs in calling workflows
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic and non-interactive execution
+# - Least privilege (contents: read)
+# - Hardened runner via ps-job-setup (canonical bootstrap)
+# - SHA-pinned external actions (enforced by Validate-CI itself)
+# - Evidence artifacts always uploaded (best-effort)
 #
-# Operational Notes:
-#   - Timeouts: defined here (reusable callers cannot set them)
-#   - Artifacts: reports/** and logs/** uploaded by ps-upload-artifacts
-#   - CI vs local: Validate-CI script handles bootstrap mode locally
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-job-setup
+# - ./.github/actions/ci-validate
+# - ./.github/actions/ps-upload-artifacts
+# - tools/scripts/branding/print-section.sh (platform)
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call
+# - Reusable workflow (internal platform building block)
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Secrets: optional NODE_AUTH_TOKEN (npm installs only)
+# - Permissions: contents: read
+# - PR diff mode supported via pr_only + base/head SHAs
+#
+#
+# OPERATIONAL NOTES
+# ------------------------------------------------------------------------------
+# - Timeout: 10 minutes (policy gate should stay fast)
+# - Artifacts: reports/**, logs/** uploaded under artifact_name
 # ==============================================================================
 
 name: Validate CI
@@ -51,110 +72,162 @@ name: Validate CI
 on:
   workflow_call:
     inputs:
+      # ==========================================================================
+      # RUNTIME & ENVIRONMENT
+      # ==========================================================================
       runner:
         description: "Runner label"
+        type: string
         required: false
         default: "ubuntu-22.04"
-        type: string
+
       node_version:
         description: "Node.js major version"
+        type: string
         required: false
         default: "22"
-        type: string
+
       fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
         required: false
         default: 1
-        type: number
+
       cache:
         description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
         required: false
         default: "1"
-        type: string
-      install_dependencies:
-        description: "Install dependencies in the target repo (1 = on, 0 = off)"
-        required: false
-        default: "0"
-        type: string
+
+      # ==========================================================================
+      # CHECKOUT TARGET
+      # ==========================================================================
       checkout_ref:
-        description: "Optional git ref to validate"
+        description: "Optional git ref to validate (branch, tag, or SHA)"
+        type: string
         required: false
         default: ""
-        type: string
+
+      # ==========================================================================
+      # PLATFORM VERSIONING
+      # ==========================================================================
       platform_ref:
         description: "Platform repo ref to checkout for shared scripts/configs"
+        type: string
         required: false
         default: "main"
+
+      # ==========================================================================
+      # DEPENDENCY INSTALLATION CONTROLS
+      # ==========================================================================
+      install_dependencies:
+        description: "Install dependencies in the target repo (1 = on, 0 = off)"
         type: string
-      install_platform_dependencies:
-        description: "Install dependencies in the platform repo (1 = on, 0 = off)"
-        required: false
-        default: "1"
-        type: string
-      verify_remote_shas:
-        description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
-        required: false
-        default: "1"
-        type: string
-      pr_only:
-        description: "Validate only workflows/actions changed in the PR (1 = on, 0 = off)"
         required: false
         default: "0"
+
+      install_platform_dependencies:
+        description: "Install dependencies in the platform repo (1 = on, 0 = off)"
         type: string
+        required: false
+        default: "1"
+
+      # ==========================================================================
+      # VALIDATION BEHAVIOUR
+      # ==========================================================================
+      verify_remote_shas:
+        description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
+      pr_only:
+        description: "Validate only workflows/actions changed in the PR (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "0"
+
       pr_base_ref:
         description: "PR base SHA for diff-based validation"
+        type: string
         required: false
         default: ""
-        type: string
+
       pr_head_ref:
         description: "PR head SHA for diff-based validation"
+        type: string
         required: false
         default: ""
-        type: string
+
+      # ==========================================================================
+      # ARTIFACTS
+      # ==========================================================================
       artifact_name:
         description: "Artifact name for validate-ci outputs"
+        type: string
         required: false
         default: "validate-ci"
-        type: string
+
       retention_days:
         description: "Artifact retention in days"
+        type: number
         required: false
         default: 7
-        type: number
+
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
         required: false
 
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
 permissions:
   contents: read
 
+# ==============================================================================
+# CONCURRENCY
+# ------------------------------------------------------------------------------
+# One validate-ci run per ref at a time (prevents duplicate policy gate work).
+# ==============================================================================
 concurrency:
-  group: validate-ci-${{ github.workflow }}-${{ github.ref }}
+  group: validate-ci-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
 
+# ==============================================================================
+# GLOBAL DEFAULTS
+# ==============================================================================
 defaults:
   run:
     shell: bash
 
+# ==============================================================================
+# GLOBAL ENVIRONMENT
+# ==============================================================================
 env:
   CI: "1"
   PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
 jobs:
+  # ============================================================================
+  # POLICY GATE — VALIDATE CI
+  # ----------------------------------------------------------------------------
+  # Blocking:
+  #   Yes (callers should depend on this before running any other jobs)
+  # ============================================================================
   validate-ci:
     name: Validate CI policy
     runs-on: ${{ inputs.runner }}
+    timeout-minutes: 10
     permissions:
       contents: read
-    # Ensure HOME points to a writable directory for actions that rely on it.
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
       PS_VALIDATE_CI_PR_ONLY: ${{ inputs.pr_only }}
       PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
-    timeout-minutes: 10
+
     steps:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-job-setup
@@ -163,8 +236,8 @@ jobs:
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ inputs.checkout_ref }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: .ps-platform
-          skip_platform_checkout: "false"
+          platform_path: ".ps-platform"
+          skip_platform_checkout: "0"
 
           # HOME and harden
           home_dir: ".home"
@@ -172,31 +245,36 @@ jobs:
 
           # node/toolchain
           node_version: ${{ inputs.node_version }}
-          ref: ${{ inputs.checkout_ref }}
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
-          skip_checkout: "1"
+
+          # ps-job-setup performs checkout; do not double-checkout.
+          skip_checkout: "0"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Install platform dependencies
         if: ${{ inputs.install_platform_dependencies == '1' }}
-        shell: bash
         run: |
           set -euo pipefail
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "ci.platform" "Install platform dependencies"
-          if [[ ! -d "${PS_PLATFORM_ROOT}" ]]; then
-            echo "ERROR: PS_PLATFORM_ROOT not found at ${PS_PLATFORM_ROOT}" >&2
+
+          if [[ -z "${PS_PLATFORM_ROOT:-}" || ! -d "${PS_PLATFORM_ROOT}" ]]; then
+            echo "ERROR: PS_PLATFORM_ROOT not found at '${PS_PLATFORM_ROOT:-<unset>}'" >&2
             exit 1
           fi
+
+          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
+            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+              "ci.platform" "Install platform dependencies"
+          fi
+
           cd "${PS_PLATFORM_ROOT}"
           npm ci --no-audit --no-fund
 
-      - name: Validate CI
+      - name: Validate CI (policy)
         uses: ./.github/actions/ci-validate
 
-      - name: Upload artifacts
+      - name: Upload evidence artifacts (PS)
         if: always()
         uses: ./.github/actions/ps-upload-artifacts
         with:
@@ -209,9 +287,10 @@ jobs:
 
       - name: Validate CI complete
         if: always()
-        shell: bash
         run: |
           set -euo pipefail
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "ci.validate" "Validate-CI complete"
+          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
+            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+              "ci.validate" "Validate-CI complete"
+          fi
           echo "PS.VALIDATE_CI: OK"

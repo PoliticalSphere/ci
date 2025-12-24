@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import fs from 'node:fs';
-import { strict as assert } from 'node:assert';
-import { getRepoRoot, fail } from './test-utils.js';
+import { fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
@@ -11,12 +10,20 @@ try {
     fail('ps-lint-tools should be removed; use ps-tools with bundle=lint');
   }
   if (fs.existsSync(`${repoRoot}/.github/actions/ps-security-tools`)) {
-    fail('ps-security-tools should be removed; use ps-tools with bundle=security');
+    fail(
+      'ps-security-tools should be removed; use ps-tools with bundle=security',
+    );
   }
 
   // Ensure ps-tools supports the expected bundle inputs
-  const yml = fs.readFileSync(`${repoRoot}/.github/actions/ps-tools/action.yml`, 'utf8');
-  if (!/bundle:\s*"?lint"?/.test(yml) || !/bundle:\s*"?security"?/.test(yml) && !/bundle:/.test(yml)) {
+  const yml = fs.readFileSync(
+    `${repoRoot}/.github/actions/ps-tools/action.yml`,
+    'utf8',
+  );
+  if (
+    !/bundle:\s*"?lint"?/.test(yml) ||
+    (!/bundle:\s*"?security"?/.test(yml) && !/bundle:/.test(yml))
+  ) {
     fail('ps-tools does not declare expected bundle input (lint|security)');
   }
 

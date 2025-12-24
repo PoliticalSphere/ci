@@ -1,0 +1,67 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Validate Paths
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Validate repo-relative path inputs (working-directory, script) for workflows
+#   and actions. This is intentionally small, dependency-free, and easy to
+#   audit; it is intended to be used early (workflow boundary) and re-used.
+#
+# Design principles:
+#  - Deterministic, non-interactive shell checks
+#  - Explicit error messages and exit codes
+#  - Minimal surface; no external dependencies
+# ==============================================================================
+
+name: "Validate Paths (PS)"
+description: "Validate repo-relative path inputs (working-directory, script)"
+
+inputs:
+  working-directory:
+    description: "Repo-relative working directory"
+    required: true
+  script:
+    description: "Repo-relative script path"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs (paths)
+      shell: bash
+      env:
+        WD: "${{ inputs.working-directory }}"
+        SCRIPT: "${{ inputs.script }}"
+      run: |
+        set -euo pipefail
+
+        fail() { echo "ERROR: $*" >&2; exit 1; }
+
+        # Basic non-empty validation
+        [[ -n "$WD" ]] || fail "working-directory must not be empty"
+        [[ -n "$SCRIPT" ]] || fail "script must not be empty"
+
+        # No absolute paths
+        if [[ "$WD" = /* ]]; then
+          fail "working-directory must be repo-relative, not absolute: $WD"
+        fi
+        if [[ "$SCRIPT" = /* ]]; then
+          fail "script must be repo-relative, not absolute: $SCRIPT"
+        fi
+
+        # No path traversal
+        if [[ "$WD" == *".."* ]]; then
+          fail "working-directory must not contain '..': $WD"
+        fi
+        if [[ "$SCRIPT" == *".."* ]]; then
+          fail "script must not contain '..': $SCRIPT"
+        fi
+
+        # Existence checks in the workspace (GITHUB_WORKSPACE bound by runner)
+        if [[ ! -d "${GITHUB_WORKSPACE}/${WD}" ]]; then
+          fail "working-directory not found: $WD"
+        fi
+        if [[ ! -f "${GITHUB_WORKSPACE}/${SCRIPT}" ]]; then
+          fail "script not found: $SCRIPT"
+        fi
+
+        printf 'OK: inputs validated (working-directory=%s, script=%s)\n' "$WD" "$SCRIPT"

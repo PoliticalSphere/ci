@@ -136,6 +136,15 @@ runs:
         fi
 
     # --------------------------------------------------------------------------
+    # Validate paths (reusable)
+    # --------------------------------------------------------------------------
+    - name: Validate paths (build)
+      uses: ./.github/actions/validate-paths
+      with:
+        working-directory: ${{ inputs.working-directory }}
+        script: ${{ inputs.script }}
+
+    # --------------------------------------------------------------------------
     # Execute via ps-run for consistent logs/reports
     # --------------------------------------------------------------------------
     - name: Run build (PS)

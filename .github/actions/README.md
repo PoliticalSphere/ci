@@ -82,6 +82,7 @@ Baseline building blocks:
 - `ps-pr-comment`: post PR comments with input validation
 - `ps-write-summary`: write structured JSON summary artifacts
 - `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `tools_extra` (newline list)
+- `validate-paths`: validate repo-relative `working-directory` and `script` inputs for workflows/actions
 
 Node toolchain:
 

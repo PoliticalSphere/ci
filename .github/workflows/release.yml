@@ -1,141 +1,459 @@
 # ==============================================================================
-# Political Sphere — Reusable Workflow: Release (Optional)
+# Political Sphere — Reusable Workflow: Release
+# ==============================================================================
+#
+# PURPOSE
 # ------------------------------------------------------------------------------
-# Purpose:
-#   Create a Git tag and GitHub Release for the platform repository.
+# Create a Git tag and GitHub Release for the Political Sphere platform
+# repository in a controlled, policy-aligned manner.
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
 #
-# Scope & Responsibilities:
-#   - Does: run Validate-CI, create tag, publish GitHub Release.
-#   - Does NOT: run builds/tests or publish packages/containers.
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Enforce CI policy compliance via Validate-CI (blocking)
+#   - Support a safe DRY-RUN mode that performs validation + planning without
+#     mutating repository state
+#   - Create a SemVer tag `v<release_version>` at the chosen ref (publish mode)
+#   - Publish a GitHub Release (publish mode)
+#   - Support release notes customisation (inline or file-based) with clear
+#     precedence over auto-generation
+#   - Verify the published tag + release match the intended ref (publish mode)
+#   - Upload evidence artifacts (reports/**, logs/**) and a structured summary
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Least privilege with explicit permissions
-#   - SHA-pinned actions only
-#   - Validate-CI gate runs first
+# DOES NOT:
+#   - Build artifacts, run tests, or publish packages/containers
+#   - Deploy to environments
+#   - Mutate repo state outside tagging + release publishing (publish mode only)
 #
-# Dependencies:
-#   - ./.github/workflows/validate-ci.yml
-#   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-run
-#   - ./.github/actions/ps-upload-artifacts
-#   - ./.github/actions/ps-write-summary
-#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-#   - tools/scripts/branding/print-section.sh
 #
-# Dependents:
-#   - External callers via workflow_call
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Least privilege by default; elevate only where required
+# - Validate-CI MUST pass before release publishing or dry-run planning
+# - SHA-pinned actions only (internal actions are repo-controlled)
+# - Evidence-first: upload artifacts and summary even on failure (best-effort)
+# - Dry-run MUST NOT require write permissions
 #
-# Execution Model:
-#   - Trigger: workflow_call
-#   - Reusable workflow (internal platform building block)
 #
-# Security & Policy Notes:
-#   - Secrets: uses GH_TOKEN (GitHub-provided) for release creation
-#   - Permissions: contents: write only in the release job
-#   - Constraints: no deployments or package publishing
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Triggered via workflow_call
+# - Intended for internal platform release automation (or trusted callers)
 #
-# Operational Notes:
-#   - Timeouts: defined per job in this workflow
-#   - Artifacts: uploads reports/** and logs/** with 7-day retention
-#   - CI vs local: not designed for local execution
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Uses GitHub-provided token (`github.token`) for tag + release creation
+# - Only the publish job receives `contents: write`
+# - Dry-run job remains read-only
+# - No external credential persistence
+#
+#
+# OPERATIONAL NOTES
+# ------------------------------------------------------------------------------
+# - Concurrency is per release_version (prevents double-publishing the same tag)
+# - Do not cancel in progress: releases are stateful (tag + release publish)
+# - Artifact retention is caller-configurable
+# - Fetch-depth defaults to 0 for tag accuracy
+#
 # ==============================================================================
 
 name: Release
 
+# ==============================================================================
+# TRIGGER & INVOCATION MODEL
+# ------------------------------------------------------------------------------
+# Reusable workflow invoked via workflow_call.
+# ==============================================================================
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
         required: false
         default: "ubuntu-22.04"
         type: string
+
       node_version:
         description: "Node.js major version"
         required: false
         default: "22"
         type: string
+
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        required: false
+        default: 0
+        type: number
+
+      retention_days:
+        description: "Artifact retention in days for release evidence"
+        required: false
+        default: 7
+        type: number
+
+      # ==========================================================================
+      # RELEASE MODE
+      # ==========================================================================
+      dry_run:
+        description: "If true, validate + plan only (no tag/release mutation)"
+        required: false
+        default: false
+        type: boolean
+
+      # ==========================================================================
+      # RELEASE CONFIGURATION
+      # ==========================================================================
       release_version:
         description: "Release version (SemVer, without leading v)"
         required: true
         type: string
+
       release_ref:
-        description: "Git ref to release from (branch or SHA)"
+        description: "Git ref to release from (branch name or full SHA)"
         required: false
         default: "main"
         type: string
+
+      # ==========================================================================
+      # RELEASE NOTES
+      # --------------------------------------------------------------------------
+      # Precedence:
+      #   1) release_notes (inline)
+      #   2) release_notes_path (file in repo at release_ref)
+      #   3) generate_notes=true (GitHub auto-generation)
+      #   4) else: empty body
+      # ==========================================================================
       generate_notes:
-        description: "If true, auto-generate GitHub release notes"
+        description: "Auto-generate GitHub release notes (if no custom notes provided)"
         required: false
         default: true
         type: boolean
-      fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+
+      release_title:
+        description: "Optional release title (defaults to v<release_version>)"
         required: false
-        default: "0"
+        default: ""
         type: string
 
+      release_notes:
+        description: "Optional inline release notes (overrides generate_notes)"
+        required: false
+        default: ""
+        type: string
+
+      release_notes_path:
+        description: "Optional repo-relative path to release notes file (overrides generate_notes)"
+        required: false
+        default: ""
+        type: string
+
+      # ==========================================================================
+      # PLATFORM CONFIGURATION
+      # ==========================================================================
+      platform_ref:
+        description: "Platform repo ref to checkout for shared scripts/configs"
+        required: false
+        default: "main"
+        type: string
+
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
 permissions:
   contents: read
 
+# ==============================================================================
+# CONCURRENCY CONTROL
+# ------------------------------------------------------------------------------
+# One release per version at a time. Do not cancel in progress: releases are
+# stateful operations (tag + release publish) and should not be interrupted.
+# ==============================================================================
 concurrency:
-  group: release-${{ github.workflow }}-${{ inputs.release_version }}
+  group: release-${{ github.repository }}-${{ inputs.release_version }}
   cancel-in-progress: false
 
+# ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
 defaults:
   run:
     shell: bash
 
+# ==============================================================================
+# GLOBAL ENVIRONMENT
+# ==============================================================================
 env:
   CI: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
 
 jobs:
+  # ============================================================================
+  # POLICY GATE — VALIDATE CI
+  # ============================================================================
   validate-ci:
+    name: Validate CI (policy gate)
     uses: ./.github/workflows/validate-ci.yml
     permissions:
       contents: read
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}
+      fetch_depth: ${{ inputs.fetch_depth }}
       checkout_ref: ${{ inputs.release_ref }}
+      platform_ref: ${{ inputs.platform_ref }}
       artifact_name: release-validate-ci
-      retention_days: 7
+      retention_days: ${{ inputs.retention_days }}
 
+  # ============================================================================
+  # DRY-RUN — PLAN & VALIDATE RELEASE (NO MUTATION)
+  # ----------------------------------------------------------------------------
+  # Purpose:
+  #   Validate inputs and compute a release plan without creating tags/releases.
+  #
+  # Blocking:
+  #   Yes (when dry_run=true)
+  # ============================================================================
+  dry-run:
+    name: Dry-run (plan only)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    if: ${{ inputs.dry_run == true }}
+    permissions:
+      contents: read
+    timeout-minutes: 15
+    env:
+      PS_DRY_RUN: "1"
+      PS_RELEASE_VERSION: ${{ inputs.release_version }}
+      PS_RELEASE_REF: ${{ inputs.release_ref }}
+      PS_RELEASE_TITLE: ${{ inputs.release_title }}
+      PS_GENERATE_NOTES: ${{ inputs.generate_notes }}
+      PS_RELEASE_NOTES_INLINE: ${{ inputs.release_notes }}
+      PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-job-setup
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          skip_platform_checkout: "0"
+
+          home_dir: ".home"
+          egress_policy: audit
+
+          node_version: ${{ inputs.node_version }}
+          cache: "0"
+
+          skip_checkout: "0"
+          checkout_ref: ${{ inputs.release_ref }}
+
+          install_dependencies: "0"
+          install_tools: "0"
+          tools_bundle: "none"
+
+      - name: Compute release plan (no mutation)
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          version="${PS_RELEASE_VERSION}"
+          if [[ -z "${version}" ]]; then
+            echo "ERROR: release_version is required" >&2
+            exit 1
+          fi
+          if [[ "${version}" == v* ]]; then
+            echo "ERROR: release_version must NOT include a leading 'v' (got: ${version})" >&2
+            exit 1
+          fi
+
+          tag="v${version}"
+
+          # Resolve target commit at release_ref
+          git fetch --quiet --tags --force
+          target_sha="$(git rev-parse --verify "${PS_RELEASE_REF}^{commit}")"
+          echo "PS.RELEASE_PLAN: tag=${tag}"
+          echo "PS.RELEASE_PLAN: ref=${PS_RELEASE_REF}"
+          echo "PS.RELEASE_PLAN: target_sha=${target_sha}"
+
+          if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
+            existing_sha="$(git rev-list -n 1 "${tag}")"
+            echo "PS.RELEASE_PLAN: tag_exists=true (sha=${existing_sha})"
+            if [[ "${existing_sha}" != "${target_sha}" ]]; then
+              echo "PS.RELEASE_PLAN: WARNING tag points to different commit than release_ref"
+            fi
+          else
+            echo "PS.RELEASE_PLAN: tag_exists=false"
+          fi
+
+          # Release notes plan
+          notes_mode="none"
+          if [[ -n "${PS_RELEASE_NOTES_INLINE}" ]]; then
+            notes_mode="inline"
+          elif [[ -n "${PS_RELEASE_NOTES_PATH}" ]]; then
+            notes_mode="file"
+          elif [[ "${PS_GENERATE_NOTES}" == "true" ]]; then
+            notes_mode="generate"
+          fi
+          echo "PS.RELEASE_PLAN: notes_mode=${notes_mode}"
+
+          mkdir -p reports/summary
+          cat > reports/summary/release-plan.json <<JSON
+          {
+            "dry_run": true,
+            "tag": "${tag}",
+            "release_ref": "${PS_RELEASE_REF}",
+            "target_sha": "${target_sha}",
+            "notes_mode": "${notes_mode}"
+          }
+          JSON
+
+      - name: Upload artifacts (dry-run evidence)
+        if: always()
+        uses: ./.github/actions/ps-upload-artifacts
+        with:
+          name: release-dry-run
+          path: |
+            reports/**
+            logs/**
+          if_no_files_found: "warn"
+          retention_days: ${{ inputs.retention_days }}
+
+  # ============================================================================
+  # RELEASE PUBLISHING — TAG + GITHUB RELEASE
+  # ============================================================================
   release:
     name: Publish release
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
+    if: ${{ inputs.dry_run == false }}
     permissions:
-      contents: write  # justification: release publishing requires tag + release creation
-    timeout-minutes: 15
+      contents: write # justification: tag + release creation requires contents write
+    timeout-minutes: 20
+    env:
+      GH_TOKEN: ${{ github.token }}
+      PS_DRY_RUN: "0"
+      PS_RELEASE_VERSION: ${{ inputs.release_version }}
+      PS_RELEASE_REF: ${{ inputs.release_ref }}
+      PS_RELEASE_TITLE: ${{ inputs.release_title }}
+      PS_GENERATE_NOTES: ${{ inputs.generate_notes }}
+      PS_RELEASE_NOTES_INLINE: ${{ inputs.release_notes }}
+      PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-job-setup
         with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-          ref: ${{ inputs.release_ref }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          skip_platform_checkout: "0"
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
+          home_dir: ".home"
+          egress_policy: audit
+
+          node_version: ${{ inputs.node_version }}
+          cache: "0"
+
+          skip_checkout: "0"
+          checkout_ref: ${{ inputs.release_ref }}
+
+          install_dependencies: "0"
+          install_tools: "0"
+          tools_bundle: "none"
+
+      - name: Validate release inputs (publish)
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="${PS_RELEASE_VERSION}"
+          if [[ -z "${version}" ]]; then
+            echo "ERROR: release_version is required" >&2
+            exit 1
+          fi
+          if [[ "${version}" == v* ]]; then
+            echo "ERROR: release_version must NOT include a leading 'v' (got: ${version})" >&2
+            exit 1
+          fi
+          # Simple SemVer sanity (keeps flexibility; script may enforce stricter)
+          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([\-+][0-9A-Za-z\.-]+)?$ ]]; then
+            echo "ERROR: release_version must look like SemVer (got: ${version})" >&2
+            exit 1
+          fi
+
+      - name: Prepare release notes mode
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          mode="none"
+          if [[ -n "${PS_RELEASE_NOTES_INLINE}" ]]; then
+            mode="inline"
+          elif [[ -n "${PS_RELEASE_NOTES_PATH}" ]]; then
+            mode="file"
+          elif [[ "${PS_GENERATE_NOTES}" == "true" ]]; then
+            mode="generate"
+          fi
+
+          echo "mode=${mode}" >> "$GITHUB_OUTPUT"
+
+          # If file mode, ensure file exists at this ref
+          if [[ "${mode}" == "file" ]]; then
+            if [[ ! -f "${PS_RELEASE_NOTES_PATH}" ]]; then
+              echo "ERROR: release_notes_path not found: ${PS_RELEASE_NOTES_PATH}" >&2
+              exit 1
+            fi
+          fi
 
       - name: Publish release (PS)
         uses: ./.github/actions/ps-run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PS_RELEASE_VERSION: ${{ inputs.release_version }}
-          PS_GENERATE_NOTES: ${{ inputs.generate_notes }}
         with:
           id: "release.publish"
           title: "Publish release"
           description: "Tag and create GitHub Release"
           script: "tools/scripts/release/release.sh"
 
-      - name: Upload artifacts
+      # ------------------------------------------------------------------------
+      # RELEASE VERIFICATION (DETERMINISTIC)
+      # ------------------------------------------------------------------------
+      - name: Verify tag + release match intended ref
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="${PS_RELEASE_VERSION}"
+          tag="v${version}"
+
+          # Resolve expected commit
+          git fetch --quiet --tags --force
+          expected_sha="$(git rev-parse --verify "${PS_RELEASE_REF}^{commit}")"
+
+          # Verify tag exists and points to expected commit
+          tag_sha="$(git rev-list -n 1 "${tag}")"
+          if [[ "${tag_sha}" != "${expected_sha}" ]]; then
+            echo "ERROR: tag ${tag} points to ${tag_sha}, expected ${expected_sha} (from ${PS_RELEASE_REF})" >&2
+            exit 1
+          fi
+          echo "PS.RELEASE_VERIFY: tag_ok (${tag} -> ${tag_sha})"
+
+          # Verify GitHub Release exists and targets same commit
+          # (gh returns JSON; keep it simple and deterministic)
+          rel_json="$(gh release view "${tag}" --json tagName,targetCommitish,url)"
+          echo "${rel_json}" > "reports/summary/release-verification.json"
+
+          # Best-effort check: ensure tagName matches; targetCommitish is not always a SHA
+          # so we rely primarily on tag correctness and release existence.
+          echo "PS.RELEASE_VERIFY: release_exists (${tag})"
+
+      - name: Upload artifacts (release evidence)
         if: always()
         uses: ./.github/actions/ps-upload-artifacts
         with:
@@ -144,31 +462,50 @@ jobs:
             reports/**
             logs/**
           if_no_files_found: "warn"
-          retention_days: "7"
+          retention_days: ${{ inputs.retention_days }}
 
       - name: Release complete
         if: always()
         shell: bash
         run: |
           set -euo pipefail
-          bash tools/scripts/branding/print-section.sh "release" "Release complete"
+          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
+            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release" "Release complete"
+          fi
           echo "PS.RELEASE: OK"
 
+  # ============================================================================
+  # AGGREGATION & REPORTING — RELEASE SUMMARY
+  # ============================================================================
   summary:
     name: Release summary
     runs-on: ${{ inputs.runner }}
-    needs: [validate-ci, release]
+    needs: [validate-ci, dry-run, release]
     if: ${{ always() }}
     permissions:
       contents: read
+    timeout-minutes: 10
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-job-setup
         with:
-          fetch-depth: ${{ inputs.fetch_depth }}
+          fetch_depth: 1
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          skip_platform_checkout: "0"
 
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
+          home_dir: ".home"
+          egress_policy: audit
+
+          node_version: ${{ inputs.node_version }}
+          cache: "0"
+
+          skip_checkout: "0"
+          checkout_ref: ${{ inputs.release_ref }}
+
+          install_dependencies: "0"
+          install_tools: "0"
+          tools_bundle: "none"
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
@@ -177,14 +514,14 @@ jobs:
           output_path: "reports/summary/release.json"
           results: |
             validate-ci=${{ needs.validate-ci.result }}
+            dry-run=${{ needs.dry-run.result }}
             release=${{ needs.release.result }}
 
-      - name: Upload summary
+      - name: Upload summary (release)
         if: always()
         uses: ./.github/actions/ps-upload-artifacts
         with:
           name: release-summary
-          path: |
-            reports/summary/release.json
+          path: reports/summary/release.json
           if_no_files_found: "warn"
-          retention_days: "7"
+          retention_days: ${{ inputs.retention_days }}
