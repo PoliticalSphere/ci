@@ -374,9 +374,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
-            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.validate" "Validate release inputs (publish)"
-          fi
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.validate" "Validate release inputs (publish)" 2>/dev/null || true
 
           version="${PS_RELEASE_VERSION}"
           if [[ -z "${version}" ]]; then
@@ -399,9 +397,7 @@ jobs:
         run: |
           set -euo pipefail
 
-          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
-            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.notes" "Prepare release notes mode"
-          fi
+          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.notes" "Prepare release notes mode" 2>/dev/null || true
 
           mode="none"
           if [[ -n "${PS_RELEASE_NOTES_INLINE}" ]]; then

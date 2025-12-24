@@ -358,7 +358,7 @@ function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps, hardenRunn
       if (entry.endsWith('@')) return value.startsWith(entry);
       // If entry looks like an owner/repo (contains '/' but not a local path),
       // allow repo@sha references (e.g., step-security/harden-runner@...)
-      if (entry.includes('/') && !entry.startsWith('./')) return value.startsWith(entry + '@') || value === entry;
+      if (entry.includes('/') && !entry.startsWith('./')) return value.startsWith(`${entry}@`) || value === entry;
       // Otherwise, do an exact match (useful for local paths like './.github/actions/ps-harden-runner')
       return value === entry;
     }) || value.startsWith('step-security/harden-runner@');
