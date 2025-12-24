@@ -34,12 +34,37 @@ if [[ -f "${format_sh}" ]]; then
   . "${format_sh}"
 fi
 
-_have_fn() { type -t "$1" >/dev/null 2>&1; }
-_warn() { if _have_fn ps_warn; then ps_warn "$*"; else printf 'WARN: %s\n' "$*" >&2; fi; }
-_err()  { if _have_fn ps_error; then ps_error "$*"; else printf 'ERROR: %s\n' "$*" >&2; fi; }
+_have_fn() {
+  local fn="$1"
+  type -t "${fn}" >/dev/null 2>&1
+  return $?
+}
+_warn() {
+  local msg="$*"
+  if _have_fn ps_warn; then
+    ps_warn "${msg}"
+  else
+    printf 'WARN: %s\n' "${msg}" >&2
+  fi
+  return 0
+}
+_err() {
+  local msg="$*"
+  if _have_fn ps_error; then
+    ps_error "${msg}"
+  else
+    printf 'ERROR: %s\n' "${msg}" >&2
+  fi
+  return 0
+}
 _supports_color() {
-  if _have_fn ps_supports_color; then ps_supports_color; return $?; fi
+  if _have_fn ps_supports_color; then
+    ps_supports_color
+    return $?
+  fi
+
   [[ -t 1 && -n "${TERM:-}" && "${TERM}" != "dumb" ]]
+  return $?
 }
 
 # Resolve banner path (prefer repo_root if present)
