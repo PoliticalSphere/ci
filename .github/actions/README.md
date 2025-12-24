@@ -76,7 +76,6 @@ Risky changes require an explicit, documented decision.
 
 Baseline building blocks:
 
-- `ps-banner`: print Political Sphere ASCII branding
 - `ps-run`: standard banner + section wrapper for script execution
 - `ps-hardened-checkout`: harden runner + checkout in one step
 - `ps-preflight`: shared preflight checks for common requirements

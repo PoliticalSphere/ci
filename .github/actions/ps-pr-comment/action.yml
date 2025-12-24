@@ -66,9 +66,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Print banner
-      uses: ./.github/actions/ps-banner
-
     - name: Resolve scripts root
       shell: bash
       run: |

@@ -21,7 +21,7 @@
 #
 # Dependencies:
 #   - ./.github/workflows/validate-ci.yml
-#   - ./.github/actions/ps-setup
+#   - ./.github/actions/ps-job-setup
 #   - ./.github/actions/ps-lint-tools
 #   - ./.github/actions/ps-run
 #   - ./.github/actions/lint

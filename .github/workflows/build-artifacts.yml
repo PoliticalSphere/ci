@@ -20,7 +20,7 @@
 #
 # Dependencies:
 #   - ./.github/workflows/validate-ci.yml
-#   - ./.github/actions/ps-setup
+#   - ./.github/actions/ps-job-setup
 #   - ./.github/actions/build
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary

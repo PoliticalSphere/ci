@@ -19,7 +19,7 @@
 #   - Hardened runner as the first step
 #
 # Dependencies:
-#   - ./.github/actions/ps-setup
+#   - ./.github/actions/ps-job-setup
 #   - ./.github/actions/ci-validate
 #   - ./.github/actions/ps-upload-artifacts
 #   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
