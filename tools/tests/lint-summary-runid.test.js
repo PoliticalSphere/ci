@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { fail, getRepoRoot } from './test-utils.js';
+import { fail, getRepoRoot, SAFE_PATH } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
