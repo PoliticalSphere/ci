@@ -12,7 +12,8 @@ try {
   const env = {
     GITHUB_ACTIONS: 'true',
     GITHUB_RUN_ID: '1001',
-    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+    // Use only fixed, non-writable system directories to prevent PATH hijacking
+    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'xterm',
