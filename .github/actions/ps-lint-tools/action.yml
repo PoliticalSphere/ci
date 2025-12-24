@@ -51,7 +51,7 @@ runs:
   using: "composite"
   steps:
     - name: Install lint tools (PS)
-      uses: ./.github/actions/ps-install-tools
+      uses: ./.github/actions/ps-tools
       with:
         install_dir: ${{ inputs.install_dir }}
-        tools: "actionlint,shellcheck,hadolint,yamllint"
+        bundle: "lint"

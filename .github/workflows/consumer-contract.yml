@@ -21,7 +21,7 @@
 # Dependencies:
 #   - ./.github/workflows/validate-ci.yml
 #   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-node-bootstrap
+#   - ./.github/actions/ps-node-setup
 #   - ./.github/actions/consumer-contract
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary

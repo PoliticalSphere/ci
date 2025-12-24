@@ -1,0 +1,125 @@
+name: "PS Job Bootstrap"
+description: "Combined job bootstrap: harden runner, checkout repo, optional platform checkout, and prepare HOME."
+
+inputs:
+  fetch_depth:
+    description: "Git fetch depth (default: 1)"
+    required: false
+    default: "1"
+  checkout_ref:
+    description: "Optional ref to checkout for the repository"
+    required: false
+    default: ""
+  platform_ref:
+    description: "Optional ref to checkout for the platform repository"
+    required: false
+    default: ""
+  platform_path:
+    description: "Path to place the platform checkout"
+    required: false
+    default: ".ps-platform"
+  home_dir:
+    description: "Workspace-local HOME directory used for bootstrapping and harden-runner"
+    required: false
+    default: ".home"
+  egress_policy:
+    description: "Egress policy passed to ps-harden-runner (audit|block)"
+    required: false
+    default: "audit"
+  skip_platform_checkout:
+    description: "Skip the platform repository checkout (true|false)"
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Preflight (job bootstrap)
+      shell: bash
+      env:
+        PS_FETCH_DEPTH: ${{ inputs.fetch_depth }}
+        PS_EGRESS_POLICY: ${{ inputs.egress_policy }}
+        PS_SKIP_PLATFORM_CHECKOUT: ${{ inputs.skip_platform_checkout }}
+        PS_PLATFORM_PATH: ${{ inputs.platform_path }}
+      run: |
+        set -euo pipefail
+
+        depth="${PS_FETCH_DEPTH:-}"
+        egress="${PS_EGRESS_POLICY:-}"
+        skip_platform="${PS_SKIP_PLATFORM_CHECKOUT:-}"
+
+        # Prefer platform root when provided, otherwise fall back to action root
+        platform_root="${PS_PLATFORM_ROOT:-}"
+        if [[ -z "${platform_root}" || ! -d "${platform_root}" ]]; then
+          platform_root="$(cd "${GITHUB_ACTION_PATH}/../../.." >/dev/null 2>&1 && pwd)"
+        fi
+
+        validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          printf '%q\n' "ERROR: validate-inputs.sh not found at ${validate_sh}" >&2
+          exit 1
+        fi
+        # shellcheck source=/dev/null
+        . "${validate_sh}"
+
+        require_number "fetch_depth" "${depth}"
+        egress_lc="$(printf '%s' "${egress}" | tr '[:upper:]' '[:lower:]' | xargs)"
+        require_enum "egress_policy" "${egress_lc}" audit block || exit 1
+
+        # normalize skip boolean
+        skip_norm="$(printf '%s' "${skip_platform}" | tr '[:upper:]' '[:lower:]' | xargs)"
+        if [[ "${skip_norm}" == "1" || "${skip_norm}" == "true" || "${skip_norm}" == "yes" ]]; then
+          SKIP_PLATFORM=1
+        else
+          SKIP_PLATFORM=0
+        fi
+
+        printf '%q\n' "PS.JOB_BOOTSTRAP: fetch_depth=%s" "${depth}"
+        printf '%q\n' "PS.JOB_BOOTSTRAP: egress_policy=%s" "${egress_lc}"
+        if [[ "${SKIP_PLATFORM}" -eq 1 ]]; then
+          printf '%q\n' "PS.JOB_BOOTSTRAP: skip_platform_checkout=true"
+        else
+          printf '%q\n' "PS.JOB_BOOTSTRAP: skip_platform_checkout=false"
+        fi
+
+    - name: Harden runner (PS)
+      uses: ./.github/actions/ps-harden-runner
+      env:
+        HOME: ${{ inputs.home_dir }}
+      with:
+        egress-policy: ${{ inputs.egress_policy }}
+
+    - name: Checkout repository (PS)
+      uses: ./.github/actions/ps-checkout
+      with:
+        fetch_depth: ${{ inputs.fetch_depth }}
+        ref: ${{ inputs.checkout_ref }}
+
+    - name: Checkout platform repository
+      if: ${{ inputs.skip_platform_checkout != 'true' }}
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      with:
+        repository: PoliticalSphere/ci
+        ref: ${{ inputs.platform_ref }}
+        path: ${{ inputs.platform_path }}
+        fetch-depth: 1
+
+    - name: Set PS_PLATFORM_ROOT
+      shell: bash
+      if: ${{ inputs.skip_platform_checkout != 'true' }}
+      env:
+        PS_PLATFORM_PATH_INPUT: ${{ inputs.platform_path }}
+      run: |
+        set -euo pipefail
+        printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_INPUT}" >> "$GITHUB_ENV"
+
+    - name: Bootstrap (PS)
+      uses: ./.github/actions/ps-bootstrap
+      with:
+        platform_root: ${{ github.workspace }}/${{ inputs.platform_path }}
+        home_dir: ${{ inputs.home_dir }}
+
+    - name: Job bootstrap complete
+      shell: bash
+      run: |
+        printf '%s\n' "PS.JOB_BOOTSTRAP: OK"

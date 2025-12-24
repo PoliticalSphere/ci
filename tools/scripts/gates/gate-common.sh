@@ -200,9 +200,42 @@ _ps_erase_inline_block() {
 }
 
 _ps_should_print_summary_now() {
-  # Hard rule: NEVER print before any step starts.
-  [[ "${LINT_SUMMARY_EVER_STARTED:-0}" -eq 1 ]] || return 1
-  _lint_any_started || return 1
+  # Allow printing in two cases:
+  # 1) A lint step has started (usual case)
+  # 2) Caller explicitly requests a printed summary even when no steps have started
+  #    (e.g., PS_LINT_INLINE=0 and PS_LINT_PRINT_MODE=auto) — useful for non-TTY
+
+  local allow_early_print=0
+  case "${PS_LINT_PRINT_MODE}" in
+    first)
+      allow_early_print=1
+      ;;
+    auto)
+      if [[ "${PS_LINT_INLINE:-1}" == "0" ]]; then
+        allow_early_print=1
+      fi
+      # In non-interactive (non-TTY) CI runs, allow a one-time printed summary
+      if ! _ps_is_interactive_tty; then
+        allow_early_print=1
+      fi
+      ;;
+    *)
+      allow_early_print=0
+      ;;
+  esac
+
+  # If GITHUB_RUN_ID is present, prefer allowing one printed header across processes
+  if [[ -n "${GITHUB_RUN_ID:-}" ]]; then
+    allow_early_print=1
+  fi
+
+  if [[ "${LINT_SUMMARY_EVER_STARTED:-0}" -eq 1 ]]; then
+    # At least one step has started; ensure some step moved beyond Waiting
+    _lint_any_started || return 1
+  else
+    # No step started yet — allow only when caller explicitly requested an early print
+    [[ "${allow_early_print}" -eq 1 ]] || return 1
+  fi
 
   case "${PS_LINT_PRINT_MODE}" in
     never) return 1 ;;
@@ -229,7 +262,34 @@ _ps_should_print_summary_now() {
 }
 
 print_lint_summary() {
-  _ps_should_print_summary_now || return 0
+  # Allow immediate printing in these common non-interactive scenarios:
+  # - running in CI (CI=1)
+  # - caller explicitly disabled inline updates (PS_LINT_INLINE=0)
+  # - we have a GITHUB_RUN_ID and want to dedupe across processes
+  if [[ -n "${GITHUB_RUN_ID:-}" ]] || [[ "${CI:-0}" == "1" ]] || [[ "${PS_LINT_INLINE:-1}" == "0" ]]; then
+    :
+  else
+    _ps_should_print_summary_now || return 0
+  fi
+
+  # Deduplicate header across processes when GITHUB_RUN_ID is set
+  if [[ -n "${GITHUB_RUN_ID:-}" ]]; then
+    mkdir -p "${LINT_DIR}"
+    # Remove stale per-run markers older than ~1 minute to avoid leaks across dev runs
+    find "${LINT_DIR}" -maxdepth 1 -name ".summary_printed_*" -mmin +0 -exec rm -rf {} \; || true
+    header_dir="${LINT_DIR}/.summary_printed_${GITHUB_RUN_ID}.d"
+    # mkdir is atomic — only the first process creating this dir should print
+    if mkdir "${header_dir}" 2>/dev/null; then
+      :
+    else
+      return 0
+    fi
+  fi
+
+  # Only print once per process
+  if [[ "${LINT_SUMMARY_EVER_PRINTED:-0}" -eq 1 ]]; then
+    return 0
+  fi
 
   if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" != "first" ]]; then
     _ps_erase_inline_block "${LINT_SUMMARY_LINES:-0}"

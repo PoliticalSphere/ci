@@ -12,6 +12,11 @@
 #   - Does: validate tool list and install requested tools.
 #   - Does NOT: run lint/security scans or modify permissions.
 #
+# Deprecated:
+#   - This action is the low-level pinned installer. Prefer using `ps-tools` as the
+#     canonical, higher-level installer that provides `bundle` + `extra_tools` and
+#     better caller ergonomics. `ps-install-tools` remains for internal delegation.
+#
 # Design Principles:
 #   - Deterministic, pinned versions + SHA256 verification
 #   - Non-interactive execution

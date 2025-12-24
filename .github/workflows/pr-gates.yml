@@ -288,30 +288,15 @@ jobs:
       PS_SKIP_SECRETS_SCAN: "1"
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
     steps:
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
-        env:
-          HOME: ${{ runner.temp }}
-        with:
-          egress-policy: audit
-      - name: Checkout repository (PS)
-        uses: ./.github/actions/ps-checkout
+      - name: Job bootstrap (PS)
+        uses: ./.github/actions/ps-job-bootstrap
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-
-      - name: Checkout platform repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        with:
-          repository: PoliticalSphere/ci
-          ref: ${{ inputs.platform_ref }}
-          path: .ps-platform
-          fetch-depth: 1
-
-      - name: Bootstrap (PS)
-        uses: ./.github/actions/ps-bootstrap
-        with:
-          platform_root: ${{ github.workspace }}/.ps-platform
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: .ps-platform
           home_dir: ".home"
+          egress_policy: audit
+          skip_platform_checkout: "false"
 
       - name: Setup (PS)
         uses: ./.github/actions/ps-setup
@@ -511,35 +496,16 @@ jobs:
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 
-      - name: Harden runner (audit)
+      - name: Job bootstrap (PS)
         if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
-        env:
-          HOME: ${{ runner.temp }}
+        uses: ./.github/actions/ps-job-bootstrap
         with:
-          egress-policy: audit
-
-      - name: Checkout repository
-        if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-
-      - name: Checkout platform repository
-        if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        with:
-          repository: PoliticalSphere/ci
-          ref: ${{ inputs.platform_ref }}
-          path: .ps-platform
-          fetch-depth: 1
-
-      - name: Bootstrap (PS)
-        if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: ./.github/actions/ps-bootstrap
-        with:
-          platform_root: ${{ github.workspace }}/.ps-platform
+          fetch_depth: ${{ inputs.fetch_depth }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: .ps-platform
           home_dir: ".home"
+          egress_policy: audit
+          skip_platform_checkout: "false"
 
       - name: Setup (PS)
         if: steps.sonar_cfg.outputs.enabled == 'true'

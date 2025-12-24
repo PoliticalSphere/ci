@@ -13,11 +13,11 @@ Detailed versioning rules live in `docs/versioning.md`.
 
 ### Changed
 
-- None.
+- Consolidate tool installers: introduce `ps-tools` as the canonical tool installer (inputs: `bundle` = lint|security|none, `extra_tools` multiline, or an explicit `tools` list). Existing wrappers `ps-lint-tools` and `ps-security-tools` now delegate to `ps-tools`. `ps-install-tools` remains as the low-level installer for pinned installs (deprecated as the public entrypoint).
 
 ### Deprecated
 
-- None.
+- `ps-install-tools` is deprecated as the public entrypoint for tool installation; use `ps-tools` (added) as the canonical installer and update callers accordingly.
 
 ### Removed
 

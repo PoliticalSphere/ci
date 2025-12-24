@@ -85,13 +85,31 @@ Baseline building blocks:
 - `ps-pr-comment`: post PR comments with input validation
 - `ps-write-summary`: write structured JSON summary artifacts
 - `ps-preflight`: shared preflight checks for common requirements
-- `ps-install-tools`: install pinned CI tools from an explicit allowlist
+- `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `extra_tools` (newline list); delegates to `ps-install-tools` for pinned installs
+- `ps-install-tools`: legacy installer (deprecated). Use `ps-tools` as the canonical entrypoint for tool installation
 
 Node toolchain:
 
 - `ps-bootstrap`: standard workspace bootstrap (prepare HOME, platform checkout helpers)
+- `ps-job-bootstrap`: canonical job preamble that runs `ps-harden-runner`, `ps-checkout`, optionally checks out the platform/`.ps-platform`, then runs `ps-bootstrap` (recommended as the default job start-up step)
 - `ps-node-setup`: checkout + setup Node.js toolchain with optional deterministic installs (cache, npm ci)
-- `ps-setup`: harden runner + node setup (single step). It is the canonical bootstrap entrypoint; supports optional dependency install (`install_dependencies`), tool bundle install (`install_tools`, `tools_bundle`, `tools_extra`), and `working_directory` for monorepos.
+- `ps-setup`: harden runner + node setup (single step). It is the canonical bootstrap entrypoint; supports optional dependency install (`install_dependencies` defaults to "0"), tool bundle install (`install_tools`, `tools_bundle`, `tools_extra`), and `working_directory` for monorepos.
+
+Example: use `ps-setup` to run lint with installs/tools:
+
+```yaml
+- name: Setup (PS)
+  uses: ./.github/actions/ps-setup
+  with:
+    node_version: ${{ inputs.node_version }}
+    fetch_depth: ${{ inputs.fetch_depth }}
+    cache: ${{ inputs.cache }}
+    install_dependencies: "1"
+    install_tools: "1"
+    tools_bundle: "lint"
+    skip_checkout: "1"
+    skip_harden: "1"
+```
 
 Lint + quality:
 
@@ -108,8 +126,8 @@ Security:
 - `license-check`: license compliance against policy allowlists
 - `secret-scan-pr`: fast gitleaks scan for PRs
 - `semgrep-cli`: run Semgrep CLI and upload SARIF
-- `ps-lint-tools`: install pinned lint tools for CI
-- `ps-security-tools`: install pinned security tools for CI
+- `ps-lint-tools`: convenience wrapper that calls `ps-tools` with `bundle: lint`
+- `ps-security-tools`: convenience wrapper that calls `ps-tools` with `bundle: security`
 
 ---
 

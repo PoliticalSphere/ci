@@ -59,7 +59,7 @@ if ! command -v node >/dev/null 2>&1; then
 fi
 
 # Discover test files (recursive) in a portable way.
-# Avoid `sort -z` (not portable on macOS/BSD). We collect unsorted, then sort with newline delim.
+# Avoid using sort -z (not portable on macOS/BSD). We collect unsorted, then sort with newline delim.
 test_files=()
 while IFS= read -r f; do
   test_files+=("$f")

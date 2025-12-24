@@ -18,6 +18,9 @@ try {
     TERM: 'xterm',
   };
 
+  // Ensure no previous header files remain
+  execFileSync('bash', ['-lc', `rm -f ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* || true`]);
+
   // Run the helper twice in separate shells to simulate separate steps
   const cmd = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary`;
   const first = execFileSync('bash', ['-lc', cmd], {

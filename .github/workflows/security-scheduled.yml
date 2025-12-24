@@ -178,29 +178,25 @@ jobs:
       contents: read
     timeout-minutes: 20
     steps:
-      - name: Harden runner (PS)
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
-        env:
-          HOME: ${{ runner.temp }}
+      - name: Job bootstrap (PS)
+        uses: ./.github/actions/ps-job-bootstrap
         with:
-          egress-policy: audit
+          fetch_depth: 0
+          platform_ref: 'main'
+          platform_path: .ps-platform
+          home_dir: ${{ runner.temp }}
+          egress_policy: audit
+          skip_platform_checkout: "false"
 
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
+      - name: Setup (PS) — install security tools
+        uses: ./.github/actions/ps-setup
         with:
-          fetch-depth: 0
-
-
-      - name: Checkout platform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          repository: PoliticalSphere/ci
-          ref: 'main'
-          path: .ps-platform
-          fetch-depth: 1
-
-      - name: Install security tools (PS)
-        uses: ./.github/actions/ps-security-tools
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+          install_tools: "1"
+          tools_bundle: "security"
+          skip_checkout: "1"
+          skip_harden: "1"
 
       - name: Secrets scan (full)
         uses: ./.github/actions/ps-run
@@ -466,10 +462,16 @@ jobs:
           path: .ps-platform
           fetch-depth: 1
 
-      - name: Install security tools (PS)
-        uses: ./.github/actions/ps-security-tools
+      - name: Setup (PS) — install security tools
+        uses: ./.github/actions/ps-setup
         with:
-          install_trivy: "1"
+          fetch_depth: ${{ inputs.fetch_depth }}
+          cache: ${{ inputs.cache }}
+          install_tools: "1"
+          tools_bundle: "security"
+          tools_extra: ${{ inputs.install_trivy == '1' && 'trivy' || '' }}
+          skip_checkout: "1"
+          skip_harden: "1"
 
       - name: Run Trivy (SARIF)
         uses: ./.github/actions/ps-run

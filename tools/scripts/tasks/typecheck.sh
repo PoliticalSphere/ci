@@ -29,8 +29,8 @@ if [[ ! -f "${project_tsconfig}" ]]; then
     ps_error "project tsconfig not found: ${project_tsconfig}"
     ps_detail_err "HINT: create tsconfig.json that extends configs/lint/tsconfig.base.json and defines include/files."
   else
-    echo "ERROR: project tsconfig not found: ${project_tsconfig}" >&2
-    echo "  HINT: create tsconfig.json that extends configs/lint/tsconfig.base.json and defines include/files." >&2
+    printf 'ERROR: project tsconfig not found: %s\n' "${project_tsconfig}" >&2
+    printf '  HINT: create tsconfig.json that extends configs/lint/tsconfig.base.json and defines include/files.\n' >&2
   fi
   exit 1
 fi
@@ -50,7 +50,7 @@ else
 fi
 
 # Pass-through args safely.
-# Ensure the array is always declared to avoid "unbound variable" when `set -u` is active.
+# Ensure the array is always declared to avoid "unbound variable" when set -u is active.
 declare -a TSC_ARGS=()
 TSC_ARGS=("$@")
 

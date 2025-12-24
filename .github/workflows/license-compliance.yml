@@ -21,7 +21,7 @@
 # Dependencies:
 #   - ./.github/workflows/validate-ci.yml
 #   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-node-bootstrap
+#   - ./.github/actions/ps-node-setup
 #   - ./.github/actions/license-check
 #   - ./.github/actions/ps-upload-artifacts
 #   - ./.github/actions/ps-write-summary
@@ -151,25 +151,15 @@ jobs:
       contents: read
     timeout-minutes: 15
     steps:
-      - name: Harden runner (PS)
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
-        env:
-          HOME: ${{ runner.temp }}
+      - name: Job bootstrap (PS)
+        uses: ./.github/actions/ps-job-bootstrap
         with:
-          egress-policy: audit
-
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-
-      - name: Checkout platform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          repository: PoliticalSphere/ci
-          ref: ${{ inputs.platform_ref }}
-          path: .ps-platform
-          fetch-depth: 1
+          fetch_depth: ${{ inputs.fetch_depth }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: .ps-platform
+          home_dir: ${{ runner.temp }}
+          egress_policy: audit
+          skip_platform_checkout: "false"
 
       - name: Node runtime (PS)
         uses: ./.github/actions/ps-node-setup

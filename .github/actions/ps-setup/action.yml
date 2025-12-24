@@ -67,7 +67,7 @@ inputs:
     required: false
     default: "0"
   install_tools:
-    description: "Install pinned CLI tools via ps-install-tools (1 = on, 0 = off)"
+    description: "Install pinned CLI tools via ps-tools (1 = on, 0 = off)"
     required: false
     default: "0"
   tools_bundle:
@@ -259,13 +259,7 @@ runs:
 
     - name: Install tools (PS)
       if: ${{ inputs.install_tools == '1' }}
-      uses: ./.github/actions/ps-install-tools
-      with:
-        tools: ${{ env.PS_TOOLS }}
-
-    - name: Install tools (PS)
-      if: ${{ inputs.install_tools == '1' }}
-      uses: ./.github/actions/ps-install-tools
+      uses: ./.github/actions/ps-tools
       with:
         tools: ${{ env.PS_TOOLS }}
 

@@ -56,7 +56,8 @@ runs:
   using: "composite"
   steps:
     - name: Install security tools (PS)
-      uses: ./.github/actions/ps-install-tools
+      uses: ./.github/actions/ps-tools
       with:
         install_dir: ${{ inputs.install_dir }}
-        tools: ${{ inputs.install_trivy == '1' && 'gitleaks,trivy' || 'gitleaks' }}
+        bundle: "security"
+        extra_tools: ${{ inputs.install_trivy == '1' && 'trivy' || '' }}
