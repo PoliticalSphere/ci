@@ -29,6 +29,7 @@ const consoleHelpers = path.join(
 );
 
 const { detail, section, fatal } = await import(consoleHelpers);
+import { SAFE_PATH } from './test-utils.js';
 
 function fail(msg, stdout = '', stderr = '') {
   fatal(msg);
@@ -65,6 +66,7 @@ function runValidateCi({ cwd, label, extraEnv = {} }) {
       cwd,
       env: {
         ...process.env,
+        PATH: SAFE_PATH,
         CI: '1',
         PS_PLATFORM_ROOT: repoRoot,
         PS_VALIDATE_CI_VERIFY_REMOTE: '0',

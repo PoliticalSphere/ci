@@ -151,7 +151,7 @@ try {
     ],
     {
       cwd: tmp,
-      env: { ...process.env, CI: '1', FORCE_COLOR: '1' },
+      env: { ...process.env, PATH: SAFE_PATH, CI: '1', FORCE_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     },
@@ -177,7 +177,7 @@ try {
     [contractScript, '--policy', policyPath, '--exceptions', exceptionsPath],
     {
       cwd: tmp,
-      env: { ...process.env, CI: '1', FORCE_COLOR: '1' },
+      env: { ...process.env, PATH: SAFE_PATH, CI: '1', FORCE_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     },

@@ -13,7 +13,7 @@ try {
     GITHUB_ACTIONS: 'true',
     GITHUB_RUN_ID: '1001',
     // Use only fixed, non-writable system directories to prevent PATH hijacking
-    PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+    PATH: SAFE_PATH,
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'xterm',
@@ -21,7 +21,11 @@ try {
 
   // Ensure no previous header files remain
   // Remove any previous per-run markers used by different versions of the helper to avoid flakes
-  execFileSync('bash', ['-lc', `rm -rf ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* ${repoRoot}/logs/lint/.summary_printed_${env.GITHUB_RUN_ID}* || true`]);
+  execFileSync(
+    'bash',
+    ['-lc', `rm -rf ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* ${repoRoot}/logs/lint/.summary_printed_${env.GITHUB_RUN_ID}* || true`],
+    { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 },
+  );
 
   // Run the helper twice in separate shells to simulate separate steps
   const cmd = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary`;

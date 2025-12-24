@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { fail, getRepoRoot } from './test-utils.js';
+import { fail, getRepoRoot, SAFE_PATH } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
@@ -18,7 +18,7 @@ try {
       PS_TOOLS_EXTRA_INPUT: '',
       PS_PLATFORM_ROOT: repoRoot,
       // Use a restricted PATH containing only fixed, non-writable system dirs
-      PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+      PATH: SAFE_PATH,
       HOME: process.env.HOME,
       USER: process.env.USER,
     };
@@ -45,7 +45,7 @@ try {
   {
     // We will call the Prepare tools logic from ps-bootstrap harness to assemble PS_TOOLS env variable
     const command = `bash -lc 'PS_PLATFORM_ROOT=${repoRoot} PS_TOOLS_BUNDLE_INPUT=security PS_TOOLS_EXTRA_INPUT=trivy \n source ${repoRoot}/.github/actions/ps-bootstrap/action.yml >/dev/null 2>&1 || true; echo "OK"'`;
-    execFileSync('bash', ['-lc', command], { encoding: 'utf8', env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin', HOME: process.env.HOME, USER: process.env.USER } });
+    execFileSync('bash', ['-lc', command], { encoding: 'utf8', env: { PATH: SAFE_PATH, HOME: process.env.HOME, USER: process.env.USER } });
   }
 
   // Test 3: explicit tools takes precedence

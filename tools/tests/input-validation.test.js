@@ -1,12 +1,21 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { fail, section } from './test-utils.js';
+import { fail, section, SAFE_PATH } from './test-utils.js';
 
 section('validation', 'Input validation tests', 'Sourcing validate-inputs.sh');
 
+// Run a shell command with a constrained PATH to avoid tests depending on
+// writable or user-controlled directories. Only include fixed, system-owned
+// directories that are typically immutable to normal users.
 function runShell(cmd) {
-  const r = spawnSync('bash', ['-c', cmd], { encoding: 'utf8' });
+  const env = {
+    PATH: SAFE_PATH,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    TERM: process.env.TERM || 'dumb',
+  };
+  const r = spawnSync('bash', ['-c', cmd], { encoding: 'utf8', env });
   return r;
 }
 

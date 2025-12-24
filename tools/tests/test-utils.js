@@ -41,10 +41,12 @@ export function assertContains(text, needle, rel, hint) {
 
 import { execFileSync } from 'node:child_process';
 import { getRepoRoot } from '../scripts/ci/validate-ci/console.js';
+export const SAFE_PATH = '/usr/bin:/bin:/usr/sbin:/sbin';
+
 export function runLintSummary(envOverrides = {}) {
   const repoRoot = getRepoRoot();
   const env = {
-    PATH: '/usr/bin:/bin:/usr/sbin:/sbin:/usr/local/bin',
+    PATH: SAFE_PATH,
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'dumb',
