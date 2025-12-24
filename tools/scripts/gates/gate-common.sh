@@ -124,7 +124,10 @@ LINT_SUMMARY_EVER_STARTED=0
 # ==============================================================================
 # Traps (step-aware, helpful)
 # ==============================================================================
-_ps_last_command() { printf '%s' "${BASH_COMMAND:-}"; }
+_ps_last_command() {
+  printf '%s' "${BASH_COMMAND:-}"
+  return 0
+}
 
 on_error() {
   local exit_code="$?"
@@ -279,7 +282,8 @@ print_lint_summary() {
   if [[ -n "${GITHUB_RUN_ID:-}" ]]; then
     mkdir -p "${LINT_DIR}"
     # Remove stale per-run markers older than ~1 minute to avoid leaks across dev runs
-    find "${LINT_DIR}" -maxdepth 1 -name ".summary_printed_*" -mmin +0 -exec rm -rf {} \; || true
+    # Use +1 to avoid removing markers created very recently (reduces race/flakiness)
+    find "${LINT_DIR}" -maxdepth 1 -name ".summary_printed_*" -mmin +1 -exec rm -rf {} \; || true
     header_dir="${LINT_DIR}/.summary_printed_${GITHUB_RUN_ID}.d"
     # mkdir is atomic — only the first process creating this dir should print
     if mkdir "${header_dir}" 2>/dev/null; then
