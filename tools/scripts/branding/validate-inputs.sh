@@ -40,6 +40,7 @@ require_nonempty() {
     v_error "${name} is required"
     return 1
   fi
+  return 0
 }
 
 require_number() {
@@ -49,6 +50,7 @@ require_number() {
     v_error "${name} must be numeric"
     return 1
   fi
+  return 0
 }
 
 require_positive_number() {
@@ -58,6 +60,7 @@ require_positive_number() {
     v_error "${name} must be a positive integer"
     return 1
   fi
+  return 0
 }
 
 require_enum() {
@@ -94,4 +97,5 @@ require_command() {
     v_error "${cmd} is required but not found on PATH"
     return 1
   fi
+  return 0
 }
