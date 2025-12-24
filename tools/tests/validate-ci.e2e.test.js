@@ -28,8 +28,8 @@ const consoleHelpers = path.join(
   'console.js',
 );
 
-const { detail, section, fatal } = await import(consoleHelpers);
 import { SAFE_PATH } from './test-utils.js';
+const { detail, fatal, section } = await import(consoleHelpers);
 
 function fail(msg, stdout = '', stderr = '') {
   fatal(msg);
