@@ -13,7 +13,7 @@ import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { detail, fail, section } from './test-utils.js';
+import { detail, fail, section, SAFE_PATH } from './test-utils.js';
 
 const repoRoot = (() => {
   const __filename = fileURLToPath(import.meta.url);
@@ -151,12 +151,13 @@ try {
     ],
     {
       cwd: tmp,
-      env: { ...process.env, PATH: SAFE_PATH, CI: '1', FORCE_COLOR: '1' },
+      env: { ...process.env, PATH: `${SAFE_PATH}:${path.dirname(process.execPath)}`, CI: '1', FORCE_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     },
   );
-} catch {
+} catch (err) {
+  console.error('consumer contract pass case failed:', err?.stdout || err?.stderr || String(err));
   fail('consumer contract pass case failed unexpectedly');
 }
 
@@ -177,12 +178,13 @@ try {
     [contractScript, '--policy', policyPath, '--exceptions', exceptionsPath],
     {
       cwd: tmp,
-      env: { ...process.env, PATH: SAFE_PATH, CI: '1', FORCE_COLOR: '1' },
+      env: { ...process.env, PATH: `${SAFE_PATH}:${path.dirname(process.execPath)}`, CI: '1', FORCE_COLOR: '1' },
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     },
   );
-} catch {
+} catch (err) {
+  console.error('consumer contract fail case errored as expected:', err?.stdout || err?.stderr || String(err));
   failed = true;
 }
 
