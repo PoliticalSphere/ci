@@ -64,8 +64,8 @@ on:
       fetch_depth:
         description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
         required: false
-        default: "1"
-        type: string
+        default: 1
+        type: number
       cache:
         description: "Enable dependency caching (1 = on, 0 = off)"
         required: false

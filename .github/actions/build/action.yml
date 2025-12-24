@@ -6,39 +6,23 @@
 #
 # Metadata:
 #   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
+#   - Last updated: 2025-12-24
 #
 # Scope & Responsibilities:
 #   - Does: execute the build script in the configured working directory.
-#   - Does NOT: install dependencies or run tests.
+#   - Does NOT: install dependencies, run tests, or modify permissions.
 #
 # Design Principles:
 #   - Deterministic and non-interactive execution
 #   - CI-safe logging via ps-run
-#   - Explicit inputs for script and working directory
+#   - Strong input validation (paths, existence, traversal)
+#   - Minimal policy surface (caller chooses script/WD explicitly)
 #
 # Dependencies:
 #   - ./.github/actions/ps-run
 #   - tools/scripts/tasks/build.sh (default)
+#   - tools/scripts/branding/print-section.sh (optional, for UX)
 #
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#   - ./.github/workflows/build-artifacts.yml
-#
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#   - Invoked by: PR gates and build-artifacts workflows
-#
-# Security & Policy Notes:
-#   - Secrets: optional NODE_AUTH_TOKEN (passed by caller if needed)
-#   - Permissions: inherited from the caller (read-only expected)
-#   - Constraints: build script must exist in the repository
-#
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: produced by the build script (if any)
-#   - CI vs local: same build script used locally
 # ==============================================================================
 
 name: "Build (PS)"
@@ -46,7 +30,7 @@ description: "Run deterministic build steps via ps-run"
 
 inputs:
   id:
-    description: "Stable step id used by ps-run for logs/reports"
+    description: "Stable step id used by ps-run for logs/reports (kebab-case recommended)"
     required: false
     default: "build"
 
@@ -70,40 +54,90 @@ inputs:
     required: false
     default: "tools/scripts/tasks/build.sh"
 
-  # Optional: allow callers to pass args through to the script (space-separated).
-  # If you need structured args, prefer implementing parsing inside the script.
   args:
-    description: "Optional arguments to pass to the build script (space-separated)"
+    description: "Optional arguments to pass to the build script (space-separated). Prefer parsing inside the script."
     required: false
     default: ""
+
+  allow_args:
+    description: "Allow passing args through (1 = allow, 0 = deny). Deny strengthens determinism."
+    required: false
+    default: "1"
 
 runs:
   using: "composite"
   steps:
-    - name: "Validate inputs: script"
-      if: "${{ inputs.script == '' }}"
-      shell: bash
-      run: |
-        echo "ERROR: inputs.script is required." >&2
-        exit 1
-
-    - name: "Validate inputs: working-directory"
-      if: "${{ inputs.working-directory == '' }}"
-      shell: bash
-      run: |
-        echo "ERROR: inputs.working-directory is required." >&2
-        exit 1
-
-    - name: "Log config (build)"
+    # --------------------------------------------------------------------------
+    # Validate inputs once, strongly (paths, existence, traversal)
+    # --------------------------------------------------------------------------
+    - name: Validate inputs (build)
       shell: bash
       env:
-        PS_WORKING_DIR: ${{ inputs.working-directory }}
+        PS_ID: ${{ inputs.id }}
+        PS_TITLE: ${{ inputs.title }}
+        PS_DESC: ${{ inputs.description }}
+        PS_WD: ${{ inputs.working-directory }}
         PS_SCRIPT: ${{ inputs.script }}
+        PS_ARGS: ${{ inputs.args }}
+        PS_ALLOW_ARGS: ${{ inputs.allow_args }}
       run: |
         set -euo pipefail
-        printf 'PS.BUILD: working-directory=%s\n' "$PS_WORKING_DIR"
-        printf 'PS.BUILD: script=%s\n' "$PS_SCRIPT"
 
+        fail() { echo "ERROR: $*" >&2; exit 1; }
+
+        # Required-ish: non-empty strings
+        [[ -n "${PS_ID}" ]] || fail "inputs.id must not be empty"
+        [[ -n "${PS_TITLE}" ]] || fail "inputs.title must not be empty"
+        [[ -n "${PS_DESC}" ]] || fail "inputs.description must not be empty"
+        [[ -n "${PS_WD}" ]] || fail "inputs.working-directory must not be empty"
+        [[ -n "${PS_SCRIPT}" ]] || fail "inputs.script must not be empty"
+
+        # Boolean validation
+        [[ "${PS_ALLOW_ARGS}" == "0" || "${PS_ALLOW_ARGS}" == "1" ]] || fail "inputs.allow_args must be '0' or '1'"
+
+        # Determinism: optionally deny args
+        if [[ "${PS_ALLOW_ARGS}" == "0" && -n "${PS_ARGS}" ]]; then
+          fail "args provided but inputs.allow_args=0 (denied)"
+        fi
+
+        # Prevent path traversal / absolute paths (repo-relative only)
+        case "${PS_WD}" in
+          /*) fail "working-directory must be repo-relative, not absolute: ${PS_WD}" ;;
+          *".."*) fail "working-directory must not contain '..': ${PS_WD}" ;;
+        esac
+        case "${PS_SCRIPT}" in
+          /*) fail "script must be repo-relative, not absolute: ${PS_SCRIPT}" ;;
+          *".."*) fail "script must not contain '..': ${PS_SCRIPT}" ;;
+        esac
+
+        # Existence checks (action should fail fast and clearly)
+        [[ -d "${GITHUB_WORKSPACE}/${PS_WD}" ]] || fail "working-directory does not exist: ${PS_WD}"
+        [[ -f "${GITHUB_WORKSPACE}/${PS_SCRIPT}" ]] || fail "script not found: ${PS_SCRIPT}"
+
+        # Optional: sanity check ID format (soft guardrail)
+        if ! [[ "${PS_ID}" =~ ^[a-z0-9]+([a-z0-9-]*[a-z0-9])?$ ]]; then
+          printf 'WARN: inputs.id is not kebab-case safe: %s\n' "${PS_ID}" >&2
+        fi
+
+        # UX section header if platform branding exists
+        section_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/print-section.sh"
+        if [[ -f "${section_sh}" ]]; then
+          bash "${section_sh}" "build.config" "Build configuration"
+        fi
+
+        printf 'PS.BUILD: id=%s\n' "${PS_ID}"
+        printf 'PS.BUILD: title=%s\n' "${PS_TITLE}"
+        printf 'PS.BUILD: working-directory=%s\n' "${PS_WD}"
+        printf 'PS.BUILD: script=%s\n' "${PS_SCRIPT}"
+        if [[ -n "${PS_ARGS}" ]]; then
+          printf 'PS.BUILD: args=%s\n' "${PS_ARGS}"
+        else
+          printf 'PS.BUILD: args=<none>\n'
+        fi
+
+    # --------------------------------------------------------------------------
+    # Execute via ps-run for consistent logs/reports
+    # --------------------------------------------------------------------------
     - name: Run build (PS)
       uses: ./.github/actions/ps-run
       with:
@@ -118,4 +152,3 @@ runs:
       shell: bash
       run: |
         echo "PS.BUILD: OK"
-
