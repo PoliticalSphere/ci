@@ -15,9 +15,10 @@ set -euo pipefail
 #   - retry helper for transient failures
 #
 # Contract:
-#   - Exports / sets: repo_root
+#   - Exports / sets: REPO_ROOT (canonical); legacy variable $repo_root is also set for compatibility
 # ==============================================================================
 
+REPO_ROOT=""
 repo_root=""
 has_git=0
 format_loaded=0
@@ -29,6 +30,7 @@ _ps_realpath_dir() {
   else
     printf '%s' "$d"
   fi
+  return 0
 }
 
 set_repo_root() {
@@ -43,7 +45,9 @@ set_repo_root() {
   fi
 
   [[ -n "${root}" ]] || root="$(pwd)"
-  repo_root="$(_ps_realpath_dir "${root}")"
+  REPO_ROOT="$(_ps_realpath_dir "${root}")"
+  repo_root="$REPO_ROOT"  # legacy name kept for compatibility
+  export REPO_ROOT
   export repo_root
   return 0
 }
@@ -76,6 +80,7 @@ detail() {
   else
     echo "$*"
   fi
+  return 0
 }
 
 detail_err() {
@@ -84,6 +89,7 @@ detail_err() {
   else
     echo "$*" >&2
   fi
+  return 0
 }
 
 info() {
@@ -92,6 +98,7 @@ info() {
   else
     echo "$*"
   fi
+  return 0
 }
 
 warn() {
@@ -100,6 +107,7 @@ warn() {
   else
     echo "WARN: $*" >&2
   fi
+  return 0
 }
 
 error() {
@@ -108,6 +116,7 @@ error() {
   else
     echo "ERROR: $*" >&2
   fi
+  return 0
 }
 
 die() {
@@ -127,6 +136,7 @@ require_cmd() {
     fi
     die "${cmd} is required but was not found on PATH."
   fi
+  return 0
 }
 
 # ----------------------------

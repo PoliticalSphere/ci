@@ -38,6 +38,7 @@ _ps_realpath_dir() {
   else
     printf '%s' "$d"
   fi
+  return 0
 }
 
 _ps_has_git() {

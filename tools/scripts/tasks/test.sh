@@ -35,6 +35,7 @@ on_error() {
     error "Tests failed (exit ${rc})"
   fi
   exit "${rc}"
+  return 0
 }
 trap on_error ERR
 

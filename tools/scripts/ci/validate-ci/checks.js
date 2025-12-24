@@ -89,8 +89,9 @@ function compileRegex(reStr) {
   // unbounded quantifiers (e.g., `(.+)+`, `(.+)*`, `(a+){1,}`) which can lead
   // to super-linear runtime on crafted inputs. We reject patterns that use
   // an inner quantified group followed by another unbounded quantifier.
-  const nestedUnbounded =
-    /(\([^)]*(?:\+|\*|\{\s*\d+\s*,\s*\})[^)]*\))\s*(?:\+|\*|\{\s*\d+\s*,\s*\})/;
+  // Use a simpler, lower-complexity regex that checks for quantifier
+  // characters inside a capturing group followed by a quantifier after it.
+  const nestedUnbounded = /\([^)]*[+*{][^)]*\)\s*(?:[+*]|\{\s*\d+\s*,\s*\})/;
   if (nestedUnbounded.test(pattern)) {
     throw new Error(
       `unsafe regex pattern detected (potential catastrophic backtracking): ${pattern}`,

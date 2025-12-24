@@ -16,7 +16,7 @@ try {
   // Expect rejection with a specific error message (handle the exception explicitly)
   let threw = false;
   try {
-    compileRegex('(.+)+');
+    compileRegex(String.raw`(.+)+`);
     // If no error thrown, fail early
     fail("expected compileRegex('(.+)+') to throw an error");
   } catch (err) {
@@ -29,7 +29,7 @@ try {
   assert(threw, "expected compileRegex to reject '(.+)+'");
 
   // Allowed case: bounded repetition should not be rejected — if it throws, propagate the error
-  compileRegex('(\\.[0-9]+){0,2}$');
+  compileRegex(String.raw`(\\.[0-9]+){0,2}$`);
 
   // Test override hook: ensure a provided engine is used when set
   class FakeEngine {

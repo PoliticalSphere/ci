@@ -58,12 +58,10 @@ _ps_collect_staged_targets() {
 
   # Try capture from stdout first (preferred).
   local out=""
-  if out="$(collect_targets_staged "${pattern}" 2>/dev/null || true)"; then
-    if [[ -n "${out}" ]]; then
-      # shellcheck disable=SC2206 # we want word-splitting on newlines for file lists
-      targets=(${out})
-      return 0
-    fi
+  if out="$(collect_targets_staged "${pattern}" 2>/dev/null || true)" && [[ -n "${out}" ]]; then
+    # shellcheck disable=SC2206 # we want word-splitting on newlines for file lists
+    targets=(${out})
+    return 0
   fi
 
   # Fallback: if common.sh mutates global `targets`, copy it.

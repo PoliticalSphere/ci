@@ -60,6 +60,7 @@ _short_path() {
   else
     printf '%s' "${p}"
   fi
+  return 0
 }
 
 # Collect targets
