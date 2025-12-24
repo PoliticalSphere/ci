@@ -121,7 +121,14 @@ error() {
 
 die() {
   error "$*"
-  exit 1
+  # When this file is sourced, prefer returning an error code instead of
+  # terminating the entire process — this makes helpers safer for composed
+  # scripts and tests. When executed directly, exit with code 1 as before.
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 1
+  else
+    exit 1
+  fi
 }
 
 # ----------------------------
