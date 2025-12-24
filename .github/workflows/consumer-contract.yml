@@ -154,11 +154,12 @@ jobs:
         uses: ./.github/actions/ps-harden-runner
 
       - name: Node runtime (PS)
-        uses: ./.github/actions/ps-node-bootstrap
+        uses: ./.github/actions/ps-node-setup
         with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
           install_dependencies: "0"
+          skip_checkout: "1"
 
       - name: Contract check
         uses: ./.github/actions/consumer-contract

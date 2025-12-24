@@ -8,64 +8,71 @@ set -euo pipefail
 #   Detect unused or missing dependencies using knip.
 #
 # Modes:
-#   - Default (local): runs only when package files changed (fast)
+#   - Default (local): runs only when package/lock files changed (fast)
 #   - CI / full scan: runs across the repo when PS_FULL_SCAN=1 or CI=1
 #
-# Usage:
-#   bash tools/scripts/lint/knip.sh
-#   PS_FULL_SCAN=1 bash tools/scripts/lint/knip.sh
-# ============================================================================
+# Determinism:
+#   - Prefer repo-local binary (node_modules/.bin/knip)
+#   - Do NOT use npx in CI
+# ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/lint/common.sh
 . "${script_dir}/common.sh"
 
 set_repo_root_and_git
 set_full_scan_flag
 
-# If not full-scan, only run when package files changed
+# Fast mode: only run when dependency manifests/lockfiles changed.
 if [[ "${full_scan}" != "1" ]]; then
-  collect_targets_staged "package.json|package-lock.json|yarn.lock|pnpm-lock.yaml"
+  targets=()
+  collect_targets_staged "package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml"
   if [[ "${#targets[@]}" -eq 0 ]]; then
-    echo "Knip: no staged package files to check."
+    ps_detail "Knip: no staged package/lock files changed — skipping."
     exit 0
   fi
 fi
 
-KNIP_BIN=""
+KNIP_BIN="${KNIP_BIN:-}"
 KNIP_VIA_NPX=0
-if [[ -x "${repo_root}/node_modules/.bin/knip" ]]; then
+
+if [[ -n "${KNIP_BIN}" ]]; then
+  : # user override
+elif [[ -x "${repo_root}/node_modules/.bin/knip" ]]; then
   KNIP_BIN="${repo_root}/node_modules/.bin/knip"
 elif command -v knip >/dev/null 2>&1; then
   KNIP_BIN="$(command -v knip)"
-elif command -v npx >/dev/null 2>&1; then
+elif [[ "${CI:-0}" != "1" ]] && command -v npx >/dev/null 2>&1; then
   KNIP_BIN="$(command -v npx)"
   KNIP_VIA_NPX=1
-  ps_detail "knip not found locally — will attempt to run via npx (consider running: npm ci)"
+  ps_detail "knip not found locally — using npx (non-deterministic). Prefer: npm ci"
 else
   ps_error "knip is required but not found (run: npm ci)"
   exit 1
 fi
 
-KNIP_ARGS=(--reporter compact "${repo_root}")
+# Knip invocation
+# - reporter compact for stable output
+# - run from repo root; pass '.' rather than absolute path (cleaner output)
+declare -a KNIP_ARGS=(--reporter compact .)
 
-run_knip() {
-  if [[ "${KNIP_VIA_NPX}" -eq 1 ]]; then
-    (cd "${repo_root}" && "${KNIP_BIN}" --yes knip "${KNIP_ARGS[@]}")
-  else
-    (cd "${repo_root}" && "${KNIP_BIN}" "${KNIP_ARGS[@]}")
-  fi
-  local rc=$?
-  return "${rc}"
-}
-
-output="$(run_knip 2>&1)" || true
+output=""
+status=0
+set +e
+if [[ "${KNIP_VIA_NPX}" -eq 1 ]]; then
+  output="$(cd "${repo_root}" && "${KNIP_BIN}" --yes knip "${KNIP_ARGS[@]}" 2>&1)"
+else
+  output="$(cd "${repo_root}" && "${KNIP_BIN}" "${KNIP_ARGS[@]}" 2>&1)"
+fi
 status=$?
+set -e
+
 if [[ -n "${output}" ]]; then
-  # Filter empty lines
-  filtered="$(printf '%s\n' "${output}" | grep -Ev '^\s*$' || true)"
+  # Trim purely empty lines; keep everything else (findings are actionable)
+  filtered="$(printf '%s\n' "${output}" | grep -Ev '^[[:space:]]*$' || true)"
   if [[ -n "${filtered}" ]]; then
     printf '%s\n' "${filtered}"
   fi
 fi
-exit ${status}
+
+exit "${status}"

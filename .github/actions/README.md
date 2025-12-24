@@ -89,9 +89,9 @@ Baseline building blocks:
 
 Node toolchain:
 
-- `ps-node-bootstrap`: setup Node and run `npm ci` deterministically
-- `ps-node-setup`: checkout + bootstrap Node toolchain
-- `ps-setup`: harden runner + node setup (single step)
+- `ps-bootstrap`: standard workspace bootstrap (prepare HOME, platform checkout helpers)
+- `ps-node-setup`: checkout + setup Node.js toolchain with optional deterministic installs (cache, npm ci)
+- `ps-setup`: harden runner + node setup (single step). It is the canonical bootstrap entrypoint; supports optional dependency install (`install_dependencies`), tool bundle install (`install_tools`, `tools_bundle`, `tools_extra`), and `working_directory` for monorepos.
 
 Lint + quality:
 

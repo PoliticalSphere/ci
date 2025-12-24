@@ -17,7 +17,6 @@
   "scripts": {
     "lint": "npm -s run lint:all",
     "lint:all": "npm -s run lint:biome && npm -s run lint:eslint && npm -s run lint:yaml && npm -s run lint:actionlint && npm -s run lint:hadolint && npm -s run lint:shellcheck && npm -s run lint:markdown && npm -s run lint:cspell && npm -s run lint:knip",
-
     "lint:fix": "npm -s run lint:biome:fix && npm -s run lint:eslint:fix",
     "lint:biome": "bash tools/scripts/lint/biome.sh",
     "lint:biome:fix": "bash tools/scripts/lint/biome.sh --write",
@@ -30,19 +29,15 @@
     "lint:markdown": "bash tools/scripts/lint/markdownlint.sh",
     "lint:cspell": "bash tools/scripts/lint/cspell.sh",
     "lint:knip": "bash tools/scripts/lint/knip.sh",
-
     "gate:pre-commit": "bash tools/scripts/gates/gate-pre-commit.sh",
     "gate:pre-push": "bash tools/scripts/gates/gate-pre-push.sh",
-
     "typecheck": "bash tools/scripts/tasks/typecheck.sh",
     "test": "bash tools/scripts/tasks/test.sh",
     "build": "node -e \"console.log('Build: no-op (platform repo)')\"",
     "jscpd": "bash tools/scripts/tasks/jscpd.sh",
-
     "license-check": "bash tools/scripts/security/license-check.sh",
     "consumer-contract": "bash tools/scripts/consumer/contract-check.sh",
     "validate-ci": "node tools/scripts/ci/validate-ci/index.js",
-
     "preflight": "npm -s run lint && npm -s run typecheck && npm -s run test && npm -s run jscpd",
     "ci": "npm -s run preflight"
   },
@@ -57,6 +52,7 @@
     "eslint-plugin-security": "1.7.0",
     "eslint-plugin-sonarjs": "3.0.5",
     "eslint-plugin-unicorn": "50.0.1",
+    "globals": "^16.5.0",
     "jscpd": "4.0.5",
     "knip": "5.76.3",
     "markdownlint-cli2": "0.20.0",

@@ -172,11 +172,12 @@ jobs:
           fetch-depth: 1
 
       - name: Node runtime (PS)
-        uses: ./.github/actions/ps-node-bootstrap
+        uses: ./.github/actions/ps-node-setup
         with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
+          skip_checkout: "1"
 
       - name: License compliance
         uses: ./.github/actions/license-check

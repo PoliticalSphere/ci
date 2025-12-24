@@ -52,7 +52,7 @@ inputs:
     default: ".tooling/bin"
 
   tools:
-    description: "Comma-separated tool list (actionlint,shellcheck,hadolint,yamllint,gitleaks,trivy)"
+    description: "Newline-separated tool list (one id per line). Valid ids: actionlint, shellcheck, hadolint, yamllint, gitleaks, trivy"
     required: true
 
 runs:
@@ -102,11 +102,6 @@ runs:
         install_dir="${PS_INSTALL_DIR_INPUT:-}"
 
         require_nonempty "inputs.tools" "${tools_raw}" || exit 1
-        require_regex \
-          "inputs.tools" \
-          "${tools_raw}" \
-          '^[a-z0-9,-]+$' \
-          "Allowed: lowercase letters, digits, comma, hyphen." || exit 1
 
         # install_dir must be a safe repo-relative path (no absolute, no traversal)
         require_nonempty "inputs.install_dir" "${install_dir}" || exit 1
@@ -119,20 +114,21 @@ runs:
           exit 1
         fi
 
-        # Parse and validate tool list (trim whitespace defensively)
-        IFS=',' read -r -a tools_arr <<< "${tools_raw}"
+        # Split newline-separated list into array and validate each id
+        mapfile -t tools_arr <<< "${tools_raw}"
         if [[ "${#tools_arr[@]}" -eq 0 ]]; then
           v_error "inputs.tools must include at least one tool name"
           exit 1
         fi
 
         for tool in "${tools_arr[@]}"; do
-          tool="$(printf '%s' "${tool}" | xargs)"
-            exit 1
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          if [[ -z "${tool_trim}" ]]; then
+            continue
           fi
           require_enum \
             "tool" \
-            "${tool}" \
+            "${tool_trim}" \
             actionlint shellcheck hadolint yamllint gitleaks trivy || exit 1
         done
 
@@ -156,11 +152,41 @@ runs:
         fi
 
         tools_raw="${PS_TOOLS_RAW:-}"
-        IFS=',' read -r -a tools_arr <<< "${tools_raw}"
+
+        # Split newline-separated tool list into array, trim, validate, and dedupe
+        mapfile -t tools_arr <<< "${tools_raw}"
+        if [[ "${#tools_arr[@]}" -eq 0 ]]; then
+          v_error "inputs.tools must include at least one tool id"
+          exit 1
+        fi
+
+        # Normalize and validate tool entries
+        declare -A seen
+        normalized_tools=()
+        for t in "${tools_arr[@]}"; do
+          t_trim="$(printf '%s' "${t}" | sed 's/^\s*//; s/\s*$//')"
+          if [[ -z "${t_trim}" ]]; then
+            continue
+          fi
+          if ! printf '%s' "${t_trim}" | grep -Eq '^[a-z0-9-]+$'; then
+            v_error "invalid tool id in inputs.tools: ${t_trim} (allowed: lowercase letters, digits, hyphen)"
+            exit 1
+          fi
+          if [[ -n "${seen[${t_trim}]:-}" ]]; then
+            continue
+          fi
+          seen[${t_trim}]=1
+          normalized_tools+=("${t_trim}")
+        done
+
+        if [[ "${#normalized_tools[@]}" -eq 0 ]]; then
+          v_error "inputs.tools must include at least one non-empty valid tool id"
+          exit 1
+        fi
 
         export PS_INSTALL_DIR="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
         mkdir -p "${PS_INSTALL_DIR}"
 
-        bash "${installer}" "${tools_arr[@]}"
+        bash "${installer}" "${normalized_tools[@]}"
 
         echo "PS.INSTALL_TOOLS: OK"

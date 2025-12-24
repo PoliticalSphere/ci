@@ -20,12 +20,26 @@ init_repo_context
 
 cd "${repo_root}"
 
-export CI="${CI:-0}"
+CI="${CI:-0}"
 branding_script="${repo_root}/tools/scripts/branding/print-section.sh"
-
 tests_dir="${repo_root}/tools/tests"
+
+current_test_file=""
+
+on_error() {
+  local rc=$?
+  if [[ -n "${current_test_file}" ]]; then
+    error "Test failed: $(basename "${current_test_file}") (exit ${rc})"
+    detail_err "Path: ${current_test_file}"
+  else
+    error "Tests failed (exit ${rc})"
+  fi
+  exit "${rc}"
+}
+trap on_error ERR
+
 if [[ ! -d "${tests_dir}" ]]; then
-  if [[ "${CI}" == "1" ]]; then
+  if [[ "${CI}" != "0" ]]; then
     error "tools/tests not found (CI requires tests)."
     exit 1
   fi
@@ -44,32 +58,15 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
-# Discover all test files under tools/tests and run them (portable)
-found_any=0
+# Discover test files (recursive) in a portable way.
+# Avoid `sort -z` (not portable on macOS/BSD). We collect unsorted, then sort with newline delim.
 test_files=()
-while IFS= read -r -d '' f; do
-  test_files+=("${f}")
-done < <(find "${tests_dir}" -maxdepth 1 -type f -name '*.test.js' -print0 | sort -z)
+while IFS= read -r f; do
+  test_files+=("$f")
+done < <(find "${tests_dir}" -type f -name '*.test.js' -print | LC_ALL=C sort)
 
-if [[ "${#test_files[@]}" -gt 0 ]]; then
-  found_any=1
-  if [[ -x "${branding_script}" ]]; then
-    bash "${branding_script}" "tests" "Running tests" "tools/tests"
-  else
-    echo "Running tests: tools/tests"
-  fi
-  for f in "${test_files[@]}"; do
-    if [[ -x "${branding_script}" ]]; then
-      bash "${branding_script}" "test" "Running test" "$(basename "${f}")"
-    else
-      printf 'Running test: %q\n' "$(basename "${f}")"
-    fi
-    node "${f}"
-  done
-fi
-
-if [[ ${found_any} -eq 0 ]]; then
-  if [[ "${CI}" == "1" ]]; then
+if [[ "${#test_files[@]}" -eq 0 ]]; then
+  if [[ "${CI}" != "0" ]]; then
     error "test harness missing under tools/tests (CI requires tests)."
     exit 1
   fi
@@ -79,8 +76,25 @@ if [[ ${found_any} -eq 0 ]]; then
 fi
 
 if [[ -x "${branding_script}" ]]; then
+  bash "${branding_script}" "tests" "Running tests" "tools/tests"
+else
+  echo "Running tests: tools/tests"
+fi
+
+for f in "${test_files[@]}"; do
+  current_test_file="${f}"
+  if [[ -x "${branding_script}" ]]; then
+    bash "${branding_script}" "test" "Running test" "$(basename "${f}")"
+  else
+    printf 'Running test: %s\n' "$(basename "${f}")"
+  fi
+  node "${f}"
+done
+
+current_test_file=""
+
+if [[ -x "${branding_script}" ]]; then
   bash "${branding_script}" "tests.result" "Tests passed" "${#test_files[@]} test file(s) validated"
 else
-  count="${#test_files[@]}"
-  printf 'Tests passed: %q\n' "${count} test file(s) validated"
+  printf 'Tests passed: %s test file(s) validated\n' "${#test_files[@]}"
 fi

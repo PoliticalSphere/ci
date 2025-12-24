@@ -2,7 +2,7 @@
 set -euo pipefail
 
 # ==============================================================================
-# Political Sphere — Formatting Helpers
+# Political Sphere — Formatting Helpers (Single Source of Truth)
 # ------------------------------------------------------------------------------
 # Purpose:
 #   Shared output helpers for consistent CLI formatting across bash scripts.
@@ -15,12 +15,14 @@ set -euo pipefail
 #   NO_COLOR=1        Disable colour output (any non-empty disables)
 #   FORCE_COLOR=1     Force colour output (any non-zero enables)
 #   PS_FORMAT_ENV=... Override path to format.env
+#
+# UI:
+#   PS_FMT_WIDTH=40               Shared rule width
+#   PS_FMT_RULE_CHAR=─            Character for rules
 # ==============================================================================
 
 # Prevent double-loading when sourced by multiple scripts.
 if [[ "${PS_FORMAT_LOADED:-0}" == "1" ]]; then
-  # If this file is sourced, return; if executed, exit. Use explicit check so
-  # ShellCheck doesn't warn about unreachable 'return'.
   if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
     return 0
   else
@@ -37,7 +39,9 @@ if [[ -f "${format_env}" ]]; then
   . "${format_env}"
 fi
 
+# ----------------------------
 # Defaults (overridable)
+# ----------------------------
 PS_FMT_ICON="${PS_FMT_ICON:-▶}"
 PS_FMT_SEPARATOR="${PS_FMT_SEPARATOR:-—}"
 PS_FMT_DETAIL_INDENT="${PS_FMT_DETAIL_INDENT:-  }"
@@ -45,12 +49,24 @@ PS_FMT_BULLET_INDENT="${PS_FMT_BULLET_INDENT:-  }"
 PS_FMT_BULLET="${PS_FMT_BULLET:--}"
 PS_FMT_SECTION_ID_CASE="${PS_FMT_SECTION_ID_CASE:-upper}"
 
+# UI layout
+PS_FMT_WIDTH="${PS_FMT_WIDTH:-40}"
+PS_FMT_RULE_CHAR="${PS_FMT_RULE_CHAR:-─}"
+
 # ANSI formatting codes (overridable)
 PS_FMT_RESET="${PS_FMT_RESET:-$'\033[0m'}"
 PS_FMT_DIM="${PS_FMT_DIM:-$'\033[2m'}"
 PS_FMT_BOLD="${PS_FMT_BOLD:-$'\033[1m'}"
 
+# Build the shared rule line exactly once
+PS_FMT_RULE="${PS_FMT_RULE:-}"
+if [[ -z "${PS_FMT_RULE}" ]]; then
+  PS_FMT_RULE="$(printf "%*s" "${PS_FMT_WIDTH}" "" | tr " " "${PS_FMT_RULE_CHAR}")"
+fi
 
+# ----------------------------
+# Capability: colour support
+# ----------------------------
 ps_supports_color() {
   # NO_COLOR: treat any non-empty value as "disable"
   if [[ -n "${NO_COLOR:-}" && "${NO_COLOR:-}" != "0" ]]; then
@@ -60,10 +76,12 @@ ps_supports_color() {
   if [[ "${FORCE_COLOR:-0}" != "0" ]]; then
     return 0
   fi
-  [[ -t 1 ]] && return 0 || return 1
+  [[ -t 1 && -n "${TERM:-}" && "${TERM}" != "dumb" ]] && return 0 || return 1
 }
 
-# Internal: print to stdout or stderr with optional ANSI style prefix/suffix.
+# ----------------------------
+# Internal printer
+# ----------------------------
 _ps_print() {
   local fd="${1:?fd required}" ; shift
   local prefix="${1:-}" ; shift
@@ -83,6 +101,14 @@ _ps_print() {
       printf "%s\n" "${msg}"
     fi
   fi
+  return 0
+}
+
+# ----------------------------
+# Public helpers
+# ----------------------------
+ps_rule() {
+  printf "%s\n" "${PS_FMT_RULE}"
   return 0
 }
 

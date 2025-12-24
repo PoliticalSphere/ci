@@ -9,17 +9,18 @@
 #   - Last updated: 2025-12-20
 #
 # Scope & Responsibilities:
-#   - Does: harden the runner, checkout code, setup Node.js, optionally install deps.
+#   - Does: harden the runner, checkout code, setup Node.js, optionally install deps and install tool bundles.
 #   - Does NOT: run build/test scripts or change job permissions.
 #
 # Design Principles:
 #   - Deterministic and non-interactive execution
-#   - Explicit inputs with safe defaults
+#   - Explicit inputs with safe defaults (no unexpected heavy network installs)
 #   - SHA-pinned actions only
 #
-# Dependencies:
-#   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-node-setup
+# Dependencies & assumptions:
+#   - Expects platform scripts to be available at PS_PLATFORM_ROOT (set by prior ps-bootstrap step)
+#   - ps-bootstrap must run before ps-setup in workflows where tool bundling or validation is required
+#   - Uses ./.github/actions/ps-node-setup for node/tool bootstrapping
 #
 # Dependents:
 #   - (Optional) workflows that want a single setup step
@@ -58,13 +59,29 @@ inputs:
     required: false
     default: "0"
   cache:
-    description: "Enable dependency caching in ps-node-bootstrap (1 = on, 0 = off)"
+    description: "Enable dependency caching in Node setup (1 = on, 0 = off)"
     required: false
     default: "1"
   install_dependencies:
-    description: "Run npm ci in ps-node-bootstrap (1 = on, 0 = off)"
+    description: "Run npm ci in Node setup (1 = on, 0 = off). Defaults to 0 to avoid unexpected network installs."
     required: false
-    default: "1"
+    default: "0"
+  install_tools:
+    description: "Install pinned CLI tools via ps-install-tools (1 = on, 0 = off)"
+    required: false
+    default: "0"
+  tools_bundle:
+    description: "Predefined tools bundle to install (lint, security, none)"
+    required: false
+    default: "none"
+  tools_extra:
+    description: "Optional newline-separated list of extra tool ids to install (one per line)"
+    required: false
+    default: ""
+  working_directory:
+    description: "Working directory for dependency installation (repo-relative). Default '.' installs at repo root."
+    required: false
+    default: "."
   skip_harden:
     description: "Skip the built-in runner hardening step (1 = skip, 0 = run). Use when calling step-security/harden-runner from the workflow to ensure pre/post hooks run correctly."
     required: false
@@ -77,6 +94,73 @@ runs:
       if: ${{ inputs.skip_harden != '1' }}
       uses: ./.github/actions/ps-harden-runner
 
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_PLATFORM_ROOT: ${{ env.PS_PLATFORM_ROOT }}
+        PS_FETCH_DEPTH_INPUT: ${{ inputs.fetch_depth }}
+        PS_SKIP_CHECKOUT_INPUT: ${{ inputs.skip_checkout }}
+        PS_CACHE_INPUT: ${{ inputs.cache }}
+        PS_INSTALL_DEP_INPUT: ${{ inputs.install_dependencies }}
+        PS_INSTALL_TOOLS_INPUT: ${{ inputs.install_tools }}
+        PS_TOOLS_BUNDLE_INPUT: ${{ inputs.tools_bundle }}
+        PS_SKIP_HARDEN_INPUT: ${{ inputs.skip_harden }}
+        PS_WORKING_DIR_INPUT: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${PS_PLATFORM_ROOT:-}" || ! -d "${PS_PLATFORM_ROOT}" ]]; then
+          printf 'ERROR: PS_PLATFORM_ROOT not set or missing; ps-bootstrap must run before ps-setup and provide platform scripts for validation.\n' >&2
+          exit 1
+        fi
+
+        validate_sh="${PS_PLATFORM_ROOT}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          printf 'ERROR: validate-inputs.sh not found at %s; cannot validate inputs. Ensure platform scripts are available at PS_PLATFORM_ROOT.\n' "${validate_sh}" >&2
+          exit 1
+        fi
+
+        # shellcheck source=/dev/null
+        . "${validate_sh}"
+
+        # Validate numeric fetch_depth >= 0
+        if ! require_number "inputs.fetch_depth" "${PS_FETCH_DEPTH_INPUT}"; then
+          printf 'ERROR: inputs.fetch_depth must be a non-negative number. Got: %s\n' "${PS_FETCH_DEPTH_INPUT}" >&2
+          exit 1
+        fi
+        if (( PS_FETCH_DEPTH_INPUT < 0 )); then
+          printf 'ERROR: inputs.fetch_depth must be >= 0\n' >&2
+          exit 1
+        fi
+
+        # Validate boolean flags (only "1" or "0")
+        require_enum "inputs.skip_checkout" "${PS_SKIP_CHECKOUT_INPUT}" "1" "0" || exit 1
+        require_enum "inputs.cache" "${PS_CACHE_INPUT}" "1" "0" || exit 1
+        require_enum "inputs.install_dependencies" "${PS_INSTALL_DEP_INPUT}" "1" "0" || exit 1
+        require_enum "inputs.install_tools" "${PS_INSTALL_TOOLS_INPUT}" "1" "0" || exit 1
+        require_enum "inputs.skip_harden" "${PS_SKIP_HARDEN_INPUT}" "1" "0" || exit 1
+
+        # Validate tools bundle enum
+        require_enum "inputs.tools_bundle" "${PS_TOOLS_BUNDLE_INPUT}" "lint" "security" "none" || exit 1
+
+        # Validate working directory (repo-relative, not absolute, no traversal)
+        wd="${PS_WORKING_DIR_INPUT:-}"
+        if [[ -z "${wd}" ]]; then
+          printf 'ERROR: inputs.working_directory must be non-empty\n' >&2
+          exit 1
+        fi
+        if [[ "${wd}" == /* ]]; then
+          v_error "inputs.working_directory must be repo-relative (must not start with /)"
+          exit 1
+        fi
+        if [[ "${wd}" == *".."* ]]; then
+          v_error "inputs.working_directory must not contain '..' path traversal"
+          exit 1
+        fi
+
+        # Persist validated working dir
+        printf 'PS_WORKING_DIR=%s\n' "${wd}" >> "${GITHUB_ENV}"
+
     - name: Setup summary (PS)
       shell: bash
       env:
@@ -85,17 +169,15 @@ runs:
         PS_REF_INPUT: ${{ inputs.ref }}
         PS_CACHE: ${{ inputs.cache }}
         PS_INSTALL_DEPS: ${{ inputs.install_dependencies }}
+        PS_INSTALL_TOOLS: ${{ inputs.install_tools }}
+        PS_TOOLS_BUNDLE: ${{ inputs.tools_bundle }}
+        PS_WORKING_DIR: ${{ inputs.working_directory }}
       run: |
         set -euo pipefail
-        printf 'PS.SETUP: node_version=%q\n' "$PS_NODE_VERSION"
-        printf 'PS.SETUP: fetch_depth=%q\n' "$PS_FETCH_DEPTH"
-        if [[ -n "${PS_REF_INPUT}" ]]; then
-          printf 'PS.SETUP: ref=%s\n' "${PS_REF_INPUT}"
-        else
-          printf 'PS.SETUP: ref=<default>\n'
-        fi
-        printf 'PS.SETUP: cache=%s\n' "${PS_CACHE}"
-        printf 'PS.SETUP: install_dependencies=%s\n' "${PS_INSTALL_DEPS}"
+
+        # Use platform's branding for consistent section printing
+        bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
+          "setup.summary" "node_version=${PS_NODE_VERSION} fetch_depth=${PS_FETCH_DEPTH} ref=${PS_REF_INPUT:-<default>} cache=${PS_CACHE} install_dependencies=${PS_INSTALL_DEPS} install_tools=${PS_INSTALL_TOOLS} tools_bundle=${PS_TOOLS_BUNDLE} working_directory=${PS_WORKING_DIR}"
 
     - name: Node setup (PS)
       uses: ./.github/actions/ps-node-setup
@@ -106,6 +188,86 @@ runs:
         skip_checkout: ${{ inputs.skip_checkout }}
         cache: ${{ inputs.cache }}
         install_dependencies: ${{ inputs.install_dependencies }}
+
+    - name: Prepare tools list (PS)
+      if: ${{ inputs.install_tools == '1' }}
+      shell: bash
+      env:
+        PS_TOOLS_BUNDLE_INPUT: ${{ inputs.tools_bundle }}
+        PS_TOOLS_EXTRA_INPUT: ${{ inputs.tools_extra }}
+        PS_PLATFORM_ROOT: ${{ env.PS_PLATFORM_ROOT }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${PS_PLATFORM_ROOT:-}" || ! -d "${PS_PLATFORM_ROOT}" ]]; then
+          printf 'ERROR: PS_PLATFORM_ROOT not set or missing; cannot validate tool inputs. Ensure ps-bootstrap has run and PS_PLATFORM_ROOT points to platform checkout.\n' >&2
+          exit 1
+        fi
+
+        validate_sh="${PS_PLATFORM_ROOT}/tools/scripts/branding/validate-inputs.sh"
+        if [[ ! -f "${validate_sh}" ]]; then
+          printf 'ERROR: validate-inputs.sh not found at %s; cannot validate tools.\n' "${validate_sh}" >&2
+          exit 1
+        fi
+
+        # shellcheck source=/dev/null
+        . "${validate_sh}"
+
+        require_enum "inputs.tools_bundle" "${PS_TOOLS_BUNDLE_INPUT}" "lint" "security" "none" || exit 1
+
+        # Build newline-separated tool list deterministically
+        tools_list=""
+        if [[ "${PS_TOOLS_BUNDLE_INPUT}" == "lint" ]]; then
+          tools_list=$'actionlint\nshellcheck\nhadolint\nyamllint'
+        elif [[ "${PS_TOOLS_BUNDLE_INPUT}" == "security" ]]; then
+          # Security bundle includes gitleaks by default; add trivy via tools_extra if desired
+          tools_list=$'gitleaks'
+        fi
+
+        # Normalize extra tools list (newline-separated) and append
+        PS_TOOLS_EXTRA_INPUT_TRIMMED="$(printf '%s' "${PS_TOOLS_EXTRA_INPUT}" | sed 's/^\s*//; s/\s*$//')"
+        if [[ -n "${PS_TOOLS_EXTRA_INPUT_TRIMMED}" ]]; then
+          # split into lines, trim, and append unique entries
+          mapfile -t extras_arr <<< "${PS_TOOLS_EXTRA_INPUT_TRIMMED}"
+          for ex in "${extras_arr[@]}"; do
+            ex_trim="$(printf '%s' "${ex}" | sed 's/^\s*//; s/\s*$//')"
+            if [[ -z "${ex_trim}" ]]; then
+              continue
+            fi
+            # ensure valid tool id format
+            if ! printf '%s' "${ex_trim}" | grep -Eq '^[a-z0-9-]+$'; then
+              v_error "invalid tool id in inputs.tools_extra: ${ex_trim} (allowed: lowercase letters, digits, hyphen)"
+              exit 1
+            fi
+            # avoid duplicates
+            if ! printf '%s' "${tools_list}" | grep -Fxq "${ex_trim}"; then
+              if [[ -n "${tools_list}" ]]; then
+                tools_list+=$'\n'
+              fi
+              tools_list+="${ex_trim}"
+            fi
+          done
+        fi
+
+        if [[ -z "${tools_list}" ]]; then
+          v_error "no tools selected (tools_bundle=none and tools_extra empty)"
+          exit 1
+        fi
+
+        printf 'PS.SETUP: tools=%s\n' "${tools_list}"
+        printf 'PS_TOOLS=%s\n' "${tools_list}" >> "${GITHUB_ENV}"
+
+    - name: Install tools (PS)
+      if: ${{ inputs.install_tools == '1' }}
+      uses: ./.github/actions/ps-install-tools
+      with:
+        tools: ${{ env.PS_TOOLS }}
+
+    - name: Install tools (PS)
+      if: ${{ inputs.install_tools == '1' }}
+      uses: ./.github/actions/ps-install-tools
+      with:
+        tools: ${{ env.PS_TOOLS }}
 
     - name: Setup complete
       shell: bash

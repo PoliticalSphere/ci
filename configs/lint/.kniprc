@@ -1,5 +1,21 @@
-{
-  "entryPoints": ["."],
-  "ignores": ["node_modules", "dist", "build", "coverage", "reports"],
-  "skipUnusedPeer": true
-}
+[{
+	"resource": "/Users/morganlowman/CI/configs/lint/.kniprc",
+	"owner": "_generated_diagnostic_collection_name_#3",
+	"severity": 4,
+	"message": "Property skipUnusedPeerDependencies is not allowed.",
+	"startLineNumber": 26,
+	"startColumn": 3,
+	"endLineNumber": 26,
+	"endColumn": 31,
+	"origin": "extHost1"
+},{
+	"resource": "/Users/morganlowman/CI/configs/lint/.kniprc",
+	"owner": "_generated_diagnostic_collection_name_#3",
+	"severity": 4,
+	"message": "Property reporter is not allowed.",
+	"startLineNumber": 27,
+	"startColumn": 3,
+	"endLineNumber": 27,
+	"endColumn": 13,
+	"origin": "extHost1"
+}]

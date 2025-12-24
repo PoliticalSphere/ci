@@ -184,14 +184,11 @@ jobs:
           path: .ps-platform
           fetch-depth: 1
 
-      - name: Point HOME at workspace temp
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "runner.home" "Prepare HOME directory"
-          mkdir -p "${GITHUB_WORKSPACE}/.home"
-          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap
+        with:
+          platform_root: ${{ github.workspace }}/.ps-platform
+          home_dir: ".home"
 
       - name: Prepare runner (PS)
         uses: ./.github/actions/ps-setup
@@ -246,14 +243,11 @@ jobs:
           fetch-depth: ${{ inputs.fetch_depth }}
 
 
-      - name: Point HOME at workspace temp
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash "${GITHUB_WORKSPACE}/tools/scripts/branding/print-section.sh" \
-            "runner.home" "Prepare HOME directory"
-          mkdir -p "${GITHUB_WORKSPACE}/.home"
-          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap
+        with:
+          platform_root: ${{ github.workspace }}
+          home_dir: ".home"
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
