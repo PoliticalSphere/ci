@@ -19,6 +19,8 @@ try {
       PS_PLATFORM_ROOT: repoRoot,
       // Use a restricted PATH containing only fixed, non-writable system dirs
       PATH: '/usr/bin:/bin:/usr/sbin:/sbin',
+      HOME: process.env.HOME,
+      USER: process.env.USER,
     };
     execFileSync(
       'bash',
