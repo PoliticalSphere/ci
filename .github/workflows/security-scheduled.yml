@@ -178,25 +178,24 @@ jobs:
       contents: read
     timeout-minutes: 20
     steps:
-      - name: Job bootstrap (PS)
-        uses: ./.github/actions/ps-job-bootstrap
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-job-setup
         with:
+          # checkout & platform
           fetch_depth: 0
           platform_ref: 'main'
           platform_path: .ps-platform
-          home_dir: ${{ runner.temp }}
-          egress_policy: audit
           skip_platform_checkout: "false"
 
-      - name: Setup (PS) — install security tools
-        uses: ./.github/actions/ps-setup
-        with:
-          fetch_depth: ${{ inputs.fetch_depth }}
+          # HOME and harden
+          home_dir: ${{ runner.temp }}
+          egress_policy: audit
+
+          # node/tools
           cache: ${{ inputs.cache }}
           install_tools: "1"
           tools_bundle: "security"
           skip_checkout: "1"
-          skip_harden: "1"
 
       - name: Secrets scan (full)
         uses: ./.github/actions/ps-run
@@ -462,10 +461,20 @@ jobs:
           path: .ps-platform
           fetch-depth: 1
 
-      - name: Setup (PS) — install security tools
-        uses: ./.github/actions/ps-setup
+      - name: Job setup (PS) — install security tools
+        uses: ./.github/actions/ps-job-setup
         with:
+          # checkout already handled above by actions/checkout for platform only
           fetch_depth: ${{ inputs.fetch_depth }}
+          platform_ref: 'main'
+          platform_path: .ps-platform
+          skip_platform_checkout: "false"
+
+          # HOME and harden
+          home_dir: ${{ runner.temp }}
+          egress_policy: audit
+
+          # tools
           cache: ${{ inputs.cache }}
           install_tools: "1"
           tools_bundle: "security"

@@ -78,28 +78,26 @@ Baseline building blocks:
 
 - `ps-banner`: print Political Sphere ASCII branding
 - `ps-run`: standard banner + section wrapper for script execution
-- `ps-checkout`: safe checkout wrapper with explicit fetch depth
 - `ps-hardened-checkout`: harden runner + checkout in one step
-- `ps-harden-runner`: step-security hardening with validated inputs
+- `ps-preflight`: shared preflight checks for common requirements
 - `ps-upload-artifacts`: artifact upload with input validation
 - `ps-pr-comment`: post PR comments with input validation
 - `ps-write-summary`: write structured JSON summary artifacts
-- `ps-preflight`: shared preflight checks for common requirements
-- `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `extra_tools` (newline list); delegates to `ps-install-tools` for pinned installs
-- `ps-install-tools`: legacy installer (deprecated). Use `ps-tools` as the canonical entrypoint for tool installation
+- `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `tools_extra` (newline list)
 
 Node toolchain:
 
-- `ps-bootstrap`: standard workspace bootstrap (prepare HOME, platform checkout helpers)
-- `ps-job-bootstrap`: canonical job preamble that runs `ps-harden-runner`, `ps-checkout`, optionally checks out the platform/`.ps-platform`, then runs `ps-bootstrap` (recommended as the default job start-up step)
-- `ps-node-setup`: checkout + setup Node.js toolchain with optional deterministic installs (cache, npm ci)
-- `ps-setup`: harden runner + node setup (single step). It is the canonical bootstrap entrypoint; supports optional dependency install (`install_dependencies` defaults to "0"), tool bundle install (`install_tools`, `tools_bundle`, `tools_extra`), and `working_directory` for monorepos.
 
-Example: use `ps-setup` to run lint with installs/tools:
+- `ps-job-setup`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, bootstraps the platform, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools (replaces `ps-job-bootstrap` + `ps-setup`)
+- `ps-job-bootstrap`: (deprecated) replaced by `ps-job-setup`. Use `ps-job-setup` as the single job entrypoint.
+- `ps-node-setup`: checkout + setup Node.js toolchain with optional deterministic installs (cache, npm ci)
+- `ps-setup`: (deprecated) replaced by `ps-job-setup`. Use `ps-job-setup` as the single job entrypoint.
+
+Example: use `ps-job-setup` to run lint with installs/tools:
 
 ```yaml
-- name: Setup (PS)
-  uses: ./.github/actions/ps-setup
+- name: Job setup (PS)
+  uses: ./.github/actions/ps-job-setup
   with:
     node_version: ${{ inputs.node_version }}
     fetch_depth: ${{ inputs.fetch_depth }}
@@ -126,8 +124,6 @@ Security:
 - `license-check`: license compliance against policy allowlists
 - `secret-scan-pr`: fast gitleaks scan for PRs
 - `semgrep-cli`: run Semgrep CLI and upload SARIF
-- `ps-lint-tools`: convenience wrapper that calls `ps-tools` with `bundle: lint`
-- `ps-security-tools`: convenience wrapper that calls `ps-tools` with `bundle: security`
 
 ---
 

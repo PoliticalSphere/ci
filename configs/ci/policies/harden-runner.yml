@@ -16,7 +16,7 @@ rule:
   require_harden_runner: true
   allowed_first_steps:
     - ./.github/actions/ps-harden-runner
-    - ./.github/actions/ps-setup
+    - ./.github/actions/ps-job-setup
     - ./.github/actions/ps-hardened-checkout
     - step-security/harden-runner@
   harden_runner_action_allowlist:

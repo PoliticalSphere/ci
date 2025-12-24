@@ -152,7 +152,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Job bootstrap (PS)
-        uses: ./.github/actions/ps-job-bootstrap
+        uses: ./.github/actions/ps-job-setup
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}

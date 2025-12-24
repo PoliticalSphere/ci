@@ -2,7 +2,7 @@
 # Political Sphere — Composite Action: Setup (Runner + Node)
 # ------------------------------------------------------------------------------
 # Purpose:
-#   Combine runner hardening and Node.js setup into a single step.
+#   DEPRECATED: Use `ps-job-setup` as the single job entrypoint that combines bootstrapping and setup. This action remains for compatibility.
 #
 # Metadata:
 #   - Created: 2025-12-20
@@ -110,7 +110,7 @@ runs:
         set -euo pipefail
 
         if [[ -z "${PS_PLATFORM_ROOT:-}" || ! -d "${PS_PLATFORM_ROOT}" ]]; then
-          printf 'ERROR: PS_PLATFORM_ROOT not set or missing; ps-bootstrap must run before ps-setup and provide platform scripts for validation.\n' >&2
+          printf 'ERROR: PS_PLATFORM_ROOT not set or missing; ps-job-setup is the recommended single-step entrypoint (or ensure ps-bootstrap ran to provide platform scripts).\n' >&2
           exit 1
         fi
 

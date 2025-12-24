@@ -1,63 +1,16 @@
-# ==============================================================================
-# Political Sphere — Composite Action: Security Toolchain
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Install pinned security CLIs for CI security scans.
-#
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: install gitleaks and (optionally) trivy.
-#   - Does NOT: run security scans or modify permissions.
-#
-# Design Principles:
-#   - Deterministic, pinned versions + SHA256 verification
-#   - Non-interactive execution
-#   - Explicit inputs for optional tooling
-#
-# Dependencies:
-#   - ./.github/actions/ps-install-tools
-#
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#   - ./.github/workflows/security-scheduled.yml
-#
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller
-#   - Constraints: Linux-only (GitHub-hosted ubuntu runners)
-#
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: none
-#   - CI vs local: designed for CI usage only
-# ==============================================================================
-
 name: "PS Security Tools"
-description: "Install pinned security CLIs for CI scanning"
+description: "Wrapper to install security tools via ps-tools (bundle: security)"
 
 inputs:
-  install_dir:
-    description: "Installation directory for CLI tools (repo-relative)"
-    required: false
-    default: ".tooling/bin"
-  install_trivy:
-    description: "Install Trivy (1 = on, 0 = off)"
+  skip_install:
+    description: "Skip actual install (1|0). Pass-through for compatibility"
     required: false
     default: "0"
 
 runs:
   using: "composite"
   steps:
-    - name: Install security tools (PS)
+    - name: Install security tools
       uses: ./.github/actions/ps-tools
       with:
-        install_dir: ${{ inputs.install_dir }}
         bundle: "security"
-        extra_tools: ${{ inputs.install_trivy == '1' && 'trivy' || '' }}

@@ -1,29 +1,26 @@
 #!/usr/bin/env node
-import { readFileSync } from 'node:fs';
+import fs from 'node:fs';
 import { strict as assert } from 'node:assert';
 import { getRepoRoot, fail } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
 try {
-  const lintYml = readFileSync(`${repoRoot}/.github/actions/ps-lint-tools/action.yml`, 'utf8');
-  const secYml = readFileSync(`${repoRoot}/.github/actions/ps-security-tools/action.yml`, 'utf8');
-
-  if (!/uses:\s*\.\/\.github\/actions\/ps-tools/.test(lintYml)) {
-    fail('ps-lint-tools does not delegate to ps-tools');
+  // Ensure wrapper actions were removed
+  if (fs.existsSync(`${repoRoot}/.github/actions/ps-lint-tools`)) {
+    fail('ps-lint-tools should be removed; use ps-tools with bundle=lint');
   }
-  if (!/bundle:\s*"?lint"?/.test(lintYml)) {
-    // ok if wrapper passes bundle via input
+  if (fs.existsSync(`${repoRoot}/.github/actions/ps-security-tools`)) {
+    fail('ps-security-tools should be removed; use ps-tools with bundle=security');
   }
 
-  if (!/uses:\s*\.\/\.github\/actions\/ps-tools/.test(secYml)) {
-    fail('ps-security-tools does not delegate to ps-tools');
-  }
-  if (!/bundle:\s*"?security"?/.test(secYml)) {
-    // ok
+  // Ensure ps-tools supports the expected bundle inputs
+  const yml = fs.readFileSync(`${repoRoot}/.github/actions/ps-tools/action.yml`, 'utf8');
+  if (!/bundle:\s*"?lint"?/.test(yml) || !/bundle:\s*"?security"?/.test(yml) && !/bundle:/.test(yml)) {
+    fail('ps-tools does not declare expected bundle input (lint|security)');
   }
 
-  console.log('OK: wrappers delegate to ps-tools');
+  console.log('OK: ps-tools is canonical and wrappers are removed');
   process.exit(0);
 } catch (err) {
   fail(`ps-tools wrapper tests failed: ${err.stack || err}`);

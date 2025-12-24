@@ -156,27 +156,26 @@ jobs:
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
     timeout-minutes: 10
     steps:
-      - name: Job bootstrap (PS)
-        uses: ./.github/actions/ps-job-bootstrap
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-job-setup
         with:
+          # checkout & platform
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ inputs.checkout_ref }}
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: .ps-platform
-          home_dir: ".home"
-          egress_policy: audit
           skip_platform_checkout: "false"
 
-      - name: Prepare runner (PS)
-        uses: ./.github/actions/ps-setup
-        with:
+          # HOME and harden
+          home_dir: ".home"
+          egress_policy: audit
+
+          # node/toolchain
           node_version: ${{ inputs.node_version }}
           ref: ${{ inputs.checkout_ref }}
-          fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
           skip_checkout: "1"
-          skip_harden: "1"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 

@@ -163,24 +163,23 @@ jobs:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
     steps:
-      - name: Job bootstrap (PS)
-        uses: ./.github/actions/ps-job-bootstrap
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-job-setup
         with:
+          # checkout & platform
           fetch_depth: ${{ inputs.fetch_depth }}
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: .ps-platform
-          home_dir: ".home"
-          egress_policy: audit
           skip_platform_checkout: "false"
 
-      - name: Prepare runner (PS)
-        uses: ./.github/actions/ps-setup
-        with:
+          # HOME and harden
+          home_dir: ".home"
+          egress_policy: audit
+
+          # node/toolchain
           node_version: ${{ inputs.node_version }}
-          fetch_depth: ${{ inputs.fetch_depth }}
           cache: ${{ inputs.cache }}
           skip_checkout: "1"
-          skip_harden: "1"
 
       - name: Build (PS)
         uses: ./.github/actions/build

@@ -16,8 +16,8 @@ function runAssemble(inputsEnv) {
     const cmd = `bash -lc "source ${repoRoot}/.github/actions/ps-tools/action.yml >/dev/null 2>&1 || true"`;
     // We only need to run the assemble step; it's easiest to call the action's logic
     // indirectly by invoking a small snippet that replicates the assemble behavior.
-    // For determinism, call the 'Prepare tool list' logic from ps-setup instead.
-    const commandString = `source ${repoRoot}/.github/actions/ps-setup/action.yml >/dev/null 2>&1 || true; echo OK`;
+    // For determinism, call the 'Prepare tool list' logic from ps-job-setup instead.
+    const commandString = `source ${repoRoot}/.github/actions/ps-job-setup/action.yml >/dev/null 2>&1 || true; echo OK`;
     const out = execFileSync('bash', ['-lc', commandString], { encoding: 'utf8', env });
     return out;
   } catch (err) {
@@ -37,8 +37,8 @@ try {
 
   // Test 2: security + extra trivy -> includes trivy in assembled tools
   {
-    // We will call the Prepare tools logic from ps-setup harness to assemble PS_TOOLS env variable
-    const command = `bash -lc 'PS_PLATFORM_ROOT=${repoRoot} PS_TOOLS_BUNDLE_INPUT=security PS_TOOLS_EXTRA_INPUT=trivy \n source ${repoRoot}/.github/actions/ps-setup/action.yml >/dev/null 2>&1 || true; echo "OK"'`;
+    // We will call the Prepare tools logic from ps-job-setup harness to assemble PS_TOOLS env variable
+    const command = `bash -lc 'PS_PLATFORM_ROOT=${repoRoot} PS_TOOLS_BUNDLE_INPUT=security PS_TOOLS_EXTRA_INPUT=trivy \n source ${repoRoot}/.github/actions/ps-job-setup/action.yml >/dev/null 2>&1 || true; echo "OK"'`;
     execFileSync('bash', ['-lc', command], { encoding: 'utf8' });
   }
 
