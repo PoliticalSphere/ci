@@ -102,9 +102,9 @@ function compileRegex(reStr) {
     while (j < len && /\s/.test(str[j])) j++;
 
     // collect digits (may be empty)
-    let digitsBefore = '';
+    let _digitsBefore = '';
     while (j < len && /\d/.test(str[j])) {
-      digitsBefore += str[j++];
+      _digitsBefore += str[j++];
     }
 
     // skip whitespace
@@ -115,7 +115,8 @@ function compileRegex(reStr) {
       // skip whitespace
       while (j < len && /\s/.test(str[j])) j++;
       // if immediate '}', unbounded
-      if (j < len && str[j] === '}') return { isQuantifier: true, isUnbounded: true, endIndex: j };
+      if (j < len && str[j] === '}')
+        return { isQuantifier: true, isUnbounded: true, endIndex: j };
       // digits after comma (may be empty)
       let digitsAfter = '';
       while (j < len && /\d/.test(str[j])) {
@@ -123,7 +124,11 @@ function compileRegex(reStr) {
       }
       while (j < len && /\s/.test(str[j])) j++;
       if (j < len && str[j] === '}') {
-        return { isQuantifier: true, isUnbounded: digitsAfter.length === 0, endIndex: j };
+        return {
+          isQuantifier: true,
+          isUnbounded: digitsAfter.length === 0,
+          endIndex: j,
+        };
       }
     }
     return { isQuantifier: false, isUnbounded: false, endIndex: i };
@@ -176,8 +181,14 @@ function compileRegex(reStr) {
     function skipCharClass(idx) {
       idx++;
       while (idx < len) {
-        if (pat[idx] === '\\') { idx += 2; continue; }
-        if (pat[idx] === ']') { idx++; break; }
+        if (pat[idx] === '\\') {
+          idx += 2;
+          continue;
+        }
+        if (pat[idx] === ']') {
+          idx++;
+          break;
+        }
         idx++;
       }
       return idx;
@@ -187,10 +198,19 @@ function compileRegex(reStr) {
       let depth = 1;
       let j = idx + 1;
       while (j < len && depth > 0) {
-        if (pat[j] === '\\') { j += 2; continue; }
-        if (pat[j] === '[') { j = skipCharClass(j); continue; }
-        if (pat[j] === '(') { depth++; }
-        else if (pat[j] === ')') { depth--; }
+        if (pat[j] === '\\') {
+          j += 2;
+          continue;
+        }
+        if (pat[j] === '[') {
+          j = skipCharClass(j);
+          continue;
+        }
+        if (pat[j] === '(') {
+          depth++;
+        } else if (pat[j] === ')') {
+          depth--;
+        }
         j++;
       }
       if (depth !== 0) return -1; // unbalanced
@@ -199,8 +219,14 @@ function compileRegex(reStr) {
 
     while (i < len) {
       const ch = pat[i];
-      if (ch === '\\') { i += 2; continue; }
-      if (ch === '[') { i = skipCharClass(i); continue; }
+      if (ch === '\\') {
+        i += 2;
+        continue;
+      }
+      if (ch === '[') {
+        i = skipCharClass(i);
+        continue;
+      }
       if (ch === '(') {
         const end = skipGroup(i);
         if (end === -1) return true; // unbalanced; conservative reject
@@ -472,13 +498,21 @@ function checkJobPermissions({
   return violations;
 }
 
-function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps, hardenRunnerActionAllowlist }) {
+function checkHardenRunnerFirst({
+  rel,
+  jobId,
+  job,
+  allowedFirstSteps,
+  hardenRunnerActionAllowlist,
+}) {
   const violations = [];
   if (job.steps.length === 0) return violations;
   const first = job.steps[0];
   const uses = first.uses || '';
   const allowlist = Array.isArray(allowedFirstSteps) ? allowedFirstSteps : [];
-  const actionAllowlist = Array.isArray(hardenRunnerActionAllowlist) ? hardenRunnerActionAllowlist : [];
+  const actionAllowlist = Array.isArray(hardenRunnerActionAllowlist)
+    ? hardenRunnerActionAllowlist
+    : [];
 
   // Combined allowlist: explicit allowed-first-steps (e.g. ps-bootstrap) and
   // explicitly permitted harden-runner actions (local paths or repo names).
@@ -490,7 +524,8 @@ function checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps, hardenRunn
       if (entry.endsWith('@')) return value.startsWith(entry);
       // If entry looks like an owner/repo (contains '/' but not a local path),
       // allow repo@sha references (e.g., step-security/harden-runner@...)
-      if (entry.includes('/') && !entry.startsWith('./')) return value.startsWith(`${entry}@`) || value === entry;
+      if (entry.includes('/') && !entry.startsWith('./'))
+        return value.startsWith(`${entry}@`) || value === entry;
       // Otherwise, do an exact match (useful for local paths like './.github/actions/ps-harden-runner')
       return value === entry;
     }) || value.startsWith('step-security/harden-runner@');
@@ -1084,7 +1119,13 @@ export async function scanWorkflows({
         }),
       );
       violations.push(
-        ...checkHardenRunnerFirst({ rel, jobId, job, allowedFirstSteps, hardenRunnerActionAllowlist }),
+        ...checkHardenRunnerFirst({
+          rel,
+          jobId,
+          job,
+          allowedFirstSteps,
+          hardenRunnerActionAllowlist,
+        }),
       );
 
       for (const step of job.steps) {
