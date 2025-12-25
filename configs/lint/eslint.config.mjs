@@ -2,13 +2,13 @@
 // Political Sphere — ESLint (Flat Config, TS-correct, CI-grade)
 // =============================================================================
 
-import js from "@eslint/js";
-import importPlugin from "eslint-plugin-import";
-import security from "eslint-plugin-security";
-import sonarjs from "eslint-plugin-sonarjs";
-import unicorn from "eslint-plugin-unicorn";
-import globals from "globals";
-import tseslint from "typescript-eslint"; // ✅ correct flat-config entrypoint
+import js from '@eslint/js';
+import importPlugin from 'eslint-plugin-import';
+import security from 'eslint-plugin-security';
+import sonarjs from 'eslint-plugin-sonarjs';
+import unicorn from 'eslint-plugin-unicorn';
+import globals from 'globals';
+import tseslint from 'typescript-eslint'; // ✅ correct flat-config entrypoint
 
 export default [
   // ---------------------------------------------------------------------------
@@ -16,14 +16,14 @@ export default [
   // ---------------------------------------------------------------------------
   {
     ignores: [
-      "**/node_modules/**",
-      "**/dist/**",
-      "**/build/**",
-      "**/coverage/**",
-      "**/reports/**",
-      "**/.turbo/**",
-      "**/.nx/**"
-    ]
+      '**/node_modules/**',
+      '**/dist/**',
+      '**/build/**',
+      '**/coverage/**',
+      '**/reports/**',
+      '**/.turbo/**',
+      '**/.nx/**',
+    ],
   },
 
   // ---------------------------------------------------------------------------
@@ -40,57 +40,57 @@ export default [
   // Project rules (JS + TS)
   // ---------------------------------------------------------------------------
   {
-    files: ["**/*.{js,mjs,cjs,ts,mts,cts,tsx}"],
+    files: ['**/*.{js,mjs,cjs,ts,mts,cts,tsx}'],
     languageOptions: {
-      ecmaVersion: "latest",
-      sourceType: "module",
+      ecmaVersion: 'latest',
+      sourceType: 'module',
       globals: {
         ...globals.node,
-        console: "readonly"
-      }
+        console: 'readonly',
+      },
     },
     plugins: {
       import: importPlugin,
       security,
       sonarjs,
-      unicorn
+      unicorn,
     },
     rules: {
       // Core correctness / consistency
-      eqeqeq: ["error", "always"],
-      "no-var": "error",
-      "prefer-const": "error",
+      eqeqeq: ['error', 'always'],
+      'no-var': 'error',
+      'prefer-const': 'error',
 
       // Use only ONE unused-vars rule to avoid duplicate noise:
       // TS rule covers TS+JS in many setups; keep it as the single source of truth.
-      "no-unused-vars": "off",
-      "@typescript-eslint/no-unused-vars": [
-        "error",
-        { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }
+      'no-unused-vars': 'off',
+      '@typescript-eslint/no-unused-vars': [
+        'error',
+        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
       ],
 
-      "@typescript-eslint/no-explicit-any": "off",
-      "@typescript-eslint/no-unused-expressions": [
-        "error",
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-unused-expressions': [
+        'error',
         {
           allowShortCircuit: false,
           allowTernary: false,
-          allowTaggedTemplates: false
-        }
+          allowTaggedTemplates: false,
+        },
       ],
 
-      "@typescript-eslint/consistent-type-imports": [
-        "error",
-        { prefer: "type-imports" }
+      '@typescript-eslint/consistent-type-imports': [
+        'error',
+        { prefer: 'type-imports' },
       ],
 
       // Plugin recommendations (enabled explicitly)
-      "import/no-unresolved": "off", // often noisy in TS + path aliases; enable later if desired
-      "security/detect-object-injection": "off", // very noisy; enable selectively if you want
-      "sonarjs/cognitive-complexity": ["error", 15]
+      'import/no-unresolved': 'off', // often noisy in TS + path aliases; enable later if desired
+      'security/detect-object-injection': 'off', // very noisy; enable selectively if you want
+      'sonarjs/cognitive-complexity': ['error', 15],
     },
     linterOptions: {
-      reportUnusedDisableDirectives: "error"
-    }
-  }
+      reportUnusedDisableDirectives: 'error',
+    },
+  },
 ];

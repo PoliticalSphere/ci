@@ -5,9 +5,12 @@
 #   Write a structured JSON summary artifact for workflow results.
 #
 # Metadata:
+#   - id: ps-write-summary
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
 #   - Created: 2025-12-20
 #   - Last updated: 2025-12-20
-#
 # Scope & Responsibilities:
 #   - Does: compute overall status and write a JSON summary file.
 #   - Does NOT: upload artifacts or alter workflow permissions.

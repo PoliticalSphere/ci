@@ -5,9 +5,12 @@
 #   Validate consumer repositories against the platform contract policy.
 #
 # Metadata:
+#   - id: consumer-contract
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
 #   - Created: 2025-12-20
 #   - Last updated: 2025-12-20
-#
 # Scope & Responsibilities:
 #   - Does: run contract checks and emit reports/logs.
 #   - Does NOT: install dependencies or alter permissions.

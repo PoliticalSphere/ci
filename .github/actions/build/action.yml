@@ -5,9 +5,12 @@
 #   Run the deterministic build step with platform defaults.
 #
 # Metadata:
+#   - id: build
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
 #   - Created: 2025-12-20
 #   - Last updated: 2025-12-24
-#
 # Scope & Responsibilities:
 #   - Does: execute the build script in the configured working directory.
 #   - Does NOT: install dependencies, run tests, or modify permissions.

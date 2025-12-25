@@ -5,18 +5,9 @@
   "minLines": 10,
   "minTokens": 50,
 
-  "formats": [
-    "javascript",
-    "typescript",
-    "json",
-    "bash"
-  ],
+  "formats": ["javascript", "typescript", "json", "bash"],
 
-  "reporters": [
-    "console",
-    "json",
-    "html"
-  ],
+  "reporters": ["console", "json", "html"],
 
   "output": "logs/jscpd",
 

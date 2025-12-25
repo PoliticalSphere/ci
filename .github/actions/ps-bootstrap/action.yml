@@ -1,7 +1,18 @@
 # ==============================================================================
 # Political Sphere — Composite Action: Job Setup (Runner + Checkout + Node + Tools)
 # ------------------------------------------------------------------------------
-# Purpose:
+# 
+# Metadata:
+#   - id: ps-bootstrap
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-24
+#
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
 #   Single canonical entrypoint for job bootstrapping: harden runner, checkout
 #   repo and optional platform, prepare HOME isolation, setup Node.js, and
 #   optionally install dependencies and canonical tools bundles.
@@ -119,6 +130,10 @@ inputs:
     required: false
     default: "."
 
+outputs:
+  platform_path:
+    description: "Repo-relative path where the platform checkout or snapshot is located (e.g. .ps-platform)"
+
 runs:
   using: "composite"
   steps:
@@ -154,6 +169,8 @@ runs:
       run: |
         set -euo pipefail
         printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_INPUT}" >> "$GITHUB_ENV"
+        # Expose repo-relative platform path as a composite action output for callers
+        printf 'platform_path=%s\n' "${PS_PLATFORM_PATH_INPUT}" >> "$GITHUB_OUTPUT"
 
     - name: Download platform snapshot (PS)
       if: ${{ inputs.skip_platform_checkout == 'true' }}
@@ -168,7 +185,8 @@ runs:
       shell: bash
       if: ${{ inputs.skip_platform_checkout == 'true' }}
       env:
-        PS_PLATFORM_SNAPSHOT_PATH: ${{ inputs.platform_snapshot_path }}
+        # Align detection path with the download destination
+        PS_PLATFORM_SNAPSHOT_PATH: ${{ inputs.platform_path }}
       run: |
         set -euo pipefail
 
@@ -181,6 +199,8 @@ runs:
         else
           printf 'PS.PLATFORM: platform snapshot not found at %s; PS_PLATFORM_ROOT not set\n' "${path}" >&2
         fi
+        # Always expose the repo-relative platform path to callers (helps workflows reference files)
+        printf 'platform_path=%s\n' "${path}" >> "$GITHUB_OUTPUT"
 
     - name: Platform bootstrap (noop)
       shell: bash
