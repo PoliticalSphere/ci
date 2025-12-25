@@ -43,6 +43,21 @@ inputs:
     required: false
     default: "false"
 
+  platform_snapshot_artifact:
+    description: "Artifact name for platform snapshot (downloaded when skipping platform checkout)"
+    required: false
+    default: "platform-snapshot"
+
+  platform_snapshot_path:
+    description: "Path to extract platform snapshot into"
+    required: false
+    default: ".ps-platform"
+
+  platform_snapshot_allow_no_files_found:
+    description: "Allow download to succeed when no files found (true|false)"
+    required: false
+    default: "true"
+
   # HOME isolation & harden
   home_dir:
     description: "Workspace-local HOME directory used for bootstrapping and harden-runner"
@@ -134,18 +149,30 @@ runs:
         set -euo pipefail
         printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_INPUT}" >> "$GITHUB_ENV"
 
+    - name: Download platform snapshot (PS)
+      if: ${{ inputs.skip_platform_checkout == 'true' }}
+      uses: actions/download-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+      with:
+        name: ${{ inputs.platform_snapshot_artifact }}
+        path: ${{ inputs.platform_snapshot_path }}
+        allow-no-files-found: ${{ inputs.platform_snapshot_allow_no_files_found }}
+
     - name: Detect platform snapshot and set PS_PLATFORM_ROOT
       shell: bash
       if: ${{ inputs.skip_platform_checkout == 'true' }}
+      env:
+        PS_PLATFORM_SNAPSHOT_PATH: ${{ inputs.platform_snapshot_path }}
       run: |
         set -euo pipefail
 
+        path="${PS_PLATFORM_SNAPSHOT_PATH:-.ps-platform}"
+
         # If a platform snapshot (downloaded artifact) is present, export PS_PLATFORM_ROOT
-        if [[ -d ".ps-platform" && -f ".ps-platform/tools/scripts/branding/print-section.sh" ]]; then
-          printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/.ps-platform" >> "$GITHUB_ENV"
-          printf 'PS.PLATFORM: detected platform snapshot, PS_PLATFORM_ROOT set to %s/.ps-platform\n' "${GITHUB_WORKSPACE}"
+        if [[ -d "${path}" && -f "${path}/tools/scripts/branding/print-section.sh" ]]; then
+          printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/${path}" >> "$GITHUB_ENV"
+          printf 'PS.PLATFORM: detected platform snapshot, PS_PLATFORM_ROOT set to %s/%s\n' "${GITHUB_WORKSPACE}" "${path}"
         else
-          printf 'PS.PLATFORM: platform snapshot not found at .ps-platform; PS_PLATFORM_ROOT not set\n' >&2
+          printf 'PS.PLATFORM: platform snapshot not found at %s; PS_PLATFORM_ROOT not set\n' "${path}" >&2
         fi
 
     - name: Bootstrap platform (PS)

@@ -327,18 +327,10 @@ jobs:
     # are available. `ps-write-summary` still creates the output directory
     # (e.g. `reports/summary/`) and writes the summary file.
     steps:
-      - name: Download platform snapshot
-        if: always()
-        uses: actions/download-artifact@v3
-        with:
-          name: platform-snapshot
-          path: .ps-platform
-          allow-no-files-found: true
-
       - name: Job setup (Security Only)
-        # Delegate checkout to ps-bootstrap to centralize job setup and ensure
-        # consistent checkout behaviour across jobs. Fetch depth is passed
-        # through to control network usage.
+        # ps-bootstrap will download a platform snapshot when invoked with
+        # skip_platform_checkout: "true". This centralizes snapshot handling
+        # and sets PS_PLATFORM_ROOT when the snapshot is present.
         uses: ./.github/actions/ps-bootstrap
         with:
           skip_checkout: "0"                # Let ps-bootstrap checkout the consumer repo
