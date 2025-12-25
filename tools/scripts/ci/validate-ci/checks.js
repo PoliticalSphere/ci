@@ -71,6 +71,47 @@ function runHasAll(runLines, required) {
   });
 }
 
+// Helper: parse a brace quantifier starting at index i (where str[i] === '{')
+// Returns { isQuantifier, isUnbounded, endIndex }
+function parseBraceQuantifier(str, i) {
+  const len = str.length;
+  let j = i + 1;
+  // skip whitespace
+  while (j < len && /\s/.test(str[j])) j++;
+
+  // collect digits (may be empty)
+  let _digitsBefore = '';
+  while (j < len && /\d/.test(str[j])) {
+    _digitsBefore += str[j++];
+  }
+
+  // skip whitespace
+  while (j < len && /\s/.test(str[j])) j++;
+
+  if (j < len && str[j] === ',') {
+    j++;
+    // skip whitespace
+    while (j < len && /\s/.test(str[j])) j++;
+    // if immediate '}', unbounded
+    if (j < len && str[j] === '}')
+      return { isQuantifier: true, isUnbounded: true, endIndex: j };
+    // digits after comma (may be empty)
+    let digitsAfter = '';
+    while (j < len && /\d/.test(str[j])) {
+      digitsAfter += str[j++];
+    }
+    while (j < len && /\s/.test(str[j])) j++;
+    if (j < len && str[j] === '}') {
+      return {
+        isQuantifier: true,
+        isUnbounded: digitsAfter.length === 0,
+        endIndex: j,
+      };
+    }
+  }
+  return { isQuantifier: false, isUnbounded: false, endIndex: i };
+}
+
 function compileRegex(reStr) {
   let pattern = reStr;
   let flags = '';
@@ -93,46 +134,8 @@ function compileRegex(reStr) {
   // IMPORTANT: perform detection using a linear, hand-written scanner (no
   // regular expressions) to avoid exposing this check to the very vulnerabilities
   // it is intended to detect.
-  // Helper: parse a brace quantifier starting at index i (where str[i] === '{')
-  // Returns { isQuantifier, isUnbounded, endIndex }
-  function _parseBraceQuantifier(str, i) {
-    const len = str.length;
-    let j = i + 1;
-    // skip whitespace
-    while (j < len && /\s/.test(str[j])) j++;
-
-    // collect digits (may be empty)
-    let _digitsBefore = '';
-    while (j < len && /\d/.test(str[j])) {
-      _digitsBefore += str[j++];
-    }
-
-    // skip whitespace
-    while (j < len && /\s/.test(str[j])) j++;
-
-    if (j < len && str[j] === ',') {
-      j++;
-      // skip whitespace
-      while (j < len && /\s/.test(str[j])) j++;
-      // if immediate '}', unbounded
-      if (j < len && str[j] === '}')
-        return { isQuantifier: true, isUnbounded: true, endIndex: j };
-      // digits after comma (may be empty)
-      let digitsAfter = '';
-      while (j < len && /\d/.test(str[j])) {
-        digitsAfter += str[j++];
-      }
-      while (j < len && /\s/.test(str[j])) j++;
-      if (j < len && str[j] === '}') {
-        return {
-          isQuantifier: true,
-          isUnbounded: digitsAfter.length === 0,
-          endIndex: j,
-        };
-      }
-    }
-    return { isQuantifier: false, isUnbounded: false, endIndex: i };
-  }
+  // Brace quantifier parsing is now handled by `parseBraceQuantifier` in
+  // module scope to reduce nested function complexity and improve testability.
 
   // Move helper out so it can be tested independently and reduce nested
   // function complexity in `compileRegex`.
@@ -164,7 +167,7 @@ function compileRegex(reStr) {
       }
       if (ch === '+' || ch === '*') return true;
       if (ch === '{') {
-        const q = _parseBraceQuantifier(str, i);
+        const q = parseBraceQuantifier(str, i);
         if (q.isQuantifier && q.isUnbounded) return true;
       }
       i++;
@@ -237,7 +240,7 @@ function compileRegex(reStr) {
           while (k < len && /\s/.test(pat[k])) k++;
           if (k < len && (pat[k] === '+' || pat[k] === '*')) return true;
           if (k < len && pat[k] === '{') {
-            const q = _parseBraceQuantifier(pat, k);
+            const q = parseBraceQuantifier(pat, k);
             if (q.isQuantifier && q.isUnbounded) return true;
           }
         }
