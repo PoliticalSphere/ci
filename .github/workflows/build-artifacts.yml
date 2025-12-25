@@ -271,43 +271,27 @@ jobs:
 
       - name: Build artifacts complete
         if: always()
-        shell: bash
-        env:
-          BUILD_SCRIPT: ${{ inputs.build_script }}
-          ARTIFACT_PATHS: ${{ inputs.artifact_paths }}
-          RETENTION_DAYS: ${{ inputs.retention_days }}
-        run: |
-          set -euo pipefail
+        - name: Build artifacts complete (PS)
+          if: always()
+          uses: ./.github/actions/ps-run
+          with:
+            id: build-complete
+            title: Build artifacts complete
+            script: tools/scripts/ci/build-complete.sh
+          env:
+            BUILD_OUTCOME: ${{ steps.build.outcome }}
+            UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
 
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "${PS_BRAND_KEY}" "Build artifacts complete" 2>/dev/null || true
-
-          ts=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
-          build_outcome="${{ steps.build.outcome }}"
-          upload_outcome="${{ steps.upload.outcome }}"
-
-          echo "PS.${PS_WORKFLOW_ID}: completed_at=${ts} build=${build_outcome} upload=${upload_outcome}"
-
-          # Provide actionable hints on failure
-          if [[ "${build_outcome}" != "success" ]]; then
-            echo "ERROR: Build step failed (outcome=${build_outcome}). See logs for step 'Build (PS)'."
-            # Do not interpolate raw user input in the run block; use pre-bound env vars
-            echo "Tip: review the 'Build (PS)' step logs and check the build script at: ${BUILD_SCRIPT}"
-          fi
-
-          if [[ "${upload_outcome}" != "success" ]]; then
-            echo "WARN: Artifact upload did not succeed (outcome=${upload_outcome})."
-            echo "Tip: confirm the artifact paths and that files exist:"
-            echo "  paths: ${ARTIFACT_PATHS}"
-            echo "  retention_days: ${RETENTION_DAYS}"
-          fi
-
-          # Final status line for easy machine parsing
-          if [[ "${build_outcome}" == "success" && "${upload_outcome}" == "success" ]]; then
-            echo "PS.${PS_WORKFLOW_ID}: OK"
-          else
-            echo "PS.${PS_WORKFLOW_ID}: FAILED (build=${build_outcome} upload=${upload_outcome})"
-          fi
+        - name: Job teardown (PS)
+          if: always()
+          uses: ./.github/actions/ps-teardown
+          with:
+            summary_workflow: build-artifacts
+            summary_output_path: reports/summary/build-artifacts-job.json
+            summary_results: build=${{ job.status }}
+            artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
+            artifacts_paths: |
+              ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # AGGREGATION & REPORTING — BUILD ARTIFACTS SUMMARY
@@ -362,3 +346,17 @@ jobs:
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
           compression_level: 9 # Max compression for small JSON reports
+
+        - name: Job teardown (PS)
+          if: always()
+          uses: ./.github/actions/ps-teardown
+          with:
+            summary_workflow: build-artifacts
+            summary_output_path: reports/summary/build-artifacts.json
+            summary_results: |
+              validate-ci=${{ needs.validate-ci.result }}
+              build=${{ needs.build.result }}
+            artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
+            artifacts_paths: |
+              ${{ inputs.artifact_paths }}
+          output_path: "reports/summary/build-artifacts.json"

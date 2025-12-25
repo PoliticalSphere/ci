@@ -1,0 +1,73 @@
+name: "PS Teardown"
+description: "Canonical job teardown: write summary, upload artifacts, and optionally post PR comment"
+
+inputs:
+  summary_workflow:
+    description: "Workflow identifier for the summary payload (optional)"
+    required: false
+    default: ""
+
+  summary_output_path:
+    description: "Output path for the summary JSON (repo-relative, optional)"
+    required: false
+    default: ""
+
+  summary_results:
+    description: "Newline-separated key=value result pairs (optional)"
+    required: false
+    default: ""
+
+  artifacts_name:
+    description: "Artifact name to upload (optional)"
+    required: false
+    default: ""
+
+  artifacts_paths:
+    description: "Paths to upload (newline-separated globs, optional)"
+    required: false
+    default: ""
+
+  pr_number:
+    description: "Optional PR number to comment on"
+    required: false
+    default: ""
+
+  github_token:
+    description: "Token for posting PR comments (issues: write)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Write summary (PS)
+      if: ${{ inputs.summary_workflow != '' && inputs.summary_output_path != '' && inputs.summary_results != '' }}
+      uses: ./.github/actions/ps-write-summary
+      with:
+        workflow: ${{ inputs.summary_workflow }}
+        output_path: ${{ inputs.summary_output_path }}
+        results: ${{ inputs.summary_results }}
+
+    - name: Upload artifacts (PS)
+      if: ${{ inputs.artifacts_name != '' && inputs.artifacts_paths != '' }}
+      uses: ./.github/actions/ps-upload-artifacts
+      with:
+        name: ${{ inputs.artifacts_name }}
+        path: ${{ inputs.artifacts_paths }}
+        if_no_files_found: warn
+        retention_days: 7
+
+    - name: Post PR comment (PS)
+      if: ${{ inputs.pr_number != '' && inputs.github_token != '' }}
+      uses: ./.github/actions/ps-pr-comment
+      with:
+        pr_number: ${{ inputs.pr_number }}
+        body: |
+          Automated CI teardown report for workflow `${{ inputs.summary_workflow }}`.
+        github_token: ${{ inputs.github_token }}
+
+    - name: Teardown complete
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "PS.TEARDOWN: OK"

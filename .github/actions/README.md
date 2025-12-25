@@ -81,6 +81,7 @@ Baseline building blocks:
 - `ps-upload-artifacts`: artifact upload with input validation
 - `ps-pr-comment`: post PR comments with input validation
 - `ps-write-summary`: write structured JSON summary artifacts
+- `ps-teardown`: canonical job teardown (write summary, upload artifacts, optional PR comment)
 - `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `extra_tools` (newline list)
 - `validate-paths`: validate repo-relative `working-directory` and `script` inputs for workflows/actions
 

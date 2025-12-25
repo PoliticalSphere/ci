@@ -255,19 +255,11 @@ jobs:
 
       - name: Install platform dependencies
         if: ${{ inputs.install_platform_dependencies == '1' }}
-        run: |
-          set -euo pipefail
-
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "ci.platform" "Install platform dependencies" 2>/dev/null || true
-
-          if [[ -z "${PS_PLATFORM_ROOT:-}" || ! -d "${PS_PLATFORM_ROOT}" ]]; then
-            echo "ERROR: PS_PLATFORM_ROOT not found at '${PS_PLATFORM_ROOT:-<unset>}'" >&2
-            exit 1
-          fi
-
-          cd "${PS_PLATFORM_ROOT}"
-          npm ci --no-audit --no-fund
+        uses: ./.github/actions/ps-run
+        with:
+          id: install-platform-deps
+          title: Install platform dependencies
+          script: tools/scripts/ci/install-platform-deps.sh
 
       - name: Validate CI (policy)
         uses: ./.github/actions/ci-validate
@@ -283,12 +275,25 @@ jobs:
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
 
-      - name: Validate CI complete
+      - name: Validate CI complete (PS)
         if: always()
-        run: |
-          set -euo pipefail
-          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
-            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-              "ci.validate" "Validate-CI complete"
-          fi
-          echo "PS.VALIDATE_CI: OK"
+        uses: ./.github/actions/ps-run
+        with:
+          id: validate-ci-complete
+          title: Validate-CI complete
+          script: tools/scripts/ci/validate-ci-complete.sh
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: validate-ci
+          summary_output_path: reports/summary/validate-ci.json
+          summary_results: validate=${{ job.status }}
+          artifacts_name: ${{ inputs.artifact_name }}
+          artifacts_paths: |
+            reports/**
+            logs/**
+        # Note: GITHUB_TOKEN is optional; PR comment only when provided and pr_number set.
+        # secrets:
+        #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
