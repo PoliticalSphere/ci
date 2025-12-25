@@ -330,9 +330,10 @@ jobs:
       - name: Job setup (Security Only)
         uses: ./.github/actions/ps-bootstrap
         with:
-          skip_checkout: "1"          # Don't pull the source
-          install_dependencies: "0"   # No npm ci
-          install_tools: "0"          # No extra binaries
+          skip_checkout: "1"                # Don't pull the source
+          skip_platform_checkout: "true"    # Do not checkout the platform repo in summary (use artifact snapshot)
+          install_dependencies: "0"         # No npm ci
+          install_tools: "0"                # No extra binaries
           egress_policy: block
           home_dir: ${{ runner.temp }}
 
@@ -349,6 +350,20 @@ jobs:
           name: platform-snapshot
           path: .ps-platform
           allow-no-files-found: true
+
+      - name: Set PS_PLATFORM_ROOT from snapshot
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          # If the snapshot contains expected platform scripts, export PS_PLATFORM_ROOT
+          if [[ -d ".ps-platform" && -f ".ps-platform/tools/scripts/branding/print-section.sh" ]]; then
+            echo "PS_PLATFORM_ROOT=${{ github.workspace }}/.ps-platform" >> "$GITHUB_ENV"
+            printf 'PS.SUMMARY: PS_PLATFORM_ROOT set to %s/.ps-platform\n' "${{ github.workspace }}"
+          else
+            printf 'WARN: platform snapshot missing or incomplete; PS_PLATFORM_ROOT not set\n' >&2
+          fi
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
