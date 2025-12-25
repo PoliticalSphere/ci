@@ -231,8 +231,10 @@ jobs:
           skip_checkout: "0"          # Now handles source checkout automatically
           platform_repository: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          install_dependencies: "0"   # Still minimal (no npm ci)
-          egress_policy: block        # Keeps security hardening intact
+          install_dependencies: "1"   # Install dependencies (npm ci) so build scripts can run
+          egress_policy: audit         # Allow outbound network as needed for builds (telemetry, registries)
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
 
       - name: Validate build inputs (paths)
         uses: ./.github/actions/validate-paths
