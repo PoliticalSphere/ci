@@ -327,22 +327,6 @@ jobs:
     # are available. `ps-write-summary` still creates the output directory
     # (e.g. `reports/summary/`) and writes the summary file.
     steps:
-      - name: Job setup (Security Only)
-        uses: ./.github/actions/ps-bootstrap
-        with:
-          skip_checkout: "1"                # Don't pull the source
-          skip_platform_checkout: "true"    # Do not checkout the platform repo in summary (use artifact snapshot)
-          install_dependencies: "0"         # No npm ci
-          install_tools: "0"                # No extra binaries
-          egress_policy: block
-          home_dir: ${{ runner.temp }}
-
-
-      - name: Checkout repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
-        with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-
       - name: Download platform snapshot
         if: always()
         uses: actions/download-artifact@v3
@@ -350,6 +334,20 @@ jobs:
           name: platform-snapshot
           path: .ps-platform
           allow-no-files-found: true
+
+      - name: Job setup (Security Only)
+        # Delegate checkout to ps-bootstrap to centralize job setup and ensure
+        # consistent checkout behaviour across jobs. Fetch depth is passed
+        # through to control network usage.
+        uses: ./.github/actions/ps-bootstrap
+        with:
+          skip_checkout: "0"                # Let ps-bootstrap checkout the consumer repo
+          fetch_depth: ${{ inputs.fetch_depth }}
+          skip_platform_checkout: "true"    # Do not checkout the platform repo in summary (we use artifact snapshot)
+          install_dependencies: "0"         # No npm ci
+          install_tools: "0"                # No extra binaries
+          egress_policy: block
+          home_dir: ${{ runner.temp }}
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
