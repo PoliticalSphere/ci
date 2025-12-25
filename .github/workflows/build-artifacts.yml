@@ -86,6 +86,12 @@ on:
       # ==========================================================================
       # PLATFORM & SHARED TOOLING
       # ==========================================================================
+      platform_repository:
+        description: "Platform repository for shared configs"
+        type: string
+        required: false
+        default: "PoliticalSphere/ci"
+
       platform_ref:
         description: "Platform repository ref for shared scripts/configs"
         type: string
@@ -131,6 +137,12 @@ on:
         type: number
         required: false
         default: 7
+
+      compression_level:
+        description: "Zlib compression level (0-9)"
+        type: number
+        required: false
+        default: 6
 
       validate_retention_days:
         description: "Validate-CI artifact retention in days"
@@ -216,22 +228,11 @@ jobs:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap
         with:
-          fetch_depth: ${{ inputs.fetch_depth }}
+          skip_checkout: "0"          # Now handles source checkout automatically
+          platform_repository: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
-          install_tools: "0"
-          tools_bundle: "none"
+          install_dependencies: "0"   # Still minimal (no npm ci)
+          egress_policy: block        # Keeps security hardening intact
 
       - name: Validate build inputs (paths)
         uses: ./.github/actions/validate-paths
@@ -245,6 +246,15 @@ jobs:
         with:
           working-directory: ${{ inputs.working_directory }}
           script: ${{ inputs.build_script }}
+
+      - name: Upload platform snapshot
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        with:
+          name: platform-snapshot
+          path: .ps-platform/tools/scripts/branding/**
+          if-no-files-found: "warn"
+          retention-days: ${{ inputs.retention_days }}
 
       - name: Upload artifacts (PS)
         id: upload
@@ -332,13 +342,13 @@ jobs:
         with:
           fetch-depth: ${{ inputs.fetch_depth }}
 
-      - name: Checkout platform repository
-        uses: actions/checkout@b4ffde65f46336ab88eb53be808477a3936bae11
+      - name: Download platform snapshot
+        if: always()
+        uses: actions/download-artifact@v3
         with:
-          repository: PoliticalSphere/ci
-          ref: ${{ inputs.platform_ref }}
+          name: platform-snapshot
           path: .ps-platform
-          fetch-depth: 1
+          allow-no-files-found: true
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
