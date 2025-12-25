@@ -14,11 +14,9 @@ fi
 
 echo "mode=${mode}" >> "$GITHUB_OUTPUT"
 
-if [[ "${mode}" == "file" ]]; then
-  if [[ ! -f "${PS_RELEASE_NOTES_PATH}" ]]; then
-    echo "ERROR: release_notes_path not found: ${PS_RELEASE_NOTES_PATH}" >&2
-    exit 1
-  fi
+if [[ "${mode}" == "file" && ! -f "${PS_RELEASE_NOTES_PATH}" ]]; then
+  echo "ERROR: release_notes_path not found: ${PS_RELEASE_NOTES_PATH}" >&2
+  exit 1
 fi
 
 echo "PS.RELEASE_NOTES: mode=${mode}"
