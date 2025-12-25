@@ -7,7 +7,13 @@ import { fail, getRepoRoot, readYamlFile, section } from './test-utils.js';
 section('validate-paths', 'Validate Paths action metadata and basic content');
 
 const repoRoot = getRepoRoot();
-const actionFile = path.join(repoRoot, '.github', 'actions', 'validate-paths', 'action.yml');
+const actionFile = path.join(
+  repoRoot,
+  '.github',
+  'actions',
+  'validate-paths',
+  'action.yml',
+);
 
 if (!fs.existsSync(actionFile)) {
   fail('validate-paths action.yml not found');
@@ -32,14 +38,19 @@ if (!Array.isArray(steps) || steps.length === 0) {
 }
 
 // Ensure we have a shell run step that contains checks we expect
-const shellStep = steps.find((s) => s.shell === 'bash' && typeof s.run === 'string');
+const shellStep = steps.find(
+  (s) => s.shell === 'bash' && typeof s.run === 'string',
+);
 if (!shellStep) fail('validate-paths must include a bash run step');
 
 const content = shellStep.run;
 if (!content.includes('working-directory') || !content.includes('script')) {
   fail('validate-paths run step must reference working-directory and script');
 }
-if (!content.includes("must not contain '..'") && !content.includes("must not contain '..':")) {
+if (
+  !content.includes("must not contain '..'") &&
+  !content.includes("must not contain '..':")
+) {
   // Accept either phrasing
   fail("validate-paths must check for path traversal ( '..' )");
 }

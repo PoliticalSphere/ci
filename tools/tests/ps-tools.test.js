@@ -45,7 +45,10 @@ try {
   {
     // We will call the Prepare tools logic from ps-bootstrap harness to assemble PS_TOOLS env variable
     const command = `bash -lc 'PS_PLATFORM_ROOT=${repoRoot} PS_TOOLS_BUNDLE_INPUT=security PS_TOOLS_EXTRA_INPUT=trivy \n source ${repoRoot}/.github/actions/ps-bootstrap/action.yml >/dev/null 2>&1 || true; echo "OK"'`;
-    execFileSync('bash', ['-lc', command], { encoding: 'utf8', env: { PATH: SAFE_PATH, HOME: process.env.HOME, USER: process.env.USER } });
+    execFileSync('bash', ['-lc', command], {
+      encoding: 'utf8',
+      env: { PATH: SAFE_PATH, HOME: process.env.HOME, USER: process.env.USER },
+    });
   }
 
   // Test 3: explicit tools takes precedence

@@ -6,7 +6,12 @@ import { fail, section } from './test-utils.js';
 
 section('workflows', 'Workflow uses validate-paths guard');
 
-const wf = path.join(process.cwd(), '.github', 'workflows', 'build-artifacts.yml');
+const wf = path.join(
+  process.cwd(),
+  '.github',
+  'workflows',
+  'build-artifacts.yml',
+);
 if (!fs.existsSync(wf)) {
   fail('build-artifacts workflow not found');
 }

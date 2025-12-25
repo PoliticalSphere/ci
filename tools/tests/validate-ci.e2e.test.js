@@ -29,6 +29,7 @@ const consoleHelpers = path.join(
 );
 
 import { SAFE_PATH } from './test-utils.js';
+
 const { detail, fatal, section } = await import(consoleHelpers);
 
 function fail(msg, stdout = '', stderr = '') {

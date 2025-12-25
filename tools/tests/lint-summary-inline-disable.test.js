@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-import { runLintSummary, assertLintSummaryOnce } from './test-utils.js';
+import { assertLintSummaryOnce, runLintSummary } from './test-utils.js';
 
 // Run the lint summary twice with PS_LINT_INLINE=0 to ensure the summary
 // does not duplicate when in-place updates are disabled.

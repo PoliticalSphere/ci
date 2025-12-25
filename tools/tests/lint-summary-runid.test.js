@@ -24,7 +24,10 @@ try {
   // Remove any previous per-run markers used by different versions of the helper to avoid flakes
   execFileSync(
     'bash',
-    ['-lc', `rm -rf ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* ${repoRoot}/logs/lint/.summary_printed_${env.GITHUB_RUN_ID}* || true`],
+    [
+      '-lc',
+      `rm -rf ${repoRoot}/logs/lint/.header-printed-${env.GITHUB_RUN_ID}* ${repoRoot}/logs/lint/.summary_printed_${env.GITHUB_RUN_ID}* || true`,
+    ],
     { encoding: 'utf8', cwd: repoRoot, env, timeout: 30_000 },
   );
 
