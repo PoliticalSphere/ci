@@ -134,6 +134,20 @@ runs:
         set -euo pipefail
         printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_INPUT}" >> "$GITHUB_ENV"
 
+    - name: Detect platform snapshot and set PS_PLATFORM_ROOT
+      shell: bash
+      if: ${{ inputs.skip_platform_checkout == 'true' }}
+      run: |
+        set -euo pipefail
+
+        # If a platform snapshot (downloaded artifact) is present, export PS_PLATFORM_ROOT
+        if [[ -d ".ps-platform" && -f ".ps-platform/tools/scripts/branding/print-section.sh" ]]; then
+          printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/.ps-platform" >> "$GITHUB_ENV"
+          printf 'PS.PLATFORM: detected platform snapshot, PS_PLATFORM_ROOT set to %s/.ps-platform\n' "${GITHUB_WORKSPACE}"
+        else
+          printf 'PS.PLATFORM: platform snapshot not found at .ps-platform; PS_PLATFORM_ROOT not set\n' >&2
+        fi
+
     - name: Bootstrap platform (PS)
       uses: ./.github/actions/ps-bootstrap
       with:
