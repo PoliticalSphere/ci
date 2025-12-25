@@ -228,7 +228,7 @@ jobs:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap
         with:
-          skip_checkout: "0"          # Now handles source checkout automatically
+          skip_checkout: "0"          # Handles source checkout automatically
           platform_repository: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
           install_dependencies: "1"   # Install dependencies (npm ci) so build scripts can run
@@ -360,3 +360,4 @@ jobs:
           path: reports/summary/build-artifacts.json
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
+          compression_level: 9 # Max compression for small JSON reports

@@ -16,6 +16,8 @@
 #   - Does not alter job permissions
 #   - Uses platform-provided validation scripts where required
 # ============================================================================
+# 
+# ============================================================================
 
 name: "PS Job Setup"
 description: "Harden runner, checkout repo & platform, setup Node.js, optional installs and tools"
@@ -30,6 +32,10 @@ inputs:
     description: "Optional ref to checkout for the repository"
     required: false
     default: ""
+  platform_repository:
+    description: "Platform repository (owner/repo) to checkout for shared configs"
+    required: false
+    default: "PoliticalSphere/ci"
   platform_ref:
     description: "Optional ref to checkout for the platform repository"
     required: false
@@ -135,7 +141,7 @@ runs:
       if: ${{ inputs.skip_platform_checkout != 'true' }}
       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
       with:
-        repository: PoliticalSphere/ci
+        repository: ${{ inputs.platform_repository }}
         ref: ${{ inputs.platform_ref }}
         path: ${{ inputs.platform_path }}
         fetch-depth: 1
@@ -154,7 +160,8 @@ runs:
       uses: actions/download-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
       with:
         name: ${{ inputs.platform_snapshot_artifact }}
-        path: ${{ inputs.platform_snapshot_path }}
+        # Extract snapshot into the same path a normal checkout would use
+        path: ${{ inputs.platform_path }}
         allow-no-files-found: ${{ inputs.platform_snapshot_allow_no_files_found }}
 
     - name: Detect platform snapshot and set PS_PLATFORM_ROOT
@@ -175,11 +182,15 @@ runs:
           printf 'PS.PLATFORM: platform snapshot not found at %s; PS_PLATFORM_ROOT not set\n' "${path}" >&2
         fi
 
-    - name: Bootstrap platform (PS)
-      uses: ./.github/actions/ps-bootstrap
-      with:
-        platform_root: ${{ github.workspace }}/${{ inputs.platform_path }}
-        home_dir: ${{ inputs.home_dir }}
+    - name: Platform bootstrap (noop)
+      shell: bash
+      env:
+        PS_PLATFORM_PATH_INPUT: ${{ inputs.platform_path }}
+      run: |
+        set -euo pipefail
+        # No-op placeholder: platform is either checked out into ${PS_PLATFORM_PATH_INPUT}
+        # or a snapshot was extracted there. Downstream steps should find scripts under that path.
+        printf 'PS.PLATFORM: ready (path=%s/%s)\n' "${GITHUB_WORKSPACE}" "${PS_PLATFORM_PATH_INPUT}"
 
     - name: Bootstrap & Validate (PS)
       shell: bash
