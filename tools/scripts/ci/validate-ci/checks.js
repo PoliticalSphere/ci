@@ -314,24 +314,17 @@ async function checkUsesReference({
       return { violations, handled: false };
     }
     if (!ok) {
-      let reason = 'remote lookup failed';
-      if (result?.error === 'ref_not_found') {
-        reason = 'ref not found';
-      } else if (result?.error === 'api_unreachable') {
-        reason = 'GitHub API unreachable';
-      } else if (result?.error === 'api_unreachable_local_skip') {
-        reason = 'GitHub API unreachable (local skip)';
-      } else if (result?.error === 'unauthorized') {
-        reason = 'unauthorized';
-      } else if (result?.error === 'forbidden_or_rate_limited') {
-        reason = 'forbidden or rate limited';
-      } else if (result?.error === 'rate_limited') {
-        reason = 'rate limited';
-      } else if (result?.error === 'unexpected_status') {
-        reason = 'unexpected status';
-      } else if (result?.error === 'invalid_action_ref') {
-        reason = 'invalid action reference';
-      }
+      const ERROR_REASONS = {
+        ref_not_found: 'ref not found',
+        api_unreachable: 'GitHub API unreachable',
+        api_unreachable_local_skip: 'GitHub API unreachable (local skip)',
+        unauthorized: 'unauthorized',
+        forbidden_or_rate_limited: 'forbidden or rate limited',
+        rate_limited: 'rate limited',
+        unexpected_status: 'unexpected status',
+        invalid_action_ref: 'invalid action reference',
+      };
+      const reason = ERROR_REASONS[result?.error] || 'remote lookup failed';
       const weight = result?.error === 'invalid_action_ref' ? 3 : 2;
       violations.push(
         makeViolation(
