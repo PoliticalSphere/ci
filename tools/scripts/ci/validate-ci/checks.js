@@ -112,6 +112,45 @@ function parseBraceQuantifier(str, i) {
   return { isQuantifier: false, isUnbounded: false, endIndex: i };
 }
 
+// Helper: detect unbounded quantifiers (+, *, or open-ended {,}) in a
+// pattern fragment. Kept at module scope so it can be tested independently
+// and to reduce nested complexity inside `compileRegex`.
+function _hasUnboundedQuantifierIn(str) {
+  let i = 0;
+  const len = str.length;
+  while (i < len) {
+    const ch = str[i];
+    // Skip escapes
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    // Skip character classes
+    if (ch === '[') {
+      i++;
+      while (i < len) {
+        if (str[i] === '\\') {
+          i += 2;
+          continue;
+        }
+        if (str[i] === ']') {
+          i++;
+          break;
+        }
+        i++;
+      }
+      continue;
+    }
+    if (ch === '+' || ch === '*') return true;
+    if (ch === '{') {
+      const q = parseBraceQuantifier(str, i);
+      if (q.isQuantifier && q.isUnbounded) return true;
+    }
+    i++;
+  }
+  return false;
+}
+
 function compileRegex(reStr) {
   let pattern = reStr;
   let flags = '';
@@ -137,43 +176,8 @@ function compileRegex(reStr) {
   // Brace quantifier parsing is now handled by `parseBraceQuantifier` in
   // module scope to reduce nested function complexity and improve testability.
 
-  // Move helper out so it can be tested independently and reduce nested
+  // _hasUnboundedQuantifierIn moved to module scope above to reduce nested
   // function complexity in `compileRegex`.
-  function _hasUnboundedQuantifierIn(str) {
-    let i = 0;
-    const len = str.length;
-    while (i < len) {
-      const ch = str[i];
-      // Skip escapes
-      if (ch === '\\') {
-        i += 2;
-        continue;
-      }
-      // Skip character classes
-      if (ch === '[') {
-        i++;
-        while (i < len) {
-          if (str[i] === '\\') {
-            i += 2;
-            continue;
-          }
-          if (str[i] === ']') {
-            i++;
-            break;
-          }
-          i++;
-        }
-        continue;
-      }
-      if (ch === '+' || ch === '*') return true;
-      if (ch === '{') {
-        const q = parseBraceQuantifier(str, i);
-        if (q.isQuantifier && q.isUnbounded) return true;
-      }
-      i++;
-    }
-    return false;
-  }
 
   // Refactored nested detection to use small helpers to keep cognitive
   // complexity low and make the logic clearer.
