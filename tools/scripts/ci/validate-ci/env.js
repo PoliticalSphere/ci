@@ -15,7 +15,12 @@ export function isCI() {
 
 export function getRepoRoot() {
   try {
-    const safePath = getSafePathEnv();
+    let safePath = '';
+    try {
+      safePath = getSafePathEnv();
+    } catch {
+      return process.cwd();
+    }
     const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
