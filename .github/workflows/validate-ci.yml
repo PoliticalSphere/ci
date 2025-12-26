@@ -117,6 +117,12 @@ on:
         required: false
         default: "main"
 
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "false"
+
       # ==========================================================================
       # DEPENDENCY INSTALLATION CONTROLS
       # ==========================================================================
@@ -239,6 +245,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           skip_platform_checkout: "0"
 
           # HOME and harden

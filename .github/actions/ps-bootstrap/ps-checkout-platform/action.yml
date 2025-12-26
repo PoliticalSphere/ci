@@ -93,6 +93,11 @@ inputs:
     required: false
     default: "false"
 
+  require_pinned_ref:
+    description: "Require platform ref to be a full 40-char commit SHA (true|false)."
+    required: false
+    default: "false"
+
   allowed_repositories:
     description: "Optional newline-separated allowlist of OWNER/REPO values. If set, repository must be in the list."
     required: false
@@ -129,6 +134,7 @@ runs:
         PS_SUBMODULES_INPUT: ${{ inputs.submodules }}
         PS_REQUIRE_FULL_HISTORY_INPUT: ${{ inputs.require_full_history }}
         PS_CLEAN_PATH_INPUT: ${{ inputs.clean_path }}
+        PS_REQUIRE_PINNED_REF_INPUT: ${{ inputs.require_pinned_ref }}
         PS_ALLOWED_REPOSITORIES_INPUT: ${{ inputs.allowed_repositories }}
       run: |
         set -euo pipefail
@@ -235,6 +241,12 @@ runs:
           exit 1
         fi
 
+        require_pinned="${PS_REQUIRE_PINNED_REF_INPUT:-false}"
+        case "${require_pinned}" in true|false) ;; *)
+          printf 'ERROR: inputs.require_pinned_ref must be true|false (got %q)\n' "${require_pinned}" >&2
+          exit 1 ;;
+        esac
+
         pc="${PS_PERSIST_CREDENTIALS_INPUT:-false}"
         case "${pc}" in true|false) ;; *)
           printf 'ERROR: inputs.persist_credentials must be true|false (got %q)\n' "${pc}" >&2
@@ -261,6 +273,7 @@ runs:
         emit_env "PS_PLATFORM_SUBMODULES_VALIDATED" "${sm}"
         emit_env "PS_PLATFORM_REQUIRE_FULL_HISTORY_VALIDATED" "${req}"
         emit_env "PS_PLATFORM_CLEAN_PATH_VALIDATED" "${clean}"
+        emit_env "PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED" "${require_pinned}"
 
         log_info "repository=${repo}"
         log_info "ref=${ref}"
@@ -270,6 +283,7 @@ runs:
         log_info "persist_credentials=${pc}"
         log_info "submodules=${sm}"
         log_info "clean_path=${clean}"
+        log_info "require_pinned_ref=${require_pinned}"
 
     - name: Clean platform path (optional)
       if: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == 'true' }}
@@ -291,6 +305,69 @@ runs:
         fetch-depth: ${{ env.PS_PLATFORM_FETCH_DEPTH_VALIDATED }}
         persist-credentials: ${{ env.PS_PLATFORM_PERSIST_CREDENTIALS_VALIDATED }}
         submodules: ${{ env.PS_PLATFORM_SUBMODULES_VALIDATED }}
+
+    - name: Verify platform integrity (PS)
+      shell: bash
+      env:
+        PS_PLATFORM_PATH: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
+        PS_PLATFORM_REF: ${{ env.PS_PLATFORM_REF_VALIDATED }}
+        PS_PLATFORM_REQUIRE_PINNED_REF: ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED }}
+      run: |
+        set -euo pipefail
+
+        platform_dir="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH}"
+        if [[ ! -d "${platform_dir}" ]]; then
+          printf 'ERROR: platform checkout path not found: %s\n' "${platform_dir}" >&2
+          exit 1
+        fi
+
+        if ! git -C "${platform_dir}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+          printf 'ERROR: platform checkout is not a git repository: %s\n' "${platform_dir}" >&2
+          exit 1
+        fi
+
+        head_sha="$(git -C "${platform_dir}" rev-parse HEAD)"
+        printf 'PS.CHECKOUT.PLATFORM: head_sha=%s\n' "${head_sha}"
+
+        if [[ "${PS_PLATFORM_REQUIRE_PINNED_REF}" == "true" ]]; then
+          if [[ ! "${PS_PLATFORM_REF}" =~ ^[0-9a-fA-F]{40}$ ]]; then
+            printf 'ERROR: platform ref must be a full 40-char commit SHA when require_pinned_ref=true (got %s)\n' "${PS_PLATFORM_REF}" >&2
+            exit 1
+          fi
+        fi
+
+        if [[ "${PS_PLATFORM_REF}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
+          expected_sha="$(git -C "${platform_dir}" rev-parse "${PS_PLATFORM_REF}^{commit}")"
+          if [[ "${head_sha}" != "${expected_sha}" ]]; then
+            printf 'ERROR: platform ref mismatch (expected %s, got %s)\n' "${expected_sha}" "${head_sha}" >&2
+            exit 1
+          fi
+        fi
+
+        if [[ -n "$(git -C "${platform_dir}" status --porcelain)" ]]; then
+          printf 'ERROR: platform checkout is not clean\n' >&2
+          git -C "${platform_dir}" status --porcelain >&2
+          exit 1
+        fi
+
+        missing="0"
+        for rel in \
+          "tools/scripts/branding/format.sh" \
+          "tools/scripts/branding/print-section.sh" \
+          "tools/scripts/branding/validate-inputs.sh" \
+          "tools/scripts/ci/validate-ci/index.js" \
+          "configs/ci/policies/validate-ci.yml"; do
+          if [[ ! -f "${platform_dir}/${rel}" ]]; then
+            printf 'ERROR: platform missing required file: %s\n' "${rel}" >&2
+            missing="1"
+          fi
+        done
+
+        if [[ "${missing}" == "1" ]]; then
+          exit 1
+        fi
+
+        printf 'PS.CHECKOUT.PLATFORM: integrity=ok\n'
 
     - name: Emit outputs (PS)
       id: ps_checkout_platform_outputs

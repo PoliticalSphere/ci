@@ -161,6 +161,12 @@ on:
         description: "Platform repo ref to checkout for shared scripts/configs"
         required: false
         default: "main"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "false"
         type: string
 
 # ==============================================================================
@@ -248,6 +254,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
@@ -310,6 +317,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
@@ -402,6 +410,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"

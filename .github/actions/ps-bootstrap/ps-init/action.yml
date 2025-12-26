@@ -135,6 +135,11 @@ inputs:
     required: false
     default: "false"
 
+  platform_require_pinned_ref:
+    description: "Require platform_ref to be a full 40-char commit SHA (0/1/true/false)"
+    required: false
+    default: "false"
+
   platform_allowed_repositories:
     description: "Optional newline-separated allowlist for platform_repo (OWNER/REPO). If set, platform_repo must be listed."
     required: false
@@ -216,6 +221,7 @@ runs:
         PS_SKIP_PLATFORM_INPUT: ${{ inputs.skip_platform_checkout }}
         PS_PLATFORM_FETCH_DEPTH_INPUT: ${{ inputs.platform_fetch_depth }}
         PS_PLATFORM_CLEAN_PATH_INPUT: ${{ inputs.platform_clean_path }}
+        PS_PLATFORM_REQUIRE_PINNED_REF_INPUT: ${{ inputs.platform_require_pinned_ref }}
         PS_PLATFORM_ALLOWLIST_INPUT: ${{ inputs.platform_allowed_repositories }}
 
         PS_INSTALL_TOOLS_INPUT: ${{ inputs.install_tools }}
@@ -285,6 +291,7 @@ runs:
         require_full="$(norm_bool "${PS_REQUIRE_FULL_HISTORY_INPUT}")" || { printf 'ERROR: require_full_history must be 0/1/true/false (got %q)\n' "${PS_REQUIRE_FULL_HISTORY_INPUT}" >&2; exit 1; }
         skip_platform="$(norm_bool "${PS_SKIP_PLATFORM_INPUT}")" || { printf 'ERROR: skip_platform_checkout must be 0/1/true/false (got %q)\n' "${PS_SKIP_PLATFORM_INPUT}" >&2; exit 1; }
         clean_platform="$(norm_bool "${PS_PLATFORM_CLEAN_PATH_INPUT}")" || { printf 'ERROR: platform_clean_path must be 0/1/true/false (got %q)\n' "${PS_PLATFORM_CLEAN_PATH_INPUT}" >&2; exit 1; }
+        require_pinned_ref="$(norm_bool "${PS_PLATFORM_REQUIRE_PINNED_REF_INPUT}")" || { printf 'ERROR: platform_require_pinned_ref must be 0/1/true/false (got %q)\n' "${PS_PLATFORM_REQUIRE_PINNED_REF_INPUT}" >&2; exit 1; }
         install_tools="$(norm_bool "${PS_INSTALL_TOOLS_INPUT}")" || { printf 'ERROR: install_tools must be 0/1/true/false (got %q)\n' "${PS_INSTALL_TOOLS_INPUT}" >&2; exit 1; }
         isolate_home="$(norm_bool "${PS_HOME_ISOLATION_INPUT}")" || { printf 'ERROR: home_isolation must be 0/1/true/false (got %q)\n' "${PS_HOME_ISOLATION_INPUT}" >&2; exit 1; }
 
@@ -367,6 +374,7 @@ runs:
         emit_env "PS_PLATFORM_PATH_VALIDATED" "${ppath}"
         emit_env "PS_PLATFORM_FETCH_DEPTH_VALIDATED" "${pdepth}"
         emit_env "PS_PLATFORM_CLEAN_PATH_VALIDATED" "${clean_platform}"
+        emit_env "PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED" "${require_pinned_ref}"
         emit_env "PS_PLATFORM_ALLOWLIST_VALIDATED" "${PS_PLATFORM_ALLOWLIST_INPUT:-}"
 
         emit_env "PS_INSTALL_TOOLS_VALIDATED" "${install_tools}"
@@ -512,6 +520,7 @@ runs:
         path: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
         fetch_depth: ${{ env.PS_PLATFORM_FETCH_DEPTH_VALIDATED }}
         clean_path: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == '1' && 'true' || 'false' }}
+        require_pinned_ref: ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED == '1' && 'true' || 'false' }}
         allowed_repositories: ${{ env.PS_PLATFORM_ALLOWLIST_VALIDATED }}
         require_full_history: "false"
         persist_credentials: "false"

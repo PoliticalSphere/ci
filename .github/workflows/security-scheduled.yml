@@ -92,6 +92,12 @@ on:
         type: string
         required: false
         default: "main"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "false"
       codeql_languages:
         description: "CodeQL languages (comma-separated)"
         type: string
@@ -168,6 +174,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           home_dir: ".home"
           egress_policy: audit
           cache: ${{ inputs.cache || '1' }}
@@ -214,6 +221,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           home_dir: ".home"
           egress_policy: audit
 
@@ -255,6 +263,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           home_dir: ".home"
           egress_policy: audit
 
@@ -297,6 +306,7 @@ jobs:
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           home_dir: ".home"
           egress_policy: audit
 

@@ -38,6 +38,7 @@ path without compromising workspace integrity.
 - `submodules`: Submodules mode (`false`|`true`|`recursive`). Default: `false`.
 - `require_full_history`: Require `fetch_depth=0` (`true`|`false`). Default: `false`.
 - `clean_path`: Delete the target path before checkout (`true`|`false`). Default: `false`.
+- `require_pinned_ref`: Require `ref` to be a full 40-char commit SHA (`true`|`false`). Default: `false`.
 - `allowed_repositories`: Optional newline-separated allowlist of repositories.
   If set, `repository` must be listed. Default: empty.
 

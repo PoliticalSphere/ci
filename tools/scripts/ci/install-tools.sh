@@ -85,6 +85,20 @@ require_cmd() {
   return 0
 } 
 
+curl_secure() {
+  local url="$1"
+  shift
+  if [[ -z "${url}" ]]; then
+    error "curl_secure requires a URL"
+    exit 1
+  fi
+  if [[ "${url}" != https://* ]]; then
+    error "refusing non-HTTPS URL: ${url}"
+    exit 1
+  fi
+  curl --proto '=https' --tlsv1.2 -fsSL "${url}" "$@"
+}
+
 require_var() {
   local name="$1"
   local value="${!name:-}"
@@ -131,8 +145,8 @@ install_actionlint() {
     require_var ACTIONLINT_SHA256
     ACTIONLINT_SHA="${ACTIONLINT_SHA256}"
   fi
-  curl -fsSL -o "${_tmpdir}/actionlint.tar.gz" \
-    "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ACTIONLINT_ARCH}.tar.gz"
+  curl_secure "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ACTIONLINT_ARCH}.tar.gz" \
+    -o "${_tmpdir}/actionlint.tar.gz"
   printf '%s\n' "${ACTIONLINT_SHA}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/actionlint.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/actionlint" "${install_dir}/actionlint"
@@ -152,8 +166,8 @@ install_shellcheck() {
     require_var SHELLCHECK_SHA256
     SHELLCHECK_SHA="${SHELLCHECK_SHA256}"
   fi
-  curl -fsSL -o "${_tmpdir}/shellcheck.tar.xz" \
-    "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SHELLCHECK_ARCH}.tar.xz"
+  curl_secure "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SHELLCHECK_ARCH}.tar.xz" \
+    -o "${_tmpdir}/shellcheck.tar.xz"
   printf '%s\n' "${SHELLCHECK_SHA}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
   tar -xJf "${_tmpdir}/shellcheck.tar.xz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${install_dir}/shellcheck"
@@ -173,8 +187,8 @@ install_hadolint() {
     require_var HADOLINT_SHA256
     HADOLINT_SHA="${HADOLINT_SHA256}"
   fi
-  curl -fsSL -o "${_tmpdir}/hadolint" \
-    "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HADOLINT_ARCH}"
+  curl_secure "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HADOLINT_ARCH}" \
+    -o "${_tmpdir}/hadolint"
   printf '%s\n' "${HADOLINT_SHA}  ${_tmpdir}/hadolint" | sha256sum -c -
   install -m 0755 "${_tmpdir}/hadolint" "${install_dir}/hadolint"
 
@@ -193,7 +207,7 @@ install_yamllint() {
   fi
 
   wheel_url="$(
-    curl -fsSL "https://pypi.org/pypi/yamllint/${YAMLLINT_VERSION}/json" | \
+    curl_secure "https://pypi.org/pypi/yamllint/${YAMLLINT_VERSION}/json" | \
       python3 -c "import json,sys; data=json.load(sys.stdin); urls=data['urls']; wheel=next(u for u in urls if u['packagetype']=='bdist_wheel' and u['filename'].endswith('py3-none-any.whl')); print(wheel['url'])" || true
   )"
   if [[ -z "${wheel_url}" ]]; then
@@ -203,7 +217,7 @@ install_yamllint() {
   wheel_name="$(basename "${wheel_url}")"
   wheel_path="${_tmpdir}/${wheel_name}"
 
-  if ! curl -fsSL -o "${wheel_path}" "${wheel_url}"; then
+  if ! curl_secure "${wheel_url}" -o "${wheel_path}"; then
     error "failed to download yamllint wheel from PyPI."
     exit 1
   fi
@@ -232,8 +246,8 @@ install_gitleaks() {
     require_var GITLEAKS_SHA256
     GITLEAKS_SHA="${GITLEAKS_SHA256}"
   fi
-  curl -fsSL -o "${_tmpdir}/gitleaks.tar.gz" \
-    "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz"
+  curl_secure "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz" \
+    -o "${_tmpdir}/gitleaks.tar.gz"
   printf '%s\n' "${GITLEAKS_SHA}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/gitleaks.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/gitleaks" "${install_dir}/gitleaks"
@@ -253,8 +267,8 @@ install_trivy() {
     require_var TRIVY_SHA256
     TRIVY_SHA="${TRIVY_SHA256}"
   fi
-  curl -fsSL -o "${_tmpdir}/trivy.tar.gz" \
-    "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz"
+  curl_secure "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" \
+    -o "${_tmpdir}/trivy.tar.gz"
   printf '%s\n' "${TRIVY_SHA}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/trivy.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/trivy" "${install_dir}/trivy"

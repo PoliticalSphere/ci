@@ -109,6 +109,7 @@ Platform checkout (optional):
 - `skip_platform_checkout`: Skip platform checkout (`0/1/true/false`). Default: `false`.
 - `platform_fetch_depth`: Platform fetch depth (0 = full history). Default: `1`.
 - `platform_clean_path`: Delete platform_path before checkout (`0/1/true/false`). Default: `false`.
+- `platform_require_pinned_ref`: Require platform_ref to be a full 40-char commit SHA (`0/1/true/false`). Default: `false`.
 - `platform_allowed_repositories`: Optional newline-separated allowlist for `platform_repo`. Default: empty.
 
 Tools (optional):
