@@ -36,7 +36,7 @@ set -euo pipefail
 #
 # ==============================================================================
 
-die() { echo "ERROR: $*" >&2; exit 1; }
+die() { echo "ERROR: $*" >&2; exit 1; return 1; }
 warn() { echo "WARN: $*" >&2; return 0; }
 
 # ----------------------------
@@ -52,7 +52,7 @@ format_sh="${repo_root}/tools/scripts/branding/format.sh"
 if [[ -f "${format_sh}" ]]; then
   # shellcheck source=tools/scripts/branding/format.sh
   . "${format_sh}"
-  die() { ps_error "$*"; exit 1; }
+  die() { ps_error "$*"; exit 1; return 1; }
   warn() { ps_warn "$*"; return 0; }
 fi
 
@@ -153,8 +153,9 @@ fi
 # ----------------------------
 # Post-build output check (optional)
 # ----------------------------
-if [[ "${CI}" == "1" && -n "${EXPECTED_DIST_DIR:-}" ]]; then
-  if [[ ! -d "${EXPECTED_DIST_DIR}" ]]; then
-    die "Build succeeded but output directory '${EXPECTED_DIST_DIR}' is missing!"
-  fi
+if [[ "${CI}" == "1" && -n "${EXPECTED_DIST_DIR:-}" && ! -d "${EXPECTED_DIST_DIR}" ]]; then
+  die "Build succeeded but output directory '${EXPECTED_DIST_DIR}' is missing!"
 fi
+
+# Explicitly return success when sourced to clarify intended behavior
+return 0
