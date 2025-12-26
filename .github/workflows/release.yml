@@ -327,9 +327,9 @@ jobs:
         id: notes
         uses: ./.github/actions/ps-run
         with:
-          id: prepare-release-notes
+          id: prepare-release
           title: Prepare release notes mode
-          script: tools/scripts/release/prepare-release-notes.sh
+          script: tools/scripts/release/prepare-release.sh
 
       - name: Publish release (PS)
         uses: ./.github/actions/ps-run
