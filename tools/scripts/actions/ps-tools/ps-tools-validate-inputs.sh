@@ -39,10 +39,11 @@ tools_raw="${PS_TOOLS_INPUT:-}"
 if [[ -n "${tools_raw}" ]]; then
   require_nonempty "inputs.tools" "${tools_raw}" || exit 1
   # Validate explicit tools input: enforce same pattern as extra_tools
-  tools_trimmed="$(printf '%s' "${tools_raw}" | sed 's/^\s*//; s/\s*$//')"
+  trim_expr='s/^[[:space:]]*//; s/[[:space:]]*$//'
+  tools_trimmed="$(printf '%s' "${tools_raw}" | sed "${trim_expr}")"
   tools_count=0
   while IFS= read -r t; do
-    t_trim="$(printf '%s' "${t}" | sed 's/^\s*//; s/\s*$//')"
+    t_trim="$(printf '%s' "${t}" | sed "${trim_expr}")"
     if [[ -z "${t_trim}" ]]; then
       continue
     fi
@@ -62,7 +63,7 @@ fi
 require_enum "inputs.bundle" "${PS_BUNDLE_INPUT}" "lint" "security" "none" || exit 1
 
 # Extra tools can be empty; when provided ensure each id is lowercase letters, digits or hyphen
-extra_trimmed="$(printf '%s' "${PS_EXTRA_INPUT}" | sed 's/^\s*//; s/\s*$//')"
+extra_trimmed="$(printf '%s' "${PS_EXTRA_INPUT}" | sed "${trim_expr}")"
 extra_count=0
 
 # Early exit: if bundle=none and no extras provided, fail fast (saves runner time)
@@ -73,7 +74,7 @@ fi
 
 if [[ -n "${extra_trimmed}" ]]; then
   while IFS= read -r ex; do
-    ex_trim="$(printf '%s' "${ex}" | sed 's/^\s*//; s/\s*$//')"
+    ex_trim="$(printf '%s' "${ex}" | sed "${trim_expr}")"
     if [[ -z "${ex_trim}" ]]; then
       continue
     fi

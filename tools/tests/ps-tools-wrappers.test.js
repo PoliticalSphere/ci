@@ -17,13 +17,12 @@ try {
 
   // Ensure ps-tools supports the expected bundle inputs
   const yml = fs.readFileSync(
-    `${repoRoot}/.github/actions/ps-tools/action.yml`,
+    `${repoRoot}/.github/actions/ps-bootstrap/ps-tools/action.yml`,
     'utf8',
   );
-  if (
-    !/bundle:\s*"?lint"?/.test(yml) ||
-    (!/bundle:\s*"?security"?/.test(yml) && !/bundle:/.test(yml))
-  ) {
+  const bundleLine = yml.match(/^[ \t]*bundle:[^\n]*$/m);
+  const bundleDesc = yml.match(/^[ \t]*description:\s*"[^\n]*bundle[^\n]*"$/im);
+  if (!bundleLine || !bundleDesc || !/lint\|security/.test(bundleDesc[0])) {
     fail('ps-tools does not declare expected bundle input (lint|security)');
   }
 

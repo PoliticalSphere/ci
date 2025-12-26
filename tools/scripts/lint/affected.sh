@@ -27,22 +27,20 @@ set_repo_root_and_git
 export CI=1
 
 # If PS_PR_* not provided, try to compute a base against origin/main
-if [[ -z "${PS_PR_BASE_SHA:-}" || -z "${PS_PR_HEAD_SHA:-}" ]]; then
-  if _ps_has_git; then
-    # Ensure we have a ref for origin/main (best-effort; fetch shallowly if missing)
-    if ! git show-ref --verify --quiet refs/remotes/origin/main; then
-      retry_cmd 3 2 git fetch --no-tags --depth=1 origin main >/dev/null 2>&1 || true
-    fi
-
-    if git show-ref --verify --quiet refs/remotes/origin/main; then
-      PS_PR_BASE_SHA="$(git merge-base origin/main HEAD)" || PS_PR_BASE_SHA="$(git rev-parse --verify HEAD)"
-    else
-      PS_PR_BASE_SHA="$(git rev-parse --verify HEAD)"
-    fi
-    PS_PR_HEAD_SHA="$(git rev-parse --verify HEAD)"
-
-    export PS_PR_BASE_SHA PS_PR_HEAD_SHA
+if [[ -z "${PS_PR_BASE_SHA:-}" || -z "${PS_PR_HEAD_SHA:-}" ]] && _ps_has_git; then
+  # Ensure we have a ref for origin/main (best-effort; fetch shallowly if missing)
+  if ! git show-ref --verify --quiet refs/remotes/origin/main; then
+    retry_cmd 3 2 git fetch --no-tags --depth=1 origin main >/dev/null 2>&1 || true
   fi
+
+  if git show-ref --verify --quiet refs/remotes/origin/main; then
+    PS_PR_BASE_SHA="$(git merge-base origin/main HEAD)" || PS_PR_BASE_SHA="$(git rev-parse --verify HEAD)"
+  else
+    PS_PR_BASE_SHA="$(git rev-parse --verify HEAD)"
+  fi
+  PS_PR_HEAD_SHA="$(git rev-parse --verify HEAD)"
+
+  export PS_PR_BASE_SHA PS_PR_HEAD_SHA
 fi
 
 # Parse args

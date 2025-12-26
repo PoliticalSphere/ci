@@ -19,6 +19,7 @@ set -euo pipefail
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
+  return 0
 }
 
 version="${SEMGREP_VERSION:-}"
@@ -68,8 +69,6 @@ upload_sarif() {
   local repo="${GITHUB_REPOSITORY:-}"
   local sha="${GITHUB_SHA:-}"
   local ref="${GITHUB_REF:-}"
-  local api_url="${GITHUB_API_URL:-https://api.github.com}"
-
   [[ -n "${token}" ]] || fail "GITHUB_TOKEN is required to upload SARIF"
   [[ -n "${repo}" ]] || fail "GITHUB_REPOSITORY is required to upload SARIF"
   [[ -n "${sha}" ]] || fail "GITHUB_SHA is required to upload SARIF"
@@ -125,6 +124,7 @@ try:
 except Exception as exc:
     raise SystemExit(f"SARIF upload failed: {exc}") from exc
 PY
+  return 0
 }
 
 sarif_path="${output}"

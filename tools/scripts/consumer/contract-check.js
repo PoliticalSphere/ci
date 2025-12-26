@@ -871,18 +871,20 @@ async function main() {
         violations,
       });
       drift.changed =
-        JSON.stringify(baselineComparable) !== JSON.stringify(currentComparable);
+        JSON.stringify(baselineComparable) !==
+        JSON.stringify(currentComparable);
     } catch (err) {
       drift.error = `baseline unreadable: ${err.message}`;
     }
   }
 
   if (drift.enabled) {
-    const status = drift.error
-      ? `error (${drift.error})`
-      : drift.changed
-        ? 'changed'
-        : 'no changes';
+    let status = 'no changes';
+    if (drift.error) {
+      status = `error (${drift.error})`;
+    } else if (drift.changed) {
+      status = 'changed';
+    }
     summaryLines.push(`Drift: ${status}`);
   }
 

@@ -40,6 +40,7 @@ xml_escape() {
   s="${s//\"/&quot;}"
   s="${s//\'/&apos;}"
   printf '%s' "${s}"
+  return 0
 }
 
 write_junit() {
@@ -57,6 +58,7 @@ write_junit() {
     done
     printf '</testsuite>\n'
   } > "${junit_path}"
+  return 0
 }
 
 if [[ -n "${PS_TEST_JUNIT_PATH:-}" ]]; then

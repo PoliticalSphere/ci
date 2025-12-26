@@ -44,6 +44,7 @@ run_cmd_with_optional_fix() {
     esac
   fi
   "${cmd[@]}"
+  return 0
 }
 
 # Banner

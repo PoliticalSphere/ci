@@ -106,6 +106,7 @@ emit_env() {
     delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
   done
   printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+  return 0
 }
 
 emit_env "PS_RUN_ID" "${PS_ID}"
@@ -126,6 +127,7 @@ log_security_event() {
   else
     printf '%s %s %s\n' "${ts}" "${level}" "${msg}"
   fi
+  return 0
 }
 
 bash "${section_script}" "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"

@@ -304,6 +304,9 @@ try {
 
 function tryGit(args) {
   const parts = String(args).split(/\s+/).filter(Boolean);
+  if (!SAFE_PATH) {
+    fatal('Safe PATH not initialized; refusing to spawn git');
+  }
   const r = spawnSync('git', parts, {
     cwd: workspaceRoot,
     stdio: ['ignore', 'pipe', 'ignore'],

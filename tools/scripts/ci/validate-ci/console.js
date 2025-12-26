@@ -6,11 +6,10 @@
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process';
-
-import { getSafePathEnv } from './safe-path.js';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getSafePathEnv } from './safe-path.js';
 
 const DEFAULT_FORMAT = {
   icon: '▶',
@@ -158,7 +157,12 @@ export function fatal(message) {
 
 export function getRepoRoot() {
   try {
-    const safePath = getSafePathEnv();
+    let safePath = '';
+    try {
+      safePath = getSafePathEnv();
+    } catch (err) {
+      fatal(`Safe PATH validation failed: ${err?.message || err}`);
+    }
     const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',

@@ -614,8 +614,8 @@ async function checkStepUses({
       step,
       workspaceRoot,
     });
-    violations.push(...localViolations);
-    violations.push(...checkLocalActionInputs({ rel, jobId, step }));
+    const inputViolations = checkLocalActionInputs({ rel, jobId, step });
+    violations.push(...localViolations, ...inputViolations);
     return violations;
   }
 

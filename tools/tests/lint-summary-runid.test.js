@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
-import { fail, getRepoRoot, SAFE_PATH } from './test-utils.js';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
@@ -9,11 +10,17 @@ const repoRoot = getRepoRoot();
 // GITHUB_RUN_ID in both child processes and invoking the printing helper.
 let out = '';
 try {
+  let safePath = '';
+  try {
+    safePath = getSafePathEnv();
+  } catch (err) {
+    fail(`Safe PATH validation failed: ${err?.message || err}`);
+  }
   const env = {
     GITHUB_ACTIONS: 'true',
     GITHUB_RUN_ID: '1001',
     // Use only fixed, non-writable system directories to prevent PATH hijacking
-    PATH: SAFE_PATH,
+    PATH: safePath,
     HOME: process.env.HOME,
     USER: process.env.USER,
     TERM: 'xterm',

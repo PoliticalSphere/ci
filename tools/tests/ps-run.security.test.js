@@ -3,7 +3,9 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot, mktemp, readYamlFile } from './test-utils.js';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 
 const repoRoot = getRepoRoot();
 const actionYaml = path.join(
@@ -82,18 +84,22 @@ function extractRunScript(outputPath) {
     PS_TASK_WORKDIR: '.',
     PS_TASK_ENV_KV: '',
     PS_TASK_ARGS: '',
-    PATH: process.env.PATH,
+    PATH: '',
     HOME: process.env.HOME,
   };
 
   let out = '';
   try {
+    let safePath = '';
+    try {
+      safePath = getSafePathEnv();
+    } catch (err) {
+      fail(`Safe PATH validation failed: ${err?.message || err}`);
+    }
+    env.PATH = safePath;
     execFileSync(
       'bash',
-      [
-        '-lc',
-        `exec > >(tee -a "${logPath}") 2>&1; ${path.join(tmp, 'run.sh')}`,
-      ],
+      ['-lc', `exec > "${logPath}" 2>&1; ${path.join(tmp, 'run.sh')}`],
       { encoding: 'utf8', env },
     );
     fail('expected run to fail due to unsafe log path (symlink)');
@@ -144,6 +150,8 @@ function extractRunScript(outputPath) {
   const title = 'Env Size Test';
   const huge = 'A'.repeat(70000); // > 65536
   const env_kv = `FOO=${huge}\n`;
+  const logPath = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
+  const command = `exec > "${logPath}" 2>&1; ${path.join(tmp, 'run.sh')}`;
 
   const env = {
     GITHUB_WORKSPACE: tmp,
@@ -155,19 +163,19 @@ function extractRunScript(outputPath) {
     PS_TASK_WORKDIR: '.',
     PS_TASK_ENV_KV: env_kv,
     PS_TASK_ARGS: '',
-    PATH: process.env.PATH,
+    PATH: '',
     HOME: process.env.HOME,
   };
 
   try {
-    execFileSync(
-      'bash',
-      [
-        '-lc',
-        `exec > >(tee -a "${path.join(tmp, 'logs', 'ps-task', `${id}.log`)}") 2>&1; ${path.join(tmp, 'run.sh')}`,
-      ],
-      { encoding: 'utf8', env },
-    );
+    let safePath = '';
+    try {
+      safePath = getSafePathEnv();
+    } catch (err) {
+      fail(`Safe PATH validation failed: ${err?.message || err}`);
+    }
+    env.PATH = safePath;
+    execFileSync('bash', ['-lc', command], { encoding: 'utf8', env });
     fail('expected run to fail due to env_kv value too large');
   } catch (err) {
     const out = (err.stdout || '') + (err.stderr || '');

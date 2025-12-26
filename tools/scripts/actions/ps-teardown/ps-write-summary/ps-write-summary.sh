@@ -18,6 +18,7 @@ if [[ -z "${workflow}" || -z "${output_path}" || -z "${results_block}" ]]; then
   exit 1
 fi
 
+status_failure="failure"
 overall="success"
 keys=()
 vals=()
@@ -49,11 +50,11 @@ while IFS= read -r line; do
   vals+=("${val}")
 
   # Determine overall status with precedence: failure > skipped > cancelled > success
-  if [[ "${val}" == "failure" ]]; then
-    overall="failure"
-  elif [[ "${val}" == "skipped" && "${overall}" != "failure" ]]; then
+  if [[ "${val}" == "${status_failure}" ]]; then
+    overall="${status_failure}"
+  elif [[ "${val}" == "skipped" && "${overall}" != "${status_failure}" ]]; then
     overall="skipped"
-  elif [[ "${val}" == "cancelled" && "${overall}" != "failure" && "${overall}" != "skipped" ]]; then
+  elif [[ "${val}" == "cancelled" && "${overall}" != "${status_failure}" && "${overall}" != "skipped" ]]; then
     overall="cancelled"
   fi
  done <<< "${results_block}"

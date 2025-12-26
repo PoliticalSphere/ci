@@ -226,6 +226,11 @@ function isOperatorToken(token) {
 }
 
 function tokenizeSpdxExpression(expr) {
+  const rawTokens = tokenizeRawExpression(expr);
+  return mergeWithTokens(rawTokens);
+}
+
+function tokenizeRawExpression(expr) {
   const tokens = [];
   let i = 0;
   while (i < expr.length) {
@@ -245,30 +250,35 @@ function tokenizeSpdxExpression(expr) {
     }
     tokens.push(expr.slice(start, i));
   }
+  return tokens;
+}
 
+function canMergeWithToken(token) {
+  if (token === '(' || token === ')') return false;
+  return !isOperatorToken(String(token).toUpperCase());
+}
+
+function mergeWithTokens(tokens) {
   const merged = [];
+  let skipNext = false;
   for (let idx = 0; idx < tokens.length; idx += 1) {
+    if (skipNext) {
+      skipNext = false;
+      continue;
+    }
     const token = tokens[idx];
-    if (/^WITH$/i.test(token) && merged.length > 0 && idx + 1 < tokens.length) {
+    const next = tokens[idx + 1];
+    if (/^WITH$/i.test(token) && merged.length > 0 && next) {
       const prev = merged.pop();
-      const next = tokens[idx + 1];
-      if (
-        prev !== '(' &&
-        prev !== ')' &&
-        !isOperatorToken(String(prev).toUpperCase()) &&
-        next !== '(' &&
-        next !== ')' &&
-        !isOperatorToken(String(next).toUpperCase())
-      ) {
+      if (canMergeWithToken(prev) && canMergeWithToken(next)) {
         merged.push(`${prev} WITH ${next}`);
-        idx += 1;
+        skipNext = true;
         continue;
       }
       merged.push(prev);
     }
     merged.push(token);
   }
-
   return merged;
 }
 
@@ -283,37 +293,47 @@ function toRpn(tokens) {
       continue;
     }
     if (token === ')') {
-      while (ops.length > 0 && ops[ops.length - 1] !== '(') {
-        output.push(ops.pop());
-      }
-      if (ops.length === 0) return null;
-      ops.pop();
+      if (!drainUntilLeftParen(ops, output)) return null;
       continue;
     }
-
     const upper = String(token).toUpperCase();
     if (isOperatorToken(upper)) {
-      while (
-        ops.length > 0 &&
-        isOperatorToken(ops[ops.length - 1]) &&
-        prec[ops[ops.length - 1]] >= prec[upper]
-      ) {
-        output.push(ops.pop());
-      }
+      drainOperators(ops, output, prec, upper);
       ops.push(upper);
       continue;
     }
-
     output.push(token);
   }
 
+  return drainRemainingOps(ops, output) ? output : null;
+}
+
+function drainUntilLeftParen(ops, output) {
+  while (ops.length > 0 && ops[ops.length - 1] !== '(') {
+    output.push(ops.pop());
+  }
+  if (ops.length === 0) return false;
+  ops.pop();
+  return true;
+}
+
+function drainOperators(ops, output, prec, incoming) {
+  while (
+    ops.length > 0 &&
+    isOperatorToken(ops[ops.length - 1]) &&
+    prec[ops[ops.length - 1]] >= prec[incoming]
+  ) {
+    output.push(ops.pop());
+  }
+}
+
+function drainRemainingOps(ops, output) {
   while (ops.length > 0) {
     const op = ops.pop();
-    if (op === '(' || op === ')') return null;
+    if (op === '(' || op === ')') return false;
     output.push(op);
   }
-
-  return output;
+  return true;
 }
 
 function mergeFailure(left, right) {
@@ -327,54 +347,39 @@ function evaluateSpdxExpression(policy, expr) {
   if (tokens.length === 0) {
     return { ok: false, reason: 'missing-license', match: null };
   }
-  for (const token of tokens) {
-    if (
-      token !== '(' &&
-      token !== ')' &&
-      !isOperatorToken(String(token).toUpperCase()) &&
-      !isValidSpdxExpressionToken(String(token))
-    ) {
-      return { ok: false, reason: 'invalid-expression', match: null };
-    }
+  if (!validateExpressionTokens(tokens)) {
+    return { ok: false, reason: 'invalid-expression', match: null };
   }
   const rpn = toRpn(tokens);
   if (!rpn) {
     return { ok: false, reason: 'invalid-expression', match: null };
   }
+  return evaluateRpn(policy, rpn);
+}
 
+function validateExpressionTokens(tokens) {
+  for (const token of tokens) {
+    if (token === '(' || token === ')') continue;
+    const upper = String(token).toUpperCase();
+    if (isOperatorToken(upper)) continue;
+    if (!isValidSpdxExpressionToken(String(token))) return false;
+  }
+  return true;
+}
+
+function evaluateRpn(policy, rpn) {
   const stack = [];
   for (const token of rpn) {
-    if (isOperatorToken(token)) {
-      const right = stack.pop();
-      const left = stack.pop();
-      if (!left || !right) {
-        return { ok: false, reason: 'invalid-expression', match: null };
-      }
-      if (token === 'AND') {
-        if (left.ok && right.ok) {
-          stack.push({
-            ok: true,
-            reason: 'allowlisted-expression',
-            match: left.match || right.match,
-          });
-        } else {
-          stack.push(mergeFailure(left, right));
-        }
-      } else if (token === 'OR') {
-        if (left.ok || right.ok) {
-          const match = left.ok ? left.match : right.match;
-          stack.push({
-            ok: true,
-            reason: 'allowlisted-expression',
-            match,
-          });
-        } else {
-          stack.push(mergeFailure(left, right));
-        }
-      }
+    if (!isOperatorToken(token)) {
+      stack.push(evaluateSimpleLicense(policy, token));
       continue;
     }
-    stack.push(evaluateSimpleLicense(policy, token));
+    const right = stack.pop();
+    const left = stack.pop();
+    if (!left || !right) {
+      return { ok: false, reason: 'invalid-expression', match: null };
+    }
+    stack.push(applyOperator(token, left, right));
   }
 
   if (stack.length !== 1) {
@@ -382,6 +387,24 @@ function evaluateSpdxExpression(policy, expr) {
   }
 
   return stack[0];
+}
+
+function applyOperator(token, left, right) {
+  if (token === 'AND') {
+    if (left.ok && right.ok) {
+      return {
+        ok: true,
+        reason: 'allowlisted-expression',
+        match: left.match || right.match,
+      };
+    }
+    return mergeFailure(left, right);
+  }
+  if (left.ok || right.ok) {
+    const match = left.ok ? left.match : right.match;
+    return { ok: true, reason: 'allowlisted-expression', match };
+  }
+  return mergeFailure(left, right);
 }
 
 function evaluateLicense(policy, license) {

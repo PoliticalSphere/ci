@@ -125,11 +125,9 @@ if [[ -n "${checksum}" ]]; then
     "Use a 64-character SHA-256 hex string." || exit 1
 fi
 
-if [[ "${CI:-}" == "1" || "${CI:-}" == "true" ]]; then
-  if [[ -z "${checksum}" && "${allow_unverified}" != "true" ]]; then
-    v_error "inputs.semgrep_sha256 is required in CI (set semgrep_sha256 or semgrep_allow_unverified=true)"
-    exit 1
-  fi
+if [[ ( "${CI:-}" == "1" || "${CI:-}" == "true" ) && -z "${checksum}" && "${allow_unverified}" != "true" ]]; then
+  v_error "inputs.semgrep_sha256 is required in CI (set semgrep_sha256 or semgrep_allow_unverified=true)"
+  exit 1
 fi
 
 # Basic output sanity (avoid empty / weird values).

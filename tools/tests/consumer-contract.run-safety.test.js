@@ -7,7 +7,14 @@ import path from 'node:path';
 import { fail, getRepoRoot, section } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
-const ymlPath = path.join(repoRoot, '.github', 'actions', 'ps-task', 'consumer-contract', 'action.yml');
+const ymlPath = path.join(
+  repoRoot,
+  '.github',
+  'actions',
+  'ps-task',
+  'consumer-contract',
+  'action.yml',
+);
 
 section('safety', 'consumer-contract run safety check', `File: ${ymlPath}`);
 

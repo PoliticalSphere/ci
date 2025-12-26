@@ -50,17 +50,24 @@ for (const e of entries) {
   const topName = e.name;
   const topPath = path.join(actionsRoot, topName);
   // If the directory itself defines an action, include it as topName
-  if (fs.existsSync(path.join(topPath, 'action.yml')) || fs.existsSync(path.join(topPath, 'action.yaml'))) {
+  if (
+    fs.existsSync(path.join(topPath, 'action.yml')) ||
+    fs.existsSync(path.join(topPath, 'action.yaml'))
+  ) {
     actionDirs.push(topName);
     continue;
   }
   // Otherwise, collect immediate subdirectories that define actions and add them as 'topName/subName'
-  const sub = fs.readdirSync(topPath, { withFileTypes: true })
+  const sub = fs
+    .readdirSync(topPath, { withFileTypes: true })
     .filter((s) => s.isDirectory())
     .map((s) => s.name);
   for (const subName of sub) {
     const subPath = path.join(topPath, subName);
-    if (fs.existsSync(path.join(subPath, 'action.yml')) || fs.existsSync(path.join(subPath, 'action.yaml'))) {
+    if (
+      fs.existsSync(path.join(subPath, 'action.yml')) ||
+      fs.existsSync(path.join(subPath, 'action.yaml'))
+    ) {
       actionDirs.push(`${topName}/${subName}`);
     }
   }
@@ -73,7 +80,9 @@ if (actionDirs.length === 0) {
     );
   }
   info('OK (bootstrap): no composite actions found yet.');
-  info('HINT: add composite actions under .github/actions/<name>/action.yml or nested under `.github/actions/<namespace>/<action>/action.yml`');
+  info(
+    'HINT: add composite actions under .github/actions/<name>/action.yml or nested under `.github/actions/<namespace>/<action>/action.yml`',
+  );
   process.exit(0);
 }
 

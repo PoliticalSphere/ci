@@ -28,7 +28,7 @@ init_repo_context
 # ------------------------------------------------------------------------------
 # Helpers
 # ------------------------------------------------------------------------------
-is_truthy() { [[ "${1:-}" == "1" || "${1:-}" == "true" ]]; }
+is_truthy() { [[ "${1:-}" == "1" || "${1:-}" == "true" ]]; return $?; }
 
 safe_relpath_or_die() {
   # Reject empty, absolute, or traversal-containing paths. Allows repo-relative paths.
@@ -42,6 +42,7 @@ safe_relpath_or_die() {
     error "${label} must be repo-relative and traversal-free (got: ${p})"
     exit 1
   fi
+  return 0
 }
 
 section() {
@@ -55,9 +56,10 @@ section() {
     printf '\n== %s ==\n' "${title}"
     [[ -n "${desc}" ]] && printf '%s\n' "${desc}"
   fi
+  return 0
 }
 
-now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
+now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; return 0; }
 
 hash_file_sha256() {
   local p="$1"
@@ -94,6 +96,9 @@ stat_mtime() {
   error "stat does not support mtime for ${p}"
   exit 1
 }
+
+upper_class='[:upper:]'
+lower_class='[:lower:]'
 
 # ------------------------------------------------------------------------------
 # Resolve inputs (allow repo-relative overrides; default to repo-root paths)
@@ -188,8 +193,8 @@ if [[ -n "${policy_baseline_path}" ]]; then
 fi
 
 if [[ -n "${policy_baseline_hash}" ]]; then
-  expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr '[:upper:]' '[:lower:]')"
-  actual_hash="$(hash_file_sha256 "${policy_path}" | tr '[:upper:]' '[:lower:]')"
+  expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr "${upper_class}" "${lower_class}")"
+  actual_hash="$(hash_file_sha256 "${policy_path}" | tr "${upper_class}" "${lower_class}")"
   if [[ "${actual_hash}" != "${expected_hash}" ]]; then
     error "policy baseline mismatch before run: expected ${expected_hash}, got ${actual_hash}"
     exit 1
@@ -237,8 +242,8 @@ with open(sys.argv[1], "r", encoding="utf-8") as f:
 print(data.get("policy_sha256", ""))
 PY
   )"
-  expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr '[:upper:]' '[:lower:]')"
-  actual_hash="$(printf '%s' "${actual_policy_hash}" | tr '[:upper:]' '[:lower:]')"
+  expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr "${upper_class}" "${lower_class}")"
+  actual_hash="$(printf '%s' "${actual_policy_hash}" | tr "${upper_class}" "${lower_class}")"
   if [[ -z "${actual_hash}" ]]; then
     error "policy baseline check failed: policy_sha256 missing from report"
     exit 1

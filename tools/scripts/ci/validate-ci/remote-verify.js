@@ -147,11 +147,11 @@ export function createRemoteVerifier({
           );
           result = { ok: true, error: 'rate_limited_soft' };
         } else {
-        const info = mapStatusToInfo(status);
-        detailImpl(
-          `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
-        );
-        result = { ok: false, error: info.error };
+          const info = mapStatusToInfo(status);
+          detailImpl(
+            `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
+          );
+          result = { ok: false, error: info.error };
         }
       }
     } catch {

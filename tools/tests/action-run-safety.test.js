@@ -10,7 +10,11 @@ import { fail, getRepoRoot, section } from './test-utils.js';
 const repoRoot = getRepoRoot();
 const actionsRoot = path.join(repoRoot, '.github', 'actions');
 
-section('safety', 'Action run-block input interpolation checks', `Root: ${actionsRoot}`);
+section(
+  'safety',
+  'Action run-block input interpolation checks',
+  `Root: ${actionsRoot}`,
+);
 
 if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) {
   // Nothing to do in bootstrap
@@ -41,12 +45,27 @@ for (const dir of actionDirs) {
 
         // detect input interpolation inside run blocks
         if (/\{\{\s*inputs\./.test(l) || /\$\{\{\s*inputs\./.test(l)) {
-          violations.push({ file: ymlPath, line: j + 1, text: l.trim(), reason: 'inputs interpolation' });
+          violations.push({
+            file: ymlPath,
+            line: j + 1,
+            text: l.trim(),
+            reason: 'inputs interpolation',
+          });
           continue;
         }
         // detect secrets interpolation (including github.token)
-        if (/\{\{\s*secrets\./.test(l) || /\$\{\{\s*secrets\./.test(l) || /\{\{\s*github\.token\s*\}\}/.test(l) || /\$\{\{\s*github\.token\s*\}\}/.test(l)) {
-          violations.push({ file: ymlPath, line: j + 1, text: l.trim(), reason: 'secrets interpolation' });
+        if (
+          /\{\{\s*secrets\./.test(l) ||
+          /\$\{\{\s*secrets\./.test(l) ||
+          /\{\{\s*github\.token\s*\}\}/.test(l) ||
+          /\$\{\{\s*github\.token\s*\}\}/.test(l)
+        ) {
+          violations.push({
+            file: ymlPath,
+            line: j + 1,
+            text: l.trim(),
+            reason: 'secrets interpolation',
+          });
         }
       }
     }
@@ -58,7 +77,9 @@ if (violations.length > 0) {
   for (const v of violations) {
     console.error(`${path.relative(repoRoot, v.file)}:${v.line}: ${v.text}`);
   }
-  fail('Found unsafe input interpolation inside run blocks of composite actions.');
+  fail(
+    'Found unsafe input interpolation inside run blocks of composite actions.',
+  );
 }
 
 console.log('OK: action run-block input interpolation checks passed');

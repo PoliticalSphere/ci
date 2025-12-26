@@ -6,6 +6,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot, section } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
@@ -43,9 +44,18 @@ if (scriptFiles.length === 0) {
 }
 
 let failed = 0;
+let safePath = '';
+try {
+  safePath = getSafePathEnv();
+} catch (err) {
+  fail(`Safe PATH validation failed: ${err?.message || err}`);
+}
 for (const file of scriptFiles) {
   try {
-    execFileSync('bash', ['-n', file], { encoding: 'utf8' });
+    execFileSync('bash', ['-n', file], {
+      encoding: 'utf8',
+      env: { PATH: safePath },
+    });
   } catch (err) {
     failed += 1;
     console.error(

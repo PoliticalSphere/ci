@@ -97,6 +97,7 @@ curl_secure() {
     exit 1
   fi
   curl --proto '=https' --tlsv1.2 -fsSL "${url}" "$@"
+  return 0
 }
 
 require_var() {

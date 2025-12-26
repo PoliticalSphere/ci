@@ -3,6 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot, mktemp } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
@@ -58,7 +59,7 @@ function readLog(tmp, id) {
     PS_ENV_KV: env_kv,
     PS_ALLOW_ARGS: '1',
     PS_PLATFORM_ROOT: tmp,
-    PATH: process.env.PATH,
+    PATH: '',
     HOME: process.env.HOME,
   };
 
@@ -71,15 +72,17 @@ function readLog(tmp, id) {
     'ps-task',
     'ps-run.sh',
   );
+  const logPath = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
+  const command = `exec > "${logPath}" 2>&1; ${helper}`;
   try {
-    execFileSync(
-      'bash',
-      [
-        '-lc',
-        `exec > >(tee -a "${path.join(tmp, 'logs', 'ps-task', `${id}.log`)}") 2>&1; ${helper}`,
-      ],
-      { encoding: 'utf8', env },
-    );
+    let safePath = '';
+    try {
+      safePath = getSafePathEnv();
+    } catch (err) {
+      fail(`Safe PATH validation failed: ${err?.message || err}`);
+    }
+    env.PATH = safePath;
+    execFileSync('bash', ['-lc', command], { encoding: 'utf8', env });
   } catch (err) {
     const out = (err.stdout || '') + (err.stderr || '');
     fail(`ps-run failed: ${out}`);

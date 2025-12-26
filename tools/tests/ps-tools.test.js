@@ -2,9 +2,17 @@
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { fail, getRepoRoot, SAFE_PATH } from './test-utils.js';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
+let safePath = '';
+try {
+  safePath = getSafePathEnv();
+} catch (err) {
+  fail(`Safe PATH validation failed: ${err?.message || err}`);
+}
+const actionYmlPath = `${repoRoot}/.github/actions/ps-bootstrap/ps-tools/action.yml`;
 
 // Validate that ps-tools assembles the correct tool lists and delegates to install-tools.sh
 // We exercise the internal assembly by invoking the action's Prepare/Assemble logic
@@ -18,23 +26,17 @@ try {
       PS_TOOLS_EXTRA_INPUT: '',
       PS_PLATFORM_ROOT: repoRoot,
       // Use a restricted PATH containing only fixed, non-writable system dirs
-      PATH: SAFE_PATH,
+      PATH: safePath,
       HOME: process.env.HOME,
       USER: process.env.USER,
     };
     execFileSync(
       'bash',
-      [
-        '-lc',
-        `bash -lc "${repoRoot}/.github/actions/ps-tools/action.yml" 2>/dev/null || true`,
-      ],
+      ['-lc', `bash -lc "${actionYmlPath}" 2>/dev/null || true`],
       { encoding: 'utf8', env },
     );
     // Instead of trying to execute the composite action, assert the bundle logic by reading file
-    const actionYml = readFileSync(
-      `${repoRoot}/.github/actions/ps-tools/action.yml`,
-      'utf8',
-    );
+    const actionYml = readFileSync(actionYmlPath, 'utf8');
     assert(
       actionYml.includes('bundle: "lint"') ||
         actionYml.includes('bundle: "security"'),
@@ -44,19 +46,16 @@ try {
   // Test 2: security + extra trivy -> includes trivy in assembled tools
   {
     // We will call the Prepare tools logic from ps-bootstrap harness to assemble PS_TOOLS env variable
-    const command = `bash -lc 'PS_PLATFORM_ROOT=${repoRoot} PS_TOOLS_BUNDLE_INPUT=security PS_TOOLS_EXTRA_INPUT=trivy \n source ${repoRoot}/.github/actions/ps-bootstrap/action.yml >/dev/null 2>&1 || true; echo "OK"'`;
+    const command = `bash -lc 'PS_PLATFORM_ROOT=${repoRoot} PS_TOOLS_BUNDLE_INPUT=security PS_TOOLS_EXTRA_INPUT=trivy \n source ${actionYmlPath} >/dev/null 2>&1 || true; echo "OK"'`;
     execFileSync('bash', ['-lc', command], {
       encoding: 'utf8',
-      env: { PATH: SAFE_PATH, HOME: process.env.HOME, USER: process.env.USER },
+      env: { PATH: safePath, HOME: process.env.HOME, USER: process.env.USER },
     });
   }
 
   // Test 3: explicit tools takes precedence
   {
-    const yml = readFileSync(
-      `${repoRoot}/.github/actions/ps-tools/action.yml`,
-      'utf8',
-    );
+    const yml = readFileSync(actionYmlPath, 'utf8');
     assert(
       yml.includes('tools: ""') || yml.includes('tools:'),
       'action declares tools input',
@@ -65,10 +64,7 @@ try {
 
   // Test 4: secrets scan integration input exists and references secret-scan script
   {
-    const yml = readFileSync(
-      `${repoRoot}/.github/actions/ps-tools/action.yml`,
-      'utf8',
-    );
+    const yml = readFileSync(actionYmlPath, 'utf8');
     assert(
       yml.includes('run_security_scans'),
       'action declares run_security_scans input',

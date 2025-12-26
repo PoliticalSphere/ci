@@ -323,10 +323,8 @@ print_lint_summary() {
   fi
 
   # Only print once per process, except for inline TTY updates.
-  if [[ "${LINT_SUMMARY_EVER_PRINTED:-0}" -eq 1 ]]; then
-    if ! (_ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" == "inline" || "${PS_LINT_PRINT_MODE}" == "auto" ]]); then
-      return 0
-    fi
+  if [[ "${LINT_SUMMARY_EVER_PRINTED:-0}" -eq 1 ]] && ! (_ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" == "inline" || "${PS_LINT_PRINT_MODE}" == "auto" ]]); then
+    return 0
   fi
 
   if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" != "first" ]]; then
@@ -555,6 +553,7 @@ run_lint_step() {
   if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]]; then
     case "${PS_LINT_PRINT_MODE}" in
       inline|auto) print_step_line=0 ;;
+      *) : ;;
     esac
   fi
   if [[ "${print_step_line}" -eq 1 ]]; then
