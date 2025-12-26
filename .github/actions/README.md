@@ -76,20 +76,11 @@ Risky changes require an explicit, documented decision.
 
 Baseline building blocks:
 
-- `ps-bootstrap`: bootstrap helpers (e.g., `ps-init`, `ps-node`)
-- `ps-task`: task runner family (e.g., `ps-run`)
-- `ps-teardown`: teardown utilities (e.g., `ps-exit`, `ps-upload-artifacts`)
-- `ps-task/ps-run`: canonical task runner with uniform logs/reports
-- `ps-harden-runner`: wrapper for runner hardening with validated inputs
-- `ps-checkout`: canonical checkout with validated inputs and pinned action
-- `ps-task/<task>`: thin task modules delegating to `ps-task/ps-run`
-- `ps-teardown/ps-exit`: canonical job teardown switchboard (summary, artifacts, optional PR comment)
-- `ps-teardown/ps-upload-artifacts`: artifact upload with input validation
-- `ps-teardown/ps-pr-comment`: post PR comments with input validation
-- `ps-teardown/ps-write-summary`: write structured JSON summary artifacts
-- `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `extra_tools` (newline list)
+- `ps-bootstrap`
+- `ps-task`
+- `ps-teardown`
 
-Node toolchain:
+## Node toolchain
 
 
 - `ps-bootstrap/ps-init`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, sets `PS_PLATFORM_ROOT`, and optionally installs tools.
