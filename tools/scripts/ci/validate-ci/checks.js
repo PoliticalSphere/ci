@@ -154,48 +154,68 @@ function _hasUnboundedQuantifierIn(str) {
 // Detect nested unbounded quantifiers: moved to module scope to improve
 // testability and reduce nested function complexity inside `compileRegex`.
 // Examples: `(.+)+`, `(a+){1,}`.
+
+// Skip over a character class starting at `idx` (where `pat[idx] === '['`).
+function skipCharClassFrom(pat, idx) {
+  const len = pat.length;
+  idx++;
+  while (idx < len) {
+    if (pat[idx] === '\\') {
+      idx += 2;
+      continue;
+    }
+    if (pat[idx] === ']') {
+      idx++;
+      break;
+    }
+    idx++;
+  }
+  return idx;
+}
+
+// Find the matching ')' for a group starting at `idx` (where `pat[idx] === '('`).
+// Returns the index of the ')' or -1 if unbalanced.
+function findGroupEnd(pat, idx) {
+  const len = pat.length;
+  let depth = 1;
+  let j = idx + 1;
+  while (j < len && depth > 0) {
+    if (pat[j] === '\\') {
+      j += 2;
+      continue;
+    }
+    if (pat[j] === '[') {
+      j = skipCharClassFrom(pat, j);
+      continue;
+    }
+    if (pat[j] === '(') {
+      depth++;
+    } else if (pat[j] === ')') {
+      depth--;
+    }
+    j++;
+  }
+  if (depth !== 0) return -1; // unbalanced
+  return j - 1; // matching ')'
+}
+
+// Checks whether an outer unbounded quantifier appears at or after `pos`.
+function hasOuterUnboundedAt(pat, pos) {
+  const len = pat.length;
+  let k = pos;
+  while (k < len && /\s/.test(pat[k])) k++;
+  if (k >= len) return false;
+  if (pat[k] === '+' || pat[k] === '*') return true;
+  if (pat[k] === '{') {
+    const q = parseBraceQuantifier(pat, k);
+    return q.isQuantifier && q.isUnbounded;
+  }
+  return false;
+}
+
 function _detectNestedUnbounded(pat) {
   const len = pat.length;
   let i = 0;
-
-  function skipCharClass(idx) {
-    idx++;
-    while (idx < len) {
-      if (pat[idx] === '\\') {
-        idx += 2;
-        continue;
-      }
-      if (pat[idx] === ']') {
-        idx++;
-        break;
-      }
-      idx++;
-    }
-    return idx;
-  }
-
-  function skipGroup(idx) {
-    let depth = 1;
-    let j = idx + 1;
-    while (j < len && depth > 0) {
-      if (pat[j] === '\\') {
-        j += 2;
-        continue;
-      }
-      if (pat[j] === '[') {
-        j = skipCharClass(j);
-        continue;
-      }
-      if (pat[j] === '(') {
-        depth++;
-      } else if (pat[j] === ')') {
-        depth--;
-      }
-      j++;
-    }
-    if (depth !== 0) return -1; // unbalanced
-    return j - 1; // matching ')'
-  }
 
   while (i < len) {
     const ch = pat[i];
@@ -204,22 +224,15 @@ function _detectNestedUnbounded(pat) {
       continue;
     }
     if (ch === '[') {
-      i = skipCharClass(i);
+      i = skipCharClassFrom(pat, i);
       continue;
     }
     if (ch === '(') {
-      const end = skipGroup(i);
+      const end = findGroupEnd(pat, i);
       if (end === -1) return true; // unbalanced; conservative reject
       const inner = pat.slice(i + 1, end);
-      if (_hasUnboundedQuantifierIn(inner)) {
-        // look for outer quantifier
-        let k = end + 1;
-        while (k < len && /\s/.test(pat[k])) k++;
-        if (k < len && (pat[k] === '+' || pat[k] === '*')) return true;
-        if (k < len && pat[k] === '{') {
-          const q = parseBraceQuantifier(pat, k);
-          if (q.isQuantifier && q.isUnbounded) return true;
-        }
+      if (_hasUnboundedQuantifierIn(inner) && hasOuterUnboundedAt(pat, end + 1)) {
+        return true;
       }
       i = end + 1;
       continue;
