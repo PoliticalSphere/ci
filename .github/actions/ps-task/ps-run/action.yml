@@ -239,6 +239,20 @@ runs:
           esac
         }
 
+        # Security logging helper: sanitize and timestamp events
+        log_security_event() {
+          local level="$1"; shift
+          local msg="$*"
+          msg="$(printf '%s' "${msg}" | tr -d '\r\n' | tr -c '[:print:]\t' ' ')"
+          local ts
+          ts="$(date -u +%FT%T%z 2>/dev/null || date -u +%FT%T)"
+          if [[ -n "${log_abs:-}" ]]; then
+            printf '%s %s %s\n' "${ts}" "${level}" "${msg}" >> "${log_abs}"
+          else
+            printf '%s %s %s\n' "${ts}" "${level}" "${msg}"
+          fi
+        }
+
         # ----------------------------------------------------------------------------
         # Inputs
         # ----------------------------------------------------------------------------
@@ -440,6 +454,9 @@ runs:
         printf 'PS.TASK: script=%s\n' "${script_rel}"
         printf 'PS.TASK: working_directory=%s\n' "${working_directory}"
 
+        # Log task identification for audit trail
+        log_security_event "EVENT" "task_id=${id} title=${title}"
+
         # ----------------------------------------------------------------------------
         # env_kv parsing
         # ----------------------------------------------------------------------------
@@ -456,6 +473,21 @@ runs:
           done <<< "${env_kv}"
         fi
 
+        # Basic security logging for env_kv and args counts
+        env_kv_count=${#env_args[@]}
+        log_security_event "EVENT" "env_kv_processed count=${env_kv_count} task_id=${id}"
+
+        args_array=()
+        if [[ -n "${args}" ]]; then
+          while IFS= read -r line; do
+            item="$(trim "${line}")"
+            [[ -z "${item}" ]] && continue
+            args_array+=("${item}")
+          done <<< "${args}"
+        fi
+        args_count=${#args_array[@]}
+        log_security_event "EVENT" "args_processed count=${args_count} task_id=${id}"
+
         # ----------------------------------------------------------------------------
         # args parsing (simple; space-separated)
         # ----------------------------------------------------------------------------
@@ -471,6 +503,16 @@ runs:
         # ----------------------------------------------------------------------------
         # Execute
         # ----------------------------------------------------------------------------
+        # Log environment variable count for anomaly detection
+        env_var_count=${#env_args[@]}
+        if (( env_var_count > 10 )); then
+            log_security_event "WARNING" "High number of environment variables: ${env_var_count} task_id=${id}"
+        fi
+        log_security_event "EVENT" "env_vars_set count=${env_var_count} task_id=${id}"
+
+        # Log script execution and working directory for audit trail
+        log_security_event "EVENT" "script_execution path=${script_rel} working_directory=${working_directory} task_id=${id}"
+
         set +e
         (
           cd "${working_directory_abs}"

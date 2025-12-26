@@ -126,8 +126,8 @@ runs:
         github_token="$(trim "${PS_GITHUB_TOKEN}")"
         pr_body="$(trim "${PS_PR_BODY}")"
         pr_body_path="$(trim "${PS_PR_BODY_PATH}")"
-        pr_body_prefix="$(trim "${PS_PR_BODY_PREFIX}")"
-        pr_body_suffix="$(trim "${PS_PR_BODY_SUFFIX}")"
+        pr_body_prefix="${PS_PR_BODY_PREFIX:-}"
+        pr_body_suffix="${PS_PR_BODY_SUFFIX:-}"
 
         run_summary="0"
         if [[ -n "${summary_workflow}" || -n "${summary_output_path}" || -n "${summary_results}" ]]; then

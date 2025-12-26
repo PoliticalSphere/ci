@@ -94,17 +94,53 @@ printf 'PS_RUN_ID=%s\n' "${PS_ID}" >> "${GITHUB_ENV}"
 printf 'PS_RUN_TITLE=%s\n' "${PS_TITLE}" >> "${GITHUB_ENV}"
 printf 'PS_RUN_DESCRIPTION=%s\n' "${PS_DESCRIPTION}" >> "${GITHUB_ENV}"
 
+# Security logging helper: sanitize and timestamp events; write to ${log_abs} if available
+log_security_event() {
+  local level="$1"; shift
+  local msg="$*"
+  # remove CR/LF and non-printable characters
+  msg="$(printf '%s' "${msg}" | tr -d '\r\n' | tr -c '[:print:]\t' ' ')
+"
+  local ts
+  ts="$(date -u +%FT%T%z 2>/dev/null || date -u +%FT%T)"
+  if [[ -n "${log_abs:-}" ]]; then
+    printf '%s %s %s\n' "${ts}" "${level}" "${msg}" >> "${log_abs}"
+  else
+    printf '%s %s %s\n' "${ts}" "${level}" "${msg}"
+  fi
+}
+
 bash "${section_script}" "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"
 
+# Log task identification for audit trail
+log_security_event "EVENT" "task_id=${PS_ID} title=${PS_TITLE}"
+
 cd "${wd}"
+
+# Basic security logging: env_kv (if present) and args counts
+env_kv="${PS_ENV_KV:-}"
+if [[ -n "${env_kv}" ]]; then
+  env_kv_count=$(printf '%s\n' "${env_kv}" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+else
+  env_kv_count=0
+fi
+log_security_event "EVENT" "env_kv_processed count=${env_kv_count}"
 
 args="${PS_ARGS:-}"
 if [[ -n "${args}" ]]; then
   # Intentional word-splitting: args is a workflow-author-controlled string.
   # Split into an array safely to preserve quoting semantics.
   read -r -a args_arr <<< "${args}"
+  args_count=${#args_arr[@]}
+  log_security_event "EVENT" "args_processed count=${args_count}"
+  # Log script execution and working directory
+  log_security_event "EVENT" "script_execution path=${rel_script} working_directory=${rel_wd}"
   bash "${target}" -- "${args_arr[@]}"
 else
+  args_count=0
+  log_security_event "EVENT" "args_processed count=0"
+  # Log script execution and working directory
+  log_security_event "EVENT" "script_execution path=${rel_script} working_directory=${rel_wd}"
   bash "${target}"
 fi
 
