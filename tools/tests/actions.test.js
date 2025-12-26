@@ -40,8 +40,31 @@ if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) {
   process.exit(0);
 }
 
+// Collect actions. Support two layouts:
+// 1) Top-level action directory with an action.yml present (e.g. `.github/actions/ps-tools/action.yml`)
+// 2) Namespace directory containing per-action subdirectories (e.g. `.github/actions/ps-bootstrap/ps-init/action.yml`)
 const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
-const actionDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+let actionDirs = [];
+for (const e of entries) {
+  if (!e.isDirectory()) continue;
+  const topName = e.name;
+  const topPath = path.join(actionsRoot, topName);
+  // If the directory itself defines an action, include it as topName
+  if (fs.existsSync(path.join(topPath, 'action.yml')) || fs.existsSync(path.join(topPath, 'action.yaml'))) {
+    actionDirs.push(topName);
+    continue;
+  }
+  // Otherwise, collect immediate subdirectories that define actions and add them as 'topName/subName'
+  const sub = fs.readdirSync(topPath, { withFileTypes: true })
+    .filter((s) => s.isDirectory())
+    .map((s) => s.name);
+  for (const subName of sub) {
+    const subPath = path.join(topPath, subName);
+    if (fs.existsSync(path.join(subPath, 'action.yml')) || fs.existsSync(path.join(subPath, 'action.yaml'))) {
+      actionDirs.push(`${topName}/${subName}`);
+    }
+  }
+}
 
 if (actionDirs.length === 0) {
   if (isCI()) {
@@ -50,7 +73,7 @@ if (actionDirs.length === 0) {
     );
   }
   info('OK (bootstrap): no composite actions found yet.');
-  info('HINT: add composite actions under .github/actions/<name>/action.yml');
+  info('HINT: add composite actions under .github/actions/<name>/action.yml or nested under `.github/actions/<namespace>/<action>/action.yml`');
   process.exit(0);
 }
 
@@ -86,8 +109,20 @@ if (catalog.size === 0) {
 
 actionDirs.sort();
 const actionDirSet = new Set(actionDirs);
-const missingInCatalog = actionDirs.filter((d) => !catalog.has(d));
-const extraInCatalog = [...catalog].filter((d) => !actionDirSet.has(d));
+const topLevelDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
+const topLevelSet = new Set(topLevelDirs);
+
+// An action is considered present in the catalog if either the full name (e.g. 'ps-bootstrap/ps-init')
+// is listed, or the top-level namespace is listed (e.g. 'ps-bootstrap').
+const missingInCatalog = actionDirs.filter((d) => {
+  const top = d.includes('/') ? d.split('/')[0] : d;
+  return !(catalog.has(d) || catalog.has(top));
+});
+
+// Catalog entries are allowed if they are either a validated action (full name) or a top-level namespace.
+const extraInCatalog = [...catalog].filter((d) => {
+  return !(actionDirSet.has(d) || topLevelSet.has(d));
+});
 
 if (missingInCatalog.length > 0) {
   fail(`actions missing from catalog: ${missingInCatalog.join(', ')}`);

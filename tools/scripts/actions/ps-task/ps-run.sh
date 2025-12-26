@@ -145,12 +145,13 @@ if [[ -n "${env_kv}" ]]; then
     exit 1
   fi
   total_bytes=0
+  nul_char=$'\0'
   while IFS= read -r line; do
     entry="${line}"
     [[ -z "${entry}" ]] && continue
     value="${entry#*=}"
     value="${value//$'\r'/}"
-    if [[ "${value}" == *$'\0'* ]]; then
+    if [[ -n "${nul_char}" && "${value}" == *"${nul_char}"* ]]; then
       printf 'ERROR: env_kv value must not contain NUL bytes (entry: %s)\n' "${entry%%=*}" >&2
       exit 1
     fi

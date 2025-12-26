@@ -33,6 +33,7 @@ import {
   loadUnsafePatterns,
 } from './policies.js';
 import { createRemoteVerifier } from './remote-verify.js';
+import { getSafePathEnv } from './safe-path.js';
 
 const workspaceRoot = getRepoRoot();
 const platformRoot = process.env.PS_PLATFORM_ROOT || workspaceRoot;
@@ -294,43 +295,12 @@ const artifactPolicy = loadArtifactPolicy(artifactPolicyPath);
 
 import { spawnSync } from 'node:child_process';
 
-const SAFE_PATH_DIRS = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
-
-function isDirWritable(dir) {
-  try {
-    fs.accessSync(dir, fs.constants.W_OK);
-    return true;
-  } catch (err) {
-    if (err?.code === 'EACCES' || err?.code === 'EPERM') {
-      return false;
-    }
-    fatal(`PATH entry cannot be validated: ${dir}`);
-    return false;
-  }
+let SAFE_PATH = '';
+try {
+  SAFE_PATH = getSafePathEnv();
+} catch (err) {
+  fatal(`Safe PATH validation failed: ${err?.message || err}`);
 }
-
-function buildSafePathEnv() {
-  for (const dir of SAFE_PATH_DIRS) {
-    let stat;
-    try {
-      stat = fs.statSync(dir);
-    } catch (err) {
-      if (err?.code === 'ENOENT') {
-        fatal(`PATH entry does not exist: ${dir}`);
-      }
-      fatal(`PATH entry cannot be statted: ${dir}`);
-    }
-    if (!stat.isDirectory()) {
-      fatal(`PATH entry is not a directory: ${dir}`);
-    }
-    if (isDirWritable(dir)) {
-      fatal(`PATH entry must be non-writable: ${dir}`);
-    }
-  }
-  return SAFE_PATH_DIRS.join(':');
-}
-
-const SAFE_PATH = buildSafePathEnv();
 
 function tryGit(args) {
   const parts = String(args).split(/\s+/).filter(Boolean);
