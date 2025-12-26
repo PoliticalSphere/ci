@@ -93,7 +93,19 @@ runs:
           PS_LOG_DIR=${{ inputs.log_dir }}
     - name: Contract summary (PS)
       shell: bash
+      env:
+        SUMMARY_PATH: "${{ inputs.summary_path }}"
       run: |
-        if [[ -f "${{ inputs.summary_path }}" && -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-          cat "${{ inputs.summary_path }}" >> "${GITHUB_STEP_SUMMARY}"
+        # Protect against unsafe user-controlled paths: ensure repo-relative, no traversal or absolute paths
+        summary_path="${SUMMARY_PATH:-}"
+        if [[ -z "${summary_path}" ]]; then
+          exit 0
+        fi
+        if [[ "${summary_path}" = /* ]] || [[ "${summary_path}" == *".."* ]]; then
+          echo "WARN: summary_path appears unsafe or contains traversal, skipping: ${summary_path}" >&2
+          exit 0
+        fi
+        if [[ -f "${summary_path}" && -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+          # Use explicit -- to avoid filename starting with '-'
+          cat -- "${summary_path}" >> "${GITHUB_STEP_SUMMARY}"
         fi
