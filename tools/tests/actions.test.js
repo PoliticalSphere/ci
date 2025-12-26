@@ -44,7 +44,7 @@ if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) {
 // 1) Top-level action directory with an action.yml present (e.g. `.github/actions/ps-tools/action.yml`)
 // 2) Namespace directory containing per-action subdirectories (e.g. `.github/actions/ps-bootstrap/ps-init/action.yml`)
 const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
-let actionDirs = [];
+const actionDirs = [];
 for (const e of entries) {
   if (!e.isDirectory()) continue;
   const topName = e.name;
