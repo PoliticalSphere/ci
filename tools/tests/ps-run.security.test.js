@@ -1,12 +1,19 @@
 #!/usr/bin/env node
 
+import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { fail, mktemp, getRepoRoot, readYamlFile } from './test-utils.js';
+import { fail, getRepoRoot, mktemp, readYamlFile } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
-const actionYaml = path.join(repoRoot, '.github', 'actions', 'ps-task', 'ps-run', 'action.yml');
+const actionYaml = path.join(
+  repoRoot,
+  '.github',
+  'actions',
+  'ps-task',
+  'ps-run',
+  'action.yml',
+);
 
 function extractRunScript(outputPath) {
   const y = readYamlFile(actionYaml).doc;
@@ -25,12 +32,6 @@ function extractRunScript(outputPath) {
   fs.writeFileSync(outputPath, runStr, { mode: 0o755 });
 }
 
-function readLog(tmp, id) {
-  const p = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
-  if (!fs.existsSync(p)) return null;
-  return { path: p, stat: fs.statSync(p), isSymlink: fs.lstatSync(p).isSymbolicLink(), mode: fs.statSync(p).mode };
-}
-
 // ----------------------------------------------------------------------------
 // Test: log file hardening (symlink rejection + permissions)
 // ----------------------------------------------------------------------------
@@ -42,11 +43,21 @@ function readLog(tmp, id) {
   fs.mkdirSync(path.join(tmp, 'logs', 'ps-task'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'reports', 'ps-task'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'scripts'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), { recursive: true });
-  fs.writeFileSync(path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'), '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n', { mode: 0o755 });
+  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'),
+    '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n',
+    { mode: 0o755 },
+  );
 
   const scriptRel = 'scripts/noop.sh';
-  fs.writeFileSync(path.join(tmp, scriptRel), '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n', { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(tmp, scriptRel),
+    '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n',
+    { mode: 0o755 },
+  );
 
   const id = 'test-log-hardening';
   const title = 'Log Hardening Test';
@@ -56,7 +67,7 @@ function readLog(tmp, id) {
   const logPath = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
   try {
     fs.symlinkSync(target, logPath);
-  } catch (err) {
+  } catch {
     // on some platforms symlink may require privileges; create a regular file and then make it a symlink via alternate strategy
     // but proceed — test will ensure we detect unsafe path via isSymbolicLink or failure to create
   }
@@ -77,7 +88,14 @@ function readLog(tmp, id) {
 
   let out = '';
   try {
-    execFileSync('bash', ['-lc', `exec > >(tee -a "${logPath}") 2>&1; ${path.join(tmp, 'run.sh')}`], { encoding: 'utf8', env });
+    execFileSync(
+      'bash',
+      [
+        '-lc',
+        `exec > >(tee -a "${logPath}") 2>&1; ${path.join(tmp, 'run.sh')}`,
+      ],
+      { encoding: 'utf8', env },
+    );
     fail('expected run to fail due to unsafe log path (symlink)');
   } catch (err) {
     out = (err.stdout || '') + (err.stderr || '');
@@ -106,11 +124,21 @@ function readLog(tmp, id) {
   fs.mkdirSync(path.join(tmp, 'logs', 'ps-task'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'reports', 'ps-task'), { recursive: true });
   fs.mkdirSync(path.join(tmp, 'scripts'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), { recursive: true });
-  fs.writeFileSync(path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'), '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n', { mode: 0o755 });
+  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), {
+    recursive: true,
+  });
+  fs.writeFileSync(
+    path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'),
+    '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n',
+    { mode: 0o755 },
+  );
 
   const scriptRel = 'scripts/noop.sh';
-  fs.writeFileSync(path.join(tmp, scriptRel), '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n', { mode: 0o755 });
+  fs.writeFileSync(
+    path.join(tmp, scriptRel),
+    '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n',
+    { mode: 0o755 },
+  );
 
   const id = 'test-env-size';
   const title = 'Env Size Test';
@@ -132,11 +160,23 @@ function readLog(tmp, id) {
   };
 
   try {
-    execFileSync('bash', ['-lc', `exec > >(tee -a "${path.join(tmp, 'logs', 'ps-task', `${id}.log`)}") 2>&1; ${path.join(tmp, 'run.sh')}`], { encoding: 'utf8', env });
+    execFileSync(
+      'bash',
+      [
+        '-lc',
+        `exec > >(tee -a "${path.join(tmp, 'logs', 'ps-task', `${id}.log`)}") 2>&1; ${path.join(tmp, 'run.sh')}`,
+      ],
+      { encoding: 'utf8', env },
+    );
     fail('expected run to fail due to env_kv value too large');
   } catch (err) {
     const out = (err.stdout || '') + (err.stderr || '');
-    if (!(/env_kv value too large/.test(out) || /env_kv value must not contain NUL bytes/.test(out))) {
+    if (
+      !(
+        /env_kv value too large/.test(out) ||
+        /env_kv value must not contain NUL bytes/.test(out)
+      )
+    ) {
       fail(`expected env_kv size rejection; got: ${out}`);
     }
   }
