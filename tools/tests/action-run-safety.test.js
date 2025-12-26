@@ -39,8 +39,14 @@ for (const dir of actionDirs) {
         // skip comments
         if (/^\s*#/.test(l)) continue;
 
+        // detect input interpolation inside run blocks
         if (/\{\{\s*inputs\./.test(l) || /\$\{\{\s*inputs\./.test(l)) {
-          violations.push({ file: ymlPath, line: j + 1, text: l.trim() });
+          violations.push({ file: ymlPath, line: j + 1, text: l.trim(), reason: 'inputs interpolation' });
+          continue;
+        }
+        // detect secrets interpolation (including github.token)
+        if (/\{\{\s*secrets\./.test(l) || /\$\{\{\s*secrets\./.test(l) || /\{\{\s*github\.token\s*\}\}/.test(l) || /\$\{\{\s*github\.token\s*\}\}/.test(l)) {
+          violations.push({ file: ymlPath, line: j + 1, text: l.trim(), reason: 'secrets interpolation' });
         }
       }
     }
