@@ -50,8 +50,6 @@ if [[ -n "${tools_raw}" ]]; then
       v_error "invalid tool id in inputs.tools: ${t_trim} (allowed: lowercase letters, digits, hyphen)"
       exit 1
     fi
-  done <<< "${tools_trimmed}"
-
     tools_count=$((tools_count + 1))
   done <<< "${tools_trimmed}"
 
