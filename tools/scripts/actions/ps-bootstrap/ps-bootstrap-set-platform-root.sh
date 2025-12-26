@@ -24,6 +24,8 @@ emit_env() {
     delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
   done
   printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+  # Explicit success return for clarity
+  return 0
 }
 
 emit_env "PS_PLATFORM_ROOT" "${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_INPUT}"
