@@ -60,6 +60,9 @@ path without compromising workspace integrity.
 - Sandbox validation: Rejects any path that attempts to escape the workspace.
 - Egress compliance: Runs under `ps-harden-runner`; git traffic is subject to
   the established network policy.
+- Clean path behavior: When `clean_path` is `false`, `actions/checkout` may
+  perform a fetch/reset in an existing directory. For Tier 0 jobs, prefer
+  `clean_path: "true"` to enforce a known-good state.
 - Stable telemetry: Emits absolute and relative paths for downstream tools.
 - Deterministic state: If `clean_path` is `false`, `actions/checkout` may reuse
   an existing directory (fetch/reset instead of a fresh clone). For Tier 0 jobs,

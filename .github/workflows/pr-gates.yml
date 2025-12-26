@@ -40,7 +40,7 @@
 # - Deterministic, non-interactive execution
 # - Least privilege at workflow and job level
 # - Validate-CI MUST pass before any gate job executes
-# - Single canonical bootstrap path (ps-bootstrap)
+# - Single canonical bootstrap path (ps-init)
 # - Internal actions are repository-controlled
 # - External actions (if used) must be SHA-pinned
 # - Artifacts and summary are produced best-effort, even on failure
@@ -290,6 +290,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
+      issues: write
     env:
       PS_FULL_SCAN: "0"
       PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
@@ -297,39 +298,56 @@ jobs:
       PS_SKIP_SECRETS_SCAN: "1"
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "1"
           tools_bundle: "lint"
 
-      - name: Lint (PS)
-        uses: ./.github/actions/lint
-
-      - name: Upload artifacts (lint)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          name: pr-gates-lint
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
+
+      - name: Lint (PS)
+        uses: ./.github/actions/ps-task/lint
+
+      - name: Post lint summary (PR)
+        if: >-
+          ${{ failure() &&
+          inputs.pr_number != '' &&
+          inputs.pr_is_fork != 'true' &&
+          inputs.allow_pr_comments == '1' }}
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          pr_number: ${{ inputs.pr_number }}
+          github_token: ${{ github.token }}
+          expected_base_sha: ${{ inputs.pr_base_ref }}
+          expected_head_sha: ${{ inputs.pr_head_ref }}
+          pr_comment_body_path: "logs/lint/summary.txt"
+          pr_comment_body_prefix: |
+            ❌ Lint gate failed.
+
+            Summary:
+            ```
+          pr_comment_body_suffix: |
+            ```
+
+            Check logs/lint/*.log in artifacts for full details.
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-lint.json
@@ -337,6 +355,8 @@ jobs:
           artifacts_name: pr-gates-lint
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # QUALITY GATE — TYPECHECK
@@ -356,39 +376,34 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
-      - name: Typecheck (PS)
-        uses: ./.github/actions/typecheck
-
-      - name: Upload artifacts (typecheck)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          name: pr-gates-typecheck
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
+
+      - name: Typecheck (PS)
+        uses: ./.github/actions/ps-task/typecheck
+
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-typecheck.json
@@ -396,6 +411,8 @@ jobs:
           artifacts_name: pr-gates-typecheck
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # QUALITY GATE — TESTS
@@ -415,57 +432,51 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
+        with:
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
+
       - name: Tests (PS)
-        uses: ./.github/actions/test
+        uses: ./.github/actions/ps-task/test
 
-      - name: Upload coverage artifacts
+      - name: Upload coverage artifacts (PS)
         if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
-          name: pr-gates-coverage
-          path: ${{ inputs.coverage_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          artifacts_name: pr-gates-coverage
+          artifacts_paths: ${{ inputs.coverage_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
-      - name: Upload test results
+      - name: Upload test results (PS)
         if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
-          name: pr-gates-test-results
-          path: ${{ inputs.test_results_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
-
-      - name: Upload artifacts (tests)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: pr-gates-tests
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          artifacts_name: pr-gates-test-results
+          artifacts_paths: ${{ inputs.test_results_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-tests.json
@@ -473,6 +484,8 @@ jobs:
           artifacts_name: pr-gates-tests
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # QUALITY GATE — DUPLICATION (JSCPD)
@@ -495,39 +508,34 @@ jobs:
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
-      - name: JSCPD (PS)
-        uses: ./.github/actions/jscpd
-
-      - name: Upload artifacts (jscpd)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          name: pr-gates-jscpd
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
+
+      - name: JSCPD (PS)
+        uses: ./.github/actions/ps-task/jscpd
+
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-jscpd.json
@@ -535,6 +543,8 @@ jobs:
           artifacts_name: pr-gates-jscpd
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # BUILD VERIFICATION — BUILD
@@ -554,39 +564,34 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
-      - name: Build (PS)
-        uses: ./.github/actions/build
-
-      - name: Upload artifacts (build)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          name: pr-gates-build
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
+
+      - name: Build (PS)
+        uses: ./.github/actions/ps-task/build
+
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-build.json
@@ -594,6 +599,8 @@ jobs:
           artifacts_name: pr-gates-build
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # SECURITY GATE — FAST SECRETS SCAN
@@ -613,39 +620,25 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "0"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "1"
           tools_bundle: "security"
 
       - name: Secrets scan (PR)
-        uses: ./.github/actions/secret-scan-pr
+        uses: ./.github/actions/ps-task/secret-scan-pr
 
-      - name: Upload artifacts (secrets)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: pr-gates-secrets
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-secrets.json
@@ -653,6 +646,8 @@ jobs:
           artifacts_name: pr-gates-secrets
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # SECURITY GATE — DEPENDENCY REVIEW
@@ -674,32 +669,27 @@ jobs:
       pull-requests: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "1"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "0"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "true"
           install_tools: "0"
           tools_bundle: "none"
 
-      - name: Dependency review
-        uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+      - name: Dependency review (PS)
+        uses: ./.github/actions/ps-task/dependency-review
         with:
-          base-ref: ${{ inputs.pr_base_ref }}
-          head-ref: ${{ inputs.pr_head_ref }}
+          base_ref: ${{ inputs.pr_base_ref }}
+          head_ref: ${{ inputs.pr_head_ref }}
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-dependency-review.json
@@ -707,6 +697,8 @@ jobs:
           artifacts_name: pr-gates-dependency-review
           artifacts_paths: |
             reports/**
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # QUALITY SIGNAL — SONARCLOUD (BASELINE, NON-BLOCKING)
@@ -727,20 +719,22 @@ jobs:
     continue-on-error: true
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
-          skip_checkout: "1"
-          install_dependencies: "0"
-          install_tools: "0"
           egress_policy: audit
           fetch_depth: ${{ inputs.fetch_depth }}
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          home_dir: ".home"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
+          install_tools: "0"
+          tools_bundle: "none"
 
       - name: Detect Sonar configuration
         id: sonar_cfg
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: detect-sonar
           title: Detect Sonar configuration
@@ -752,49 +746,40 @@ jobs:
 
       - name: Job setup (PS)
         if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "1"
-
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
-      - name: SonarCloud scan
-        if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
+      - name: Node setup (PS)
+        if: ${{ steps.sonar_cfg.outputs.enabled == 'true' }}
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          args: >-
-            -Dsonar.sources=.
-            -Dsonar.host.url=https://sonarcloud.io
-            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }}
-            -Dsonar.projectKey=${{ secrets.SONAR_PROJECT_KEY }}
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
 
-      - name: Upload artifacts (sonar)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+      - name: SonarCloud scan (PS)
+        if: steps.sonar_cfg.outputs.enabled == 'true'
+        uses: ./.github/actions/ps-task/sonarcloud
         with:
-          name: pr-gates-sonar
-          path: reports/**
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
+          organization: ${{ secrets.SONAR_ORGANIZATION }}
+          project_key: ${{ secrets.SONAR_PROJECT_KEY }}
+          token: ${{ secrets.SONAR_TOKEN }}
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-sonar.json
@@ -802,6 +787,8 @@ jobs:
           artifacts_name: pr-gates-sonar
           artifacts_paths: |
             reports/**
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # PR FEEDBACK — FAILURE COMMENT (OPTIONAL)
@@ -827,33 +814,28 @@ jobs:
       pull-requests: write
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "0"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
       - name: Post failure summary (PR)
-        uses: ./.github/actions/ps-pr-comment
+        uses: ./.github/actions/ps-teardown/ps-exit
         continue-on-error: true
         with:
           pr_number: ${{ inputs.pr_number }}
           github_token: ${{ github.token }}
           expected_base_sha: ${{ inputs.pr_base_ref }}
           expected_head_sha: ${{ inputs.pr_head_ref }}
-          body: |
+          pr_comment_body: |
             ❌ PR Gates failed.
 
             Results:
@@ -871,7 +853,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-notify.json
@@ -879,6 +861,8 @@ jobs:
           artifacts_name: pr-gates-notify
           artifacts_paths: |
             reports/**
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # AGGREGATION & REPORTING — PR GATES SUMMARY
@@ -899,53 +883,22 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-
-          skip_checkout: "0"
-          install_dependencies: "0"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
 
-      - name: Write summary (PS)
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: "pr-gates"
-          output_path: "reports/summary/pr-gates.json"
-          results: |
-            validate-ci=${{ needs.validate-ci.result }}
-            lint=${{ needs.lint.result }}
-            typecheck=${{ needs.typecheck.result }}
-            test=${{ needs.test.result }}
-            jscpd=${{ needs.jscpd.result }}
-            build=${{ needs.build.result }}
-            secrets=${{ needs.secrets-scan.result }}
-            dependency-review=${{ needs.dependency-review.result }}
-            sonar=${{ needs.sonar.result }}
-            notify=${{ needs.notify.result }}
-
-      - name: Upload summary (PS)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: pr-gates-summary
-          path: reports/summary/pr-gates.json
-          if_no_files_found: "ignore"
-          retention_days: ${{ inputs.retention_days }}
-
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates.json
@@ -963,3 +916,5 @@ jobs:
           artifacts_name: pr-gates-summary
           artifacts_paths: |
             reports/summary/pr-gates.json
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}

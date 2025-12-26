@@ -1,4 +1,16 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Political Sphere — Semgrep Enforcement
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Enforce Semgrep exit policy based on findings and configured flags.
+#
+# Dependencies:
+#   - .semgrep-exit-code.txt (written by semgrep-scan.sh)
+#
+# Dependents:
+#   - tools/scripts/security/semgrep-cli.sh
+# ==============================================================================
 set -euo pipefail
 
 semgrep_exit="$(cat "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt" 2>/dev/null || echo 2)"

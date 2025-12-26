@@ -16,7 +16,7 @@ inputs:
   script:
     description: "Typecheck script path (repo-relative)"
     required: false
-    default: "tools/scripts/tasks/typecheck.sh"
+    default: "tools/scripts/actions/ps-typecheck/typecheck.sh"
 
   working_directory:
     description: "Working directory to run from (repo-relative)"

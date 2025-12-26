@@ -111,7 +111,7 @@ on:
         description: "Build script path (repo-relative)"
         type: string
         required: false
-        default: "tools/scripts/tasks/build.sh"
+        default: "tools/scripts/actions/ps-build/build.sh"
 
       build_timeout_minutes:
         description: "Hard timeout for the build job"
@@ -239,55 +239,36 @@ jobs:
           egress_policy: audit        # Allow outbound network as needed for builds (telemetry, registries)
           install_tools: "0"
 
-      - name: Setup Node.js (cached)
-        if: ${{ inputs.cache == '1' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          node-version: ${{ inputs.node_version }}
-          cache: "npm"
-          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
-
-      - name: Setup Node.js
-        if: ${{ inputs.cache != '1' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: ${{ inputs.node_version }}
-
-      - name: Install repository dependencies
-        run: npm ci --no-audit --no-fund
-        working-directory: ${{ inputs.working_directory }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: "1"
+          working_directory: ${{ inputs.working_directory }}
+          cache_dependency_path: ${{ inputs.working_directory }}/package-lock.json
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Build (PS)
         id: build
-        uses: ./.github/actions/build
+        uses: ./.github/actions/ps-task/build
         with:
           working-directory: ${{ inputs.working_directory }}
           script: ${{ inputs.build_script }}
 
-      - name: Upload platform snapshot
+      - name: Upload platform snapshot (PS)
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
-          name: platform-snapshot
-          path: ${{ steps.job_setup.outputs.platform_root }}/tools/scripts/branding/**
-          if-no-files-found: "warn"
-          retention-days: ${{ inputs.retention_days }}
-
-      - name: Upload artifacts (PS)
-        id: upload
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: ${{ env.PS_ARTIFACT_PREFIX }}
-          path: ${{ inputs.artifact_paths }}
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
+          artifacts_name: platform-snapshot
+          artifacts_paths: ${{ steps.job_setup.outputs.platform_root }}/tools/scripts/branding/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: build-artifacts
           summary_output_path: reports/summary/build-artifacts-job.json
@@ -295,6 +276,8 @@ jobs:
           artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # AGGREGATION & REPORTING — BUILD ARTIFACTS SUMMARY
@@ -318,7 +301,7 @@ jobs:
     # (e.g. `reports/summary/`) and writes the summary file.
     steps:
       - name: Job setup (Security Only)
-        # ps-bootstrap will download a platform snapshot when invoked with
+        # ps-init will download a platform snapshot when invoked with
         # skip_platform_checkout: "true". This centralizes snapshot handling
         # and sets PS_PLATFORM_ROOT when the snapshot is present.
         uses: ./.github/actions/ps-bootstrap/ps-init
@@ -328,34 +311,18 @@ jobs:
           egress_policy: block
           install_tools: "0"
 
-      - name: Write summary (PS)
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: ${{ env.PS_WORKFLOW_ID }}
-          output_path: "reports/summary/build-artifacts.json"
-          results: |
-            validate-ci=${{ needs.validate-ci.result }}
-            build=${{ needs.build.result }}
-
-      - name: Upload summary (PS)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: ${{ env.PS_ARTIFACT_PREFIX }}-summary
-          path: reports/summary/build-artifacts.json
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-          compression_level: 9 # Max compression for small JSON reports
-
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: build-artifacts
           summary_output_path: reports/summary/build-artifacts.json
           summary_results: |
             validate-ci=${{ needs.validate-ci.result }}
             build=${{ needs.build.result }}
-          artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
+          artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}-summary
           artifacts_paths: |
-            ${{ inputs.artifact_paths }}
+            reports/summary/build-artifacts.json
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+          artifacts_compression_level: 9

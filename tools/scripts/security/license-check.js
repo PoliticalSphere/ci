@@ -16,6 +16,8 @@ import yaml from 'yaml';
 import { bullet, detail, fatal, section } from '../ci/validate-ci/console.js';
 import { parseArgs, readText, resolvePath, writeOutputs } from '../lib/cli.js';
 
+const nameFromPathCache = new Map();
+
 function normalizeLicense(raw) {
   if (!raw) return '';
   if (Array.isArray(raw)) {
@@ -29,15 +31,29 @@ function normalizeLicense(raw) {
 }
 
 function nameFromPath(entryPath) {
+  const cached = nameFromPathCache.get(entryPath);
+  if (cached) {
+    return cached;
+  }
   const parts = entryPath.split('node_modules/').filter(Boolean);
-  if (parts.length === 0) return entryPath;
+  if (parts.length === 0) {
+    nameFromPathCache.set(entryPath, entryPath);
+    return entryPath;
+  }
   const tail = parts[parts.length - 1].replace(/\/+$/, '');
   const segments = tail.split('/').filter(Boolean);
-  if (segments.length === 0) return entryPath;
-  if (segments[0].startsWith('@') && segments.length >= 2) {
-    return `${segments[0]}/${segments[1]}`;
+  if (segments.length === 0) {
+    nameFromPathCache.set(entryPath, entryPath);
+    return entryPath;
   }
-  return segments[0];
+  if (segments[0].startsWith('@') && segments.length >= 2) {
+    const scoped = `${segments[0]}/${segments[1]}`;
+    nameFromPathCache.set(entryPath, scoped);
+    return scoped;
+  }
+  const name = segments[0];
+  nameFromPathCache.set(entryPath, name);
+  return name;
 }
 
 function sha256(text) {
@@ -144,6 +160,25 @@ function matchDetails(list, regexes, value) {
   return { matched: false, type: '', pattern: '' };
 }
 
+function isValidSpdxId(token) {
+  if (!token) return false;
+  if (token === 'NONE' || token === 'NOASSERTION') return true;
+  if (/^LicenseRef-[A-Za-z0-9.-]+$/.test(token)) return true;
+  if (/^DocumentRef-[A-Za-z0-9.-]+:LicenseRef-[A-Za-z0-9.-]+$/.test(token)) {
+    return true;
+  }
+  return /^[A-Za-z0-9][A-Za-z0-9.-]*(\+)?$/.test(token);
+}
+
+function isValidSpdxExpressionToken(token) {
+  if (!token) return false;
+  const withMatch = token.match(/^(.+)\s+WITH\s+(.+)$/i);
+  if (withMatch) {
+    return isValidSpdxId(withMatch[1]) && isValidSpdxId(withMatch[2]);
+  }
+  return isValidSpdxId(token);
+}
+
 function evaluateSimpleLicense(policy, license) {
   // Normalize token and remove outer parentheses and whitespace in a clear way
   let tokens = String(license).trim();
@@ -155,6 +190,10 @@ function evaluateSimpleLicense(policy, license) {
     return policy.allowFileReference
       ? { ok: true, reason: 'file-reference-allowed', match: null }
       : { ok: false, reason: 'file-reference-disallowed', match: null };
+  }
+
+  if (!isValidSpdxExpressionToken(tokens)) {
+    return { ok: false, reason: 'invalid-license', match: null };
   }
 
   const denyMatch = matchDetails(policy.denylist, policy.denyRegex, tokens);
@@ -279,6 +318,16 @@ function evaluateSpdxExpression(policy, expr) {
   const tokens = tokenizeSpdxExpression(expr);
   if (tokens.length === 0) {
     return { ok: false, reason: 'missing-license', match: null };
+  }
+  for (const token of tokens) {
+    if (
+      token !== '(' &&
+      token !== ')' &&
+      !isOperatorToken(String(token).toUpperCase()) &&
+      !isValidSpdxExpressionToken(String(token))
+    ) {
+      return { ok: false, reason: 'invalid-expression', match: null };
+    }
   }
   const rpn = toRpn(tokens);
   if (!rpn) {

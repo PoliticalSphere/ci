@@ -1,0 +1,27 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Dependency Review
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run GitHub dependency review with validated inputs.
+# ==============================================================================
+
+name: "Dependency Review"
+description: "Run GitHub dependency review"
+
+inputs:
+  base_ref:
+    description: "Base ref (SHA) for dependency review"
+    required: true
+
+  head_ref:
+    description: "Head ref (SHA) for dependency review"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Dependency review
+      uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+      with:
+        base-ref: ${{ inputs.base_ref }}
+        head-ref: ${{ inputs.head_ref }}

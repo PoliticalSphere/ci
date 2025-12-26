@@ -1,0 +1,76 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Node Setup
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Setup Node.js and optionally install dependencies using bootstrap scripts.
+# ==============================================================================
+
+name: "PS Node Setup"
+description: "Setup Node.js (optional cache) and install dependencies"
+
+inputs:
+  node_version:
+    description: "Node.js major version"
+    required: true
+
+  cache:
+    description: "Enable npm cache (1 = on, 0 = off)"
+    required: false
+    default: "1"
+
+  install_dependencies:
+    description: "Install repository dependencies via npm ci (1 = on, 0 = off)"
+    required: false
+    default: "1"
+
+  working_directory:
+    description: "Working directory for dependency install (repo-relative)"
+    required: false
+    default: "."
+
+  cache_dependency_path:
+    description: "Path to dependency lockfile for caching (repo-relative)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Resolve roots (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-resolve-roots.sh"
+
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_NODE_VERSION_INPUT: ${{ inputs.node_version }}
+        PS_CACHE_INPUT: ${{ inputs.cache }}
+        PS_INSTALL_DEP_INPUT: ${{ inputs.install_dependencies }}
+        PS_WORKING_DIR_INPUT: ${{ inputs.working_directory }}
+      run: |
+        set -euo pipefail
+        bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-validate-node.sh"
+
+    - name: Setup Node.js (cached)
+      if: ${{ inputs.cache == '1' }}
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: ${{ inputs.node_version }}
+        cache: "npm"
+        cache-dependency-path: ${{ inputs.cache_dependency_path != '' && inputs.cache_dependency_path || format('{0}/package-lock.json', inputs.working_directory) }}
+
+    - name: Setup Node.js
+      if: ${{ inputs.cache != '1' }}
+      uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      with:
+        node-version: ${{ inputs.node_version }}
+
+    - name: Install dependencies (PS)
+      if: ${{ inputs.install_dependencies == '1' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-install-deps.sh"

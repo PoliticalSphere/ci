@@ -4,7 +4,8 @@ Canonical task runner and thin task modules for Political Sphere CI.
 
 - `ps-run`: the only execution engine; enforces validation, logs, and reports.
 - `build`, `lint`, `typecheck`, `test`, `jscpd`, `consumer-contract`,
-  `license-check`, `semgrep-cli`: thin modules that delegate to `ps-run`.
+  `license-check`, `semgrep-cli`, `secret-scan-pr`: thin modules that delegate to `ps-run`.
+- `dependency-review`, `sonarcloud`, `codeql`: thin wrappers around pinned external actions.
 
 ## Logs and reports
 

@@ -249,51 +249,31 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
-      - name: Setup Node.js (cached)
-        if: ${{ inputs.install_dependencies == '1' && inputs.cache == '1' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          node-version: ${{ inputs.node_version }}
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
-
-      - name: Setup Node.js
-        if: ${{ inputs.install_dependencies != '1' || inputs.cache != '1' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: ${{ inputs.node_version }}
-
-      - name: Install repository dependencies
-        if: ${{ inputs.install_dependencies == '1' }}
-        run: npm ci --no-audit --no-fund
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: ${{ inputs.install_dependencies }}
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Install platform dependencies
         if: ${{ inputs.install_platform_dependencies == '1' }}
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: install-platform-deps
           title: Install platform dependencies
           script: tools/scripts/ci/install-platform-deps.sh
 
       - name: Validate CI (policy)
-        uses: ./.github/actions/ci-validate
-
-      - name: Upload evidence artifacts (PS)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: ${{ inputs.artifact_name }}
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
+        uses: ./.github/actions/ps-bootstrap/ci-validate
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: validate-ci
           summary_output_path: reports/summary/validate-ci.json
@@ -302,6 +282,8 @@ jobs:
           artifacts_paths: |
             reports/**
             logs/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
         # Note: GITHUB_TOKEN is optional; PR comment only when provided and pr_number set.
         # secrets:
         #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

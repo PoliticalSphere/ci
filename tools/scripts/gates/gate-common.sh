@@ -322,9 +322,11 @@ print_lint_summary() {
     fi
   fi
 
-  # Only print once per process
+  # Only print once per process, except for inline TTY updates.
   if [[ "${LINT_SUMMARY_EVER_PRINTED:-0}" -eq 1 ]]; then
-    return 0
+    if ! (_ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" == "inline" || "${PS_LINT_PRINT_MODE}" == "auto" ]]); then
+      return 0
+    fi
   fi
 
   if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" != "first" ]]; then
@@ -390,6 +392,23 @@ print_lint_summary() {
   done
 
   printf '%s' "${buf}"
+
+  if [[ -n "${LINT_DIR:-}" ]]; then
+    mkdir -p "${LINT_DIR}"
+    if command -v python3 >/dev/null 2>&1; then
+      python3 - <<'PY' "${LINT_DIR}/summary.txt"
+import re
+import sys
+
+text = sys.stdin.read()
+text = re.sub(r'\x1b\[[0-9;]*[A-Za-z]', '', text)
+with open(sys.argv[1], 'w', encoding='utf-8') as f:
+    f.write(text)
+PY
+    else
+      printf '%s' "${buf}" > "${LINT_DIR}/summary.txt"
+    fi
+  fi
 
   # 2 header lines + N rows
   LINT_SUMMARY_LINES=$(( 2 + ${#LINT_IDS[@]} ))
@@ -529,9 +548,18 @@ run_lint_step() {
   LINT_STATUSES[idx]="${status}"
   LINT_LOGS[idx]="${log_file}"
 
-  # Always emit a compact per-step status line so progress is visible even when
-  # terminal inline updates fail or are unsupported (helps CI and plain logs).
-  printf '%s %s: %s\n' "${PS_FMT_ICON:-▶}" "${title}" "${LINT_STATUSES[$idx]}"
+  # Emit a compact per-step status line for non-inline contexts.
+  # In interactive inline mode, this extra line breaks cursor math and causes
+  # the summary block to smear in the terminal.
+  local print_step_line=1
+  if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]]; then
+    case "${PS_LINT_PRINT_MODE}" in
+      inline|auto) print_step_line=0 ;;
+    esac
+  fi
+  if [[ "${print_step_line}" -eq 1 ]]; then
+    printf '%s %s: %s\n' "${PS_FMT_ICON:-▶}" "${title}" "${LINT_STATUSES[$idx]}"
+  fi
 
   print_lint_summary
 

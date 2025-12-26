@@ -67,6 +67,11 @@ inputs:
     required: false
     default: "reports/semgrep/semgrep.sarif"
 
+  semgrep_sha256:
+    description: "Optional SHA-256 checksum for the Semgrep package artifact"
+    required: false
+    default: ""
+
   fail_on_findings:
     description: "If true, fail when Semgrep reports findings (exit 1)"
     required: false
@@ -95,4 +100,5 @@ runs:
           SEMGREP_CONFIG=${{ inputs.config }}
           SEMGREP_PATH=${{ inputs.path }}
           SEMGREP_OUTPUT=${{ inputs.output }}
+          SEMGREP_SHA256=${{ inputs.semgrep_sha256 }}
           SEMGREP_FAIL_ON_FINDINGS=${{ inputs.fail_on_findings }}

@@ -1,19 +1,67 @@
 # ==============================================================================
 # Political Sphere — Composite Action: PS Task Runner
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Canonical task runner for repository scripts with uniform logging/reporting.
+# ==============================================================================
 #
-# Responsibilities:
+# METADATA
+# ------------------------------------------------------------------------------
+# id: ps-run
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - tools/scripts/ci/emit-report.py (optional; python3 required)
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-task/* (task wrappers)
+# - ./.github/actions/ps-bootstrap/ps-tools (security scans)
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Canonical task runner for repository scripts with uniform logging/reporting.
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
 #   - Validate inputs and path safety
 #   - Enforce deterministic execution
 #   - Validate required files before running
 #   - Execute script and capture logs + report JSON (best-effort)
 #   - Optionally validate expected outputs via glob-aware artifact_paths
 #
-# Notes:
-#   - artifact_paths entries are treated as globs (newline-separated).
-#   - A report is written best-effort even when validation fails early.
+# DOES NOT:
+#   - Install dependencies
+#   - Modify job permissions
+#   - Perform repository checkout
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Repo-local path enforcement with realpath checks
+# - Best-effort reporting even on failure
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 1 — High (executes repository scripts with strict guardrails)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents path traversal, argument splitting, and artifact spoofing
+#          while preserving audit-ready logs for downstream systems.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Records task outputs via structured JSON reports and canonical log paths.
+#
+# NOTES
+# ------------------------------------------------------------------------------
+# - artifact_paths entries are treated as globs (newline-separated).
+# - A report is written best-effort even when validation fails early.
+#
 # ==============================================================================
 
 name: "PS Task Runner"
@@ -68,7 +116,7 @@ inputs:
     default: ""
 
   args:
-    description: "Optional arguments to pass to the script (space-separated)"
+    description: "Optional arguments to pass to the script (newline-separated)"
     required: false
     default: ""
 
@@ -76,6 +124,11 @@ inputs:
     description: "Allow args passthrough (0|1)"
     required: false
     default: "1"
+
+  strict_artifacts:
+    description: "Require each artifact_paths pattern to match at least one file (0|1)"
+    required: false
+    default: "0"
 
 outputs:
   status:
@@ -117,6 +170,7 @@ runs:
         PS_TASK_ENV_KV: ${{ inputs.env_kv }}
         PS_TASK_ARGS: ${{ inputs.args }}
         PS_TASK_ALLOW_ARGS: ${{ inputs.allow_args }}
+        PS_TASK_STRICT_ARTIFACTS: ${{ inputs.strict_artifacts }}
       run: |
         set -euo pipefail
 
@@ -154,6 +208,37 @@ runs:
           return 0
         }
 
+        resolve_abs_path() {
+          local target="$1"
+          if command -v python3 >/dev/null 2>&1; then
+            python3 - <<'PY' "${target}"
+        import os, sys
+        target = sys.argv[1]
+        print(os.path.realpath(target))
+        PY
+            return 0
+          fi
+          if command -v realpath >/dev/null 2>&1; then
+            realpath -m -- "${target}"
+            return 0
+          fi
+          if command -v readlink >/dev/null 2>&1; then
+            readlink -f -- "${target}" 2>/dev/null || readlink -- "${target}"
+            return 0
+          fi
+          return 1
+        }
+
+        check_under_root() {
+          local target="$1"
+          local resolved
+          resolved="$(resolve_abs_path "${target}")" || fail "path resolver missing for security check: ${target}"
+          case "${resolved}" in
+            "${repo_root}"|${repo_root}/*) return 0 ;;
+            *) fail "path escape detected: ${target} resolves outside workspace" ;;
+          esac
+        }
+
         # ----------------------------------------------------------------------------
         # Inputs
         # ----------------------------------------------------------------------------
@@ -172,6 +257,7 @@ runs:
         allow_args="${PS_TASK_ALLOW_ARGS:-1}"
         require_files="${PS_TASK_REQUIRE_FILES:-}"
         artifact_paths="${PS_TASK_ARTIFACT_PATHS:-}"
+        strict_artifacts="${PS_TASK_STRICT_ARTIFACTS:-0}"
 
         [[ -n "${id}" ]] || fail "inputs.id must not be empty"
         [[ -n "${title}" ]] || fail "inputs.title must not be empty"
@@ -198,6 +284,11 @@ runs:
           *) fail "inputs.allow_args must be 0 or 1 (got: ${allow_args})" ;;
         esac
 
+        case "${strict_artifacts}" in
+          0|1) ;;
+          *) fail "inputs.strict_artifacts must be 0 or 1 (got: ${strict_artifacts})" ;;
+        esac
+
         if [[ "${allow_args}" == "0" && -n "${args}" ]]; then
           fail "args provided but allow_args=0"
         fi
@@ -208,6 +299,8 @@ runs:
         repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
         script_abs="${repo_root}/${script_rel}"
         working_directory_abs="${repo_root}/${working_directory}"
+        check_under_root "${script_abs}"
+        check_under_root "${working_directory_abs}"
 
         # ----------------------------------------------------------------------------
         # Canonical paths (declare early so we can write a report even on failure)
@@ -234,7 +327,21 @@ runs:
           end_ms="$(now_ms)"
           dur=$((end_ms - start_ms))
 
-          if command -v python3 >/dev/null 2>&1; then
+          emit_script="${repo_root}/tools/scripts/ci/emit-report.py"
+          if command -v python3 >/dev/null 2>&1 && [[ -f "${emit_script}" ]]; then
+            REPORT_PATH="${report_abs}" \
+            TASK_ID="${id}" \
+            TASK_TITLE="${title}" \
+            TASK_DESC="${desc}" \
+            TASK_STATUS="${s}" \
+            TASK_EXIT_CODE="${ec}" \
+            TASK_DURATION_MS="${dur}" \
+            TASK_LOG_PATH="${log_rel}" \
+            TASK_REPORT_PATH="${report_rel}" \
+            TASK_SCRIPT="${script_rel}" \
+            TASK_WORKDIR="${working_directory}" \
+            python3 "${emit_script}"
+          elif command -v python3 >/dev/null 2>&1; then
             REPORT_PATH="${report_abs}" \
             TASK_ID="${id}" \
             TASK_TITLE="${title}" \
@@ -312,7 +419,9 @@ runs:
             item="$(trim "${line}")"
             [[ -z "${item}" ]] && continue
             safe_relpath "${item}" || fail "require_files entry must be repo-relative without traversal (got: ${item})"
-            [[ -f "${repo_root}/${item}" ]] || fail "required file missing: ${item}"
+            file_abs="${repo_root}/${item}"
+            [[ -f "${file_abs}" ]] || fail "required file missing: ${item}"
+            check_under_root "${file_abs}"
           done <<< "${require_files}"
         fi
 
@@ -352,7 +461,11 @@ runs:
         # ----------------------------------------------------------------------------
         args_array=()
         if [[ -n "${args}" ]]; then
-          read -r -a args_array <<< "${args}"
+          while IFS= read -r line; do
+            item="$(trim "${line}")"
+            [[ -z "${item}" ]] && continue
+            args_array+=("${item}")
+          done <<< "${args}"
         fi
 
         # ----------------------------------------------------------------------------
@@ -376,6 +489,7 @@ runs:
         if [[ -n "${artifact_paths}" ]]; then
           shopt -s globstar nullglob
           artifact_missing=0
+          artifact_any=0
 
           while IFS= read -r line; do
             pat="$(trim "${line}")"
@@ -384,12 +498,24 @@ runs:
             # Evaluate glob relative to repo root
             matches=( "${repo_root}"/${pat} )
             if [[ "${#matches[@]}" -eq 0 ]]; then
-              printf 'PS.TASK: missing artifact glob match: %s\n' "${pat}"
-              artifact_missing=1
+              if [[ "${strict_artifacts}" == "1" ]]; then
+                printf 'PS.TASK: missing artifact glob match: %s\n' "${pat}"
+                artifact_missing=1
+              fi
+            else
+              artifact_any=1
+              for match in "${matches[@]}"; do
+                check_under_root "${match}"
+              done
             fi
           done <<< "${artifact_paths}"
 
-          if [[ "${artifact_missing}" -eq 1 ]]; then
+          if [[ "${strict_artifacts}" == "1" ]]; then
+            if [[ "${artifact_missing}" -eq 1 ]]; then
+              status="failure"
+              [[ "${exit_code}" -eq 0 ]] && exit_code=1
+            fi
+          elif [[ "${artifact_any}" -eq 0 ]]; then
             status="failure"
             [[ "${exit_code}" -eq 0 ]] && exit_code=1
           fi

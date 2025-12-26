@@ -1,0 +1,102 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Build
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run the deterministic build step with platform defaults.
+#
+# Metadata:
+#   - id: build
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-24
+# Scope & Responsibilities:
+#   - Does: execute the build script in the configured working directory.
+#   - Does NOT: install dependencies, run tests, or modify permissions.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - CI-safe logging via ps-task/ps-run
+#   - Strong input validation (paths, existence, traversal)
+#   - Minimal policy surface (caller chooses script/WD explicitly)
+#
+# Dependencies:
+#   - ./.github/actions/ps-task/ps-run
+#   - tools/scripts/actions/ps-build/build.sh (default)
+#   - tools/scripts/branding/print-section.sh (optional, for UX)
+#
+# ==============================================================================
+
+name: "Build (PS)"
+description: "Run deterministic build steps via ps-task"
+
+inputs:
+  id:
+    description: "Stable step id used by ps-task/ps-run for logs/reports (kebab-case recommended)"
+    required: false
+    default: "build"
+
+  title:
+    description: "Human-readable title for reporting"
+    required: false
+    default: "Build"
+
+  description:
+    description: "Short description for reporting"
+    required: false
+    default: "Deterministic build"
+
+  working_directory:
+    description: "Working directory to run the build from (repo-relative)"
+    required: false
+    default: "."
+
+  working-directory:
+    description: "Deprecated: use working_directory"
+    required: false
+    default: ""
+
+  script:
+    description: "Build script path (repo-relative)"
+    required: false
+    default: "tools/scripts/actions/ps-build/build.sh"
+
+  args:
+    description: "Optional arguments to pass to the build script (space-separated). Prefer parsing inside the script."
+    required: false
+    default: ""
+
+  allow_args:
+    description: "Allow passing args through (1 = allow, 0 = deny). Deny strengthens determinism."
+    required: false
+    default: "1"
+
+  artifact_paths:
+    description: "Artifacts to capture (repo-relative, newline list)"
+    required: false
+    default: |
+      reports/**
+      logs/**
+
+  env_kv:
+    description: "Environment variables to inject (KEY=VALUE per line)"
+    required: false
+    default: ""
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run build (PS)
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: ${{ inputs.id }}
+        title: ${{ inputs.title }}
+        description: ${{ inputs.description }}
+        working_directory: ${{ inputs.working_directory != '' && inputs.working_directory || inputs['working-directory'] }}
+        script: ${{ inputs.script }}
+        require_files: ${{ inputs.script }}
+        args: ${{ inputs.args }}
+        allow_args: ${{ inputs.allow_args }}
+        artifact_paths: ${{ inputs.artifact_paths }}
+        env_kv: ${{ inputs.env_kv }}

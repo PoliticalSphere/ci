@@ -80,27 +80,25 @@ Baseline building blocks:
 - `ps-harden-runner`: wrapper for runner hardening with validated inputs
 - `ps-checkout`: canonical checkout with validated inputs and pinned action
 - `ps-task/<task>`: thin task modules delegating to `ps-task/ps-run`
-- `ps-upload-artifacts`: artifact upload with input validation
-- `ps-pr-comment`: post PR comments with input validation
-- `ps-write-summary`: write structured JSON summary artifacts
-- `ps-teardown`: canonical job teardown (write summary, upload artifacts, optional PR comment)
+- `ps-teardown/ps-exit`: canonical job teardown switchboard (summary, artifacts, optional PR comment)
+- `ps-teardown/ps-upload-artifacts`: artifact upload with input validation
+- `ps-teardown/ps-pr-comment`: post PR comments with input validation
+- `ps-teardown/ps-write-summary`: write structured JSON summary artifacts
 - `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `extra_tools` (newline list)
 
 Node toolchain:
 
 
-- `ps-bootstrap`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, sets `PS_PLATFORM_ROOT`, sets up Node.js, and optionally installs dependencies and tools (node setup merged into this action).
+- `ps-bootstrap/ps-init`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, sets `PS_PLATFORM_ROOT`, and optionally installs tools.
+- `ps-bootstrap/ps-node`: Node.js setup and optional dependency install switchboard.
 
 Example: use `ps-bootstrap` to run lint with installs/tools:
 
 ```yaml
 - name: Job setup (PS)
-  uses: ./.github/actions/ps-bootstrap
+  uses: ./.github/actions/ps-bootstrap/ps-init
   with:
-    node_version: ${{ inputs.node_version }}
     fetch_depth: ${{ inputs.fetch_depth }}
-    cache: ${{ inputs.cache }}
-    install_dependencies: "1"
     install_tools: "1"
     tools_bundle: "lint"
     skip_checkout: "1"

@@ -253,27 +253,30 @@ jobs:
           tools_bundle: "none"
 
       - name: Setup Node.js (PS)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          node-version: ${{ inputs.node_version }}
+          node_version: ${{ inputs.node_version }}
+          cache: "0"
+          install_dependencies: "0"
+          working_directory: "."
 
       - name: Compute release plan (no mutation)
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: compute-release-plan
           title: Compute release plan (no mutation)
           script: tools/scripts/release/compute-plan.sh
 
-      - name: Upload artifacts (dry-run evidence)
+      - name: Upload artifacts (dry-run evidence) (PS)
         if: always()
-        uses: ./.github/actions/ps-upload-artifacts
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
-          name: release-dry-run
-          path: |
+          artifacts_name: release-dry-run
+          artifacts_paths: |
             reports/**
             logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # RELEASE PUBLISHING — TAG + GITHUB RELEASE
@@ -312,12 +315,15 @@ jobs:
           tools_bundle: "none"
 
       - name: Setup Node.js (PS)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          node-version: ${{ inputs.node_version }}
+          node_version: ${{ inputs.node_version }}
+          cache: "0"
+          install_dependencies: "0"
+          working_directory: "."
 
       - name: Validate release inputs (publish)
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: validate-release-inputs
           title: Validate release inputs (publish)
@@ -325,14 +331,14 @@ jobs:
 
       - name: Prepare release notes mode
         id: notes
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: prepare-release
           title: Prepare release notes mode
           script: tools/scripts/release/prepare-release.sh
 
       - name: Publish release (PS)
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: "release.publish"
           title: "Publish release"
@@ -343,7 +349,7 @@ jobs:
       # RELEASE VERIFICATION (DETERMINISTIC)
       # ------------------------------------------------------------------------
       - name: Verify tag + release match intended ref
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: verify-release
           title: Verify tag + release
@@ -351,20 +357,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
 
-      - name: Upload artifacts (release evidence)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: release-artifacts
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
       - name: Release complete
         if: always()
-        uses: ./.github/actions/ps-run
+        uses: ./.github/actions/ps-task/ps-run
         with:
           id: release-complete
           title: Release complete
@@ -372,7 +367,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: release
           summary_output_path: reports/summary/release.json
@@ -381,6 +376,8 @@ jobs:
           artifacts_paths: |
             reports/**
             logs/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # AGGREGATION & REPORTING — RELEASE SUMMARY
@@ -410,32 +407,16 @@ jobs:
           tools_bundle: "none"
 
       - name: Setup Node.js (PS)
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          node-version: ${{ inputs.node_version }}
-
-      - name: Write summary (PS)
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: "release"
-          output_path: "reports/summary/release.json"
-          results: |
-            validate-ci=${{ needs.validate-ci.result }}
-            dry-run=${{ needs.dry-run.result }}
-            release=${{ needs.release.result }}
-
-      - name: Upload summary (release)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: release-summary
-          path: reports/summary/release.json
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
+          node_version: ${{ inputs.node_version }}
+          cache: "0"
+          install_dependencies: "0"
+          working_directory: "."
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: release
           summary_output_path: reports/summary/release.json
@@ -446,3 +427,5 @@ jobs:
           artifacts_name: release-summary
           artifacts_paths: |
             reports/summary/release.json
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}

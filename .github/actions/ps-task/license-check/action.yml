@@ -2,10 +2,60 @@
 # Political Sphere — Composite Action: License Compliance
 # ==============================================================================
 #
+# METADATA
+# ------------------------------------------------------------------------------
+# id: license-check
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-task/ps-run
+# - tools/scripts/security/license-check.sh
+# - tools/scripts/security/license-check.js
+# - configs/security/license-policy.yml (default policy)
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - Workflow jobs that invoke license-check for compliance gating
+#
 # PURPOSE
 # ------------------------------------------------------------------------------
 # Enforce OSS license compliance using a policy file + dependency lockfile, and
 # emit evidence (reports/logs) in a deterministic, CI-safe manner.
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Validate output directories
+#   - Run the license check via ps-run
+#   - Emit deterministic reports/logs for audit
+#
+# DOES NOT:
+#   - Install dependencies or lockfiles
+#   - Modify job permissions
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Policy-driven enforcement
+# - Audit-friendly evidence outputs
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 1 — High (policy enforcement for OSS compliance)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents unapproved OSS licenses from entering the build by enforcing
+#          policy against the dependency lockfile.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Reports and logs are emitted to configured directories for compliance review.
 #
 # ==============================================================================
 name: "License Compliance"

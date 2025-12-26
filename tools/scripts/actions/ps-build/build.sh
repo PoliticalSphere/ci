@@ -149,3 +149,12 @@ if [[ "${PS_QUIET:-0}" == "1" ]]; then
 else
   "${pm_cmd}" run build -- "${BUILD_ARGS[@]}"
 fi
+
+# ----------------------------
+# Post-build output check (optional)
+# ----------------------------
+if [[ "${CI}" == "1" && -n "${EXPECTED_DIST_DIR:-}" ]]; then
+  if [[ ! -d "${EXPECTED_DIST_DIR}" ]]; then
+    die "Build succeeded but output directory '${EXPECTED_DIST_DIR}' is missing!"
+  fi
+fi

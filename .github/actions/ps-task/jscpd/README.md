@@ -11,7 +11,7 @@ Run duplication detection via the canonical task runner.
 
 ## Inputs
 
-None.
+- `threshold`: Duplication threshold percentage. Default: `5`.
 
 ## Outputs
 

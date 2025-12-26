@@ -21,7 +21,7 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 # Common script helpers (formatting, repo_root, retry_cmd)
 # shellcheck source=tools/scripts/common.sh
-. "${script_dir}/../common.sh"
+. "${script_dir}/../../common.sh"
 init_repo_context
 
 # Reuse target selection helpers (PR diff / staged / full scan decision)
@@ -57,6 +57,11 @@ fi
 JSCPD_ARGS=()
 if [[ "$#" -gt 0 ]]; then
   JSCPD_ARGS+=("$@")
+fi
+
+if [[ -n "${JSCPD_THRESHOLD:-}" ]]; then
+  JSCPD_ARGS+=(--threshold "${JSCPD_THRESHOLD}")
+  detail "JSCPD: threshold override ${JSCPD_THRESHOLD}."
 fi
 
 # Files eligible for duplication scanning (keep to code-ish formats by default).
@@ -99,8 +104,19 @@ cd "${repo_root}"
 # Helpful context on what we scanned (without spamming logs).
 detail "JSCPD: scanning ${#targets[@]} target(s)."
 
+set +e
 if [[ "${#JSCPD_ARGS[@]}" -gt 0 ]]; then
   "${JSCPD_BIN}" --config "${config_path}" "${JSCPD_ARGS[@]}" "${targets[@]}"
 else
   "${JSCPD_BIN}" --config "${config_path}" "${targets[@]}"
+fi
+rc=$?
+set -e
+
+if [[ "${rc}" -ne 0 ]]; then
+  if [[ "${PS_STRICT_MAINTAINABILITY:-1}" == "1" ]]; then
+    exit "${rc}"
+  fi
+  detail "JSCPD: advisory mode enabled (PS_STRICT_MAINTAINABILITY=0); exiting 0."
+  exit 0
 fi

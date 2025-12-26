@@ -1,0 +1,46 @@
+# ==============================================================================
+# Political Sphere — Composite Action: SonarCloud
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run SonarCloud analysis with pinned action and explicit inputs.
+# ==============================================================================
+
+name: "SonarCloud Scan"
+description: "Run SonarCloud scan"
+
+inputs:
+  organization:
+    description: "SonarCloud organization key"
+    required: true
+
+  project_key:
+    description: "SonarCloud project key"
+    required: true
+
+  token:
+    description: "SonarCloud token"
+    required: true
+
+  sources:
+    description: "Source paths (comma-separated)"
+    required: false
+    default: "."
+
+  host_url:
+    description: "SonarCloud host URL"
+    required: false
+    default: "https://sonarcloud.io"
+
+runs:
+  using: "composite"
+  steps:
+    - name: SonarCloud scan
+      uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
+      with:
+        args: >-
+          -Dsonar.sources=${{ inputs.sources }}
+          -Dsonar.host.url=${{ inputs.host_url }}
+          -Dsonar.organization=${{ inputs.organization }}
+          -Dsonar.projectKey=${{ inputs.project_key }}
+      env:
+        SONAR_TOKEN: ${{ inputs.token }}

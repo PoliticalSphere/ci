@@ -159,7 +159,7 @@ jobs:
           install_tools: "0"
 
       - name: Contract check
-        uses: ./.github/actions/consumer-contract
+        uses: ./.github/actions/ps-task/consumer-contract
         with:
           policy_path: ${{ inputs.policy_path }}
           exceptions_path: ${{ inputs.exceptions_path }}
@@ -167,38 +167,9 @@ jobs:
           summary_path: ${{ inputs.summary_path }}
           log_dir: ${{ inputs.log_dir }}
 
-      - name: Write summary
-        if: always()
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: "consumer-contract"
-          output_path: "reports/summary/consumer-contract.json"
-          results: |
-            contract=${{ job.status == 'success' && 'success' || 'failure' }}
-
-      - name: Upload report artifacts
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: consumer-contract-report
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
-      - name: Upload summary artifact
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: consumer-contract-summary
-          path: reports/summary/consumer-contract.json
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: consumer-contract
           summary_output_path: reports/summary/consumer-contract.json
@@ -207,3 +178,5 @@ jobs:
           artifacts_paths: |
             reports/**
             logs/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}

@@ -1,0 +1,39 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Secrets Scan (PR)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run fast PR-scoped secret scan using gitleaks with platform policy.
+# ==============================================================================
+
+name: "Secrets Scan (PR)"
+description: "Run fast PR secret scan via gitleaks"
+
+inputs:
+  report_dir:
+    description: "Report output directory (repo-relative)"
+    required: false
+    default: "reports/security"
+
+  log_dir:
+    description: "Log output directory (repo-relative)"
+    required: false
+    default: "logs/security"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Secrets scan (PR) (PS)
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "secrets.pr"
+        title: "Secrets scan (PR)"
+        description: "Fast PR-scoped secret scan"
+        script: "tools/scripts/security/secret-scan-pr.sh"
+        require_files: |
+          tools/scripts/security/secret-scan-pr.sh
+        artifact_paths: |
+          ${{ inputs.report_dir }}
+          ${{ inputs.log_dir }}
+        env_kv: |
+          PS_REPORT_DIR=${{ inputs.report_dir }}
+          PS_LOG_DIR=${{ inputs.log_dir }}

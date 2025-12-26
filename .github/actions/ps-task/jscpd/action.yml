@@ -19,7 +19,7 @@
 #
 # Dependencies:
 #   - ./.github/actions/ps-task/ps-run
-#   - tools/scripts/tasks/jscpd.sh
+#   - tools/scripts/actions/ps-jscpd/jscpd.sh
 #   - configs/lint/jscpd.json
 #
 # Dependents:
@@ -44,7 +44,11 @@
 name: "JSCPD"
 description: "Run duplication detection"
 
-inputs: {}
+inputs:
+  threshold:
+    description: "Duplication threshold percentage"
+    required: false
+    default: "5"
 
 runs:
   using: "composite"
@@ -55,7 +59,9 @@ runs:
         id: "jscpd"
         title: "Duplication detection"
         description: "Code duplication scanning"
-        script: "tools/scripts/tasks/jscpd.sh"
+        script: "tools/scripts/actions/ps-jscpd/jscpd.sh"
         require_files: |
           configs/lint/jscpd.json
-          tools/scripts/tasks/jscpd.sh
+          tools/scripts/actions/ps-jscpd/jscpd.sh
+        env_kv: |
+          JSCPD_THRESHOLD=${{ inputs.threshold }}

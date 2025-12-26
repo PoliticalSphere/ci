@@ -62,6 +62,10 @@ inputs:
     description: "Summary output path (repo-relative)"
     required: false
     default: "reports/contracts/contract.txt"
+  baseline_path:
+    description: "Baseline report path for drift detection (repo-relative)"
+    required: false
+    default: ""
   log_dir:
     description: "Log output directory (repo-relative)"
     required: false
@@ -85,4 +89,11 @@ runs:
           PS_CONTRACT_EXCEPTIONS=${{ inputs.exceptions_path }}
           PS_CONTRACT_REPORT=${{ inputs.report_path }}
           PS_CONTRACT_SUMMARY=${{ inputs.summary_path }}
+          PS_CONTRACT_BASELINE=${{ inputs.baseline_path }}
           PS_LOG_DIR=${{ inputs.log_dir }}
+    - name: Contract summary (PS)
+      shell: bash
+      run: |
+        if [[ -f "${{ inputs.summary_path }}" && -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
+          cat "${{ inputs.summary_path }}" >> "${GITHUB_STEP_SUMMARY}"
+        fi

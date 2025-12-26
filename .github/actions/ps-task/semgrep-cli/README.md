@@ -1,3 +1,23 @@
+<!--
+# ==============================================================================
+# Political Sphere — Semgrep CLI (SARIF) (README)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Security contract and operational guidance for Semgrep CLI (SARIF).
+#
+# Dependencies:
+#   - ./.github/actions/ps-task/ps-run
+#   - tools/scripts/security/semgrep-cli.sh
+#   - tools/scripts/security/semgrep-validate-inputs.sh
+#   - tools/scripts/security/semgrep-install.sh
+#   - tools/scripts/security/semgrep-scan.sh
+#   - tools/scripts/security/semgrep-enforce.sh
+#
+# Dependents:
+#   - ./.github/workflows/security-scheduled.yml
+# ==============================================================================
+-->
+
 # Semgrep CLI (SARIF)
 
 Run Semgrep via a pinned install, produce SARIF, and upload to code scanning via
@@ -20,6 +40,7 @@ the canonical task runner.
 - `config`: Semgrep config (e.g., `p/ci` or a local config path). Default: `p/ci`.
 - `path`: Scan path (repo-relative). Default: `.`.
 - `output`: SARIF output path. Default: `reports/semgrep/semgrep.sarif`.
+- `semgrep_sha256`: Optional SHA-256 checksum for the Semgrep package artifact.
 - `fail_on_findings`: `true` or `false`. Default: `true`.
 
 ## Outputs

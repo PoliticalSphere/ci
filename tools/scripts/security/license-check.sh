@@ -59,6 +59,42 @@ section() {
 
 now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; }
 
+hash_file_sha256() {
+  local p="$1"
+  if command -v python3 >/dev/null 2>&1; then
+    python3 - <<'PY' "${p}"
+import hashlib, sys
+with open(sys.argv[1], "rb") as handle:
+    print(hashlib.sha256(handle.read()).hexdigest())
+PY
+    return 0
+  fi
+  if command -v shasum >/dev/null 2>&1; then
+    shasum -a 256 "${p}" | awk '{print $1}'
+    return 0
+  fi
+  if command -v sha256sum >/dev/null 2>&1; then
+    sha256sum "${p}" | awk '{print $1}'
+    return 0
+  fi
+  error "sha256 tool missing for policy hash verification"
+  exit 1
+}
+
+stat_mtime() {
+  local p="$1"
+  if stat -c %Y "${p}" >/dev/null 2>&1; then
+    stat -c %Y "${p}"
+    return 0
+  fi
+  if stat -f %m "${p}" >/dev/null 2>&1; then
+    stat -f %m "${p}"
+    return 0
+  fi
+  error "stat does not support mtime for ${p}"
+  exit 1
+}
+
 # ------------------------------------------------------------------------------
 # Resolve inputs (allow repo-relative overrides; default to repo-root paths)
 # ------------------------------------------------------------------------------
@@ -71,6 +107,8 @@ log_dir_rel="${PS_LOG_DIR:-logs/security}"
 summary_rel="${PS_LICENSE_SUMMARY:-${report_dir_rel}/license-summary.txt}"
 report_rel="${PS_LICENSE_REPORT:-${report_dir_rel}/license-report.json}"
 run_meta_rel="${PS_LICENSE_RUN_META:-${report_dir_rel}/license-run.json}"
+policy_baseline_rel="${PS_LICENSE_POLICY_BASELINE:-}"
+policy_baseline_hash="${PS_LICENSE_POLICY_SHA256:-}"
 
 # Validate path safety for anything that might be overridden via env
 safe_relpath_or_die "${policy_rel}" "PS_LICENSE_POLICY"
@@ -80,6 +118,9 @@ safe_relpath_or_die "${log_dir_rel}" "PS_LOG_DIR"
 safe_relpath_or_die "${summary_rel}" "PS_LICENSE_SUMMARY"
 safe_relpath_or_die "${report_rel}" "PS_LICENSE_REPORT"
 safe_relpath_or_die "${run_meta_rel}" "PS_LICENSE_RUN_META"
+if [[ -n "${policy_baseline_rel}" ]]; then
+  safe_relpath_or_die "${policy_baseline_rel}" "PS_LICENSE_POLICY_BASELINE"
+fi
 
 policy_path="${repo_root}/${policy_rel}"
 lock_path="${repo_root}/${lock_rel}"
@@ -90,6 +131,10 @@ summary_path="${repo_root}/${summary_rel}"
 report_path="${repo_root}/${report_rel}"
 run_meta_path="${repo_root}/${run_meta_rel}"
 log_path="${log_dir}/license-check.log"
+policy_baseline_path=""
+if [[ -n "${policy_baseline_rel}" ]]; then
+  policy_baseline_path="${repo_root}/${policy_baseline_rel}"
+fi
 
 # ------------------------------------------------------------------------------
 # Preconditions
@@ -131,6 +176,28 @@ fi
 # ------------------------------------------------------------------------------
 section "security.license.run" "Run license scanner" "Emit JSON report + summary"
 
+# ------------------------------------------------------------------------------
+# Pre-flight integrity checks (optional hardening)
+# ------------------------------------------------------------------------------
+if [[ -n "${policy_baseline_path}" ]]; then
+  if [[ ! -f "${policy_baseline_path}" ]]; then
+    error "policy baseline hash file not found at ${policy_baseline_rel}"
+    exit 1
+  fi
+  policy_baseline_hash="$(tr -d '[:space:]' < "${policy_baseline_path}")"
+fi
+
+if [[ -n "${policy_baseline_hash}" ]]; then
+  expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr '[:upper:]' '[:lower:]')"
+  actual_hash="$(hash_file_sha256 "${policy_path}" | tr '[:upper:]' '[:lower:]')"
+  if [[ "${actual_hash}" != "${expected_hash}" ]]; then
+    error "policy baseline mismatch before run: expected ${expected_hash}, got ${actual_hash}"
+    exit 1
+  fi
+fi
+
+lock_mtime_pre="$(stat_mtime "${lock_path}")"
+
 start_ts="$(now_iso)"
 start_epoch="$(date +%s)"
 
@@ -144,9 +211,43 @@ node "${repo_root}/tools/scripts/security/license-check.js" \
 
 exit_code=$?
 
+lock_mtime_post="$(stat_mtime "${lock_path}")"
+if [[ "${lock_mtime_pre}" != "${lock_mtime_post}" ]]; then
+  error "lockfile was modified during scan"
+  exit_code=1
+fi
+
 end_ts="$(now_iso)"
 end_epoch="$(date +%s)"
 duration_s=$(( end_epoch - start_epoch ))
+
+# ------------------------------------------------------------------------------
+# Policy hash baseline check (optional hardening)
+# ------------------------------------------------------------------------------
+if [[ -n "${policy_baseline_hash}" ]]; then
+  if [[ ! -f "${report_path}" ]]; then
+    error "policy baseline check failed: report not found at ${report_rel}"
+    exit 1
+  fi
+  actual_policy_hash="$(
+    python3 - <<'PY' "${report_path}"
+import json, sys
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    data = json.load(f)
+print(data.get("policy_sha256", ""))
+PY
+  )"
+  expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr '[:upper:]' '[:lower:]')"
+  actual_hash="$(printf '%s' "${actual_policy_hash}" | tr '[:upper:]' '[:lower:]')"
+  if [[ -z "${actual_hash}" ]]; then
+    error "policy baseline check failed: policy_sha256 missing from report"
+    exit 1
+  fi
+  if [[ "${actual_hash}" != "${expected_hash}" ]]; then
+    error "policy baseline mismatch: expected ${expected_hash}, got ${actual_hash}"
+    exit_code=1
+  fi
+fi
 
 # ------------------------------------------------------------------------------
 # Evidence: minimal run metadata (machine-readable)

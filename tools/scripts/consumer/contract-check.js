@@ -634,6 +634,27 @@ function checkPathIntegrity({
   }
 }
 
+function stableClone(value) {
+  if (Array.isArray(value)) {
+    return value.map((item) => stableClone(item));
+  }
+  if (value && typeof value === 'object') {
+    const entries = Object.keys(value)
+      .sort()
+      .map((key) => [key, stableClone(value[key])]);
+    return Object.fromEntries(entries);
+  }
+  return value;
+}
+
+function buildComparableReport(report) {
+  return stableClone({
+    summary: report?.summary || {},
+    policy: report?.policy || {},
+    violations: report?.violations || [],
+  });
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const repoRoot = process.env.PS_CONTRACT_REPO_ROOT || getRepoRoot();
@@ -661,6 +682,10 @@ async function main() {
     args.summary ||
       process.env.PS_CONTRACT_SUMMARY ||
       path.join(repoRoot, 'reports', 'contracts', 'contract.txt'),
+  );
+  const baselinePath = resolvePath(
+    repoRoot,
+    args.baseline || process.env.PS_CONTRACT_BASELINE || '',
   );
 
   const policyDoc = await parseConfig(policyPath, 'contract policy');
@@ -829,10 +854,45 @@ async function main() {
     }
   }
 
+  const drift = { enabled: false, changed: false };
+  if (baselinePath && fs.existsSync(baselinePath)) {
+    drift.enabled = true;
+    drift.baseline_path = path.relative(repoRoot, baselinePath);
+    try {
+      const baselineReport = JSON.parse(readText(baselinePath));
+      const baselineComparable = buildComparableReport(baselineReport);
+      const currentComparable = buildComparableReport({
+        summary,
+        policy: {
+          mode,
+          required_files: requiredFiles,
+          required_scripts: requiredScripts,
+        },
+        violations,
+      });
+      drift.changed =
+        JSON.stringify(baselineComparable) !== JSON.stringify(currentComparable);
+    } catch (err) {
+      drift.error = `baseline unreadable: ${err.message}`;
+    }
+  }
+
+  if (drift.enabled) {
+    const status = drift.error
+      ? `error (${drift.error})`
+      : drift.changed
+        ? 'changed'
+        : 'no changes';
+    summaryLines.push(`Drift: ${status}`);
+  }
+
   writeOutputs({
     reportPath,
     summaryPath,
     reportData: {
+      format: 'ps.contract',
+      schema_version: '1.0.0',
+      generated_at: new Date().toISOString(),
       summary,
       policy: {
         mode,
@@ -840,6 +900,7 @@ async function main() {
         required_scripts: requiredScripts,
       },
       violations,
+      drift,
     },
     summaryLines,
   });

@@ -1,4 +1,19 @@
 #!/usr/bin/env bash
+# ==============================================================================
+# Political Sphere — Semgrep CLI Orchestrator
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Validate inputs, install Semgrep, run scan, and enforce policy with SARIF.
+#
+# Dependencies:
+#   - tools/scripts/security/semgrep-validate-inputs.sh
+#   - tools/scripts/security/semgrep-install.sh
+#   - tools/scripts/security/semgrep-scan.sh
+#   - tools/scripts/security/semgrep-enforce.sh
+#
+# Dependents:
+#   - ./.github/actions/ps-task/semgrep-cli
+# ==============================================================================
 set -euo pipefail
 
 fail() {
@@ -10,6 +25,7 @@ version="${SEMGREP_VERSION:-}"
 config="${SEMGREP_CONFIG:-p/ci}"
 scan_path="${SEMGREP_PATH:-.}"
 output="${SEMGREP_OUTPUT:-reports/semgrep/semgrep.sarif}"
+checksum="${SEMGREP_SHA256:-}"
 fail_on_findings="${SEMGREP_FAIL_ON_FINDINGS:-true}"
 
 SEMGREP_VERSION_INPUT="${version}"
@@ -17,16 +33,28 @@ SEMGREP_FAIL_ON_FINDINGS_INPUT="${fail_on_findings}"
 SEMGREP_OUTPUT_INPUT="${output}"
 SEMGREP_CONFIG_INPUT="${config}"
 SEMGREP_PATH_INPUT="${scan_path}"
+SEMGREP_SHA256_INPUT="${checksum}"
 
 export SEMGREP_VERSION_INPUT
 export SEMGREP_FAIL_ON_FINDINGS_INPUT
 export SEMGREP_OUTPUT_INPUT
 export SEMGREP_CONFIG_INPUT
 export SEMGREP_PATH_INPUT
+export SEMGREP_SHA256_INPUT
 
 bash "${GITHUB_WORKSPACE}/tools/scripts/security/semgrep-validate-inputs.sh"
 
 bash "${GITHUB_WORKSPACE}/tools/scripts/security/semgrep-install.sh"
+
+installed_version="$(semgrep --version | sed -E 's/[^0-9]*([0-9]+\.[0-9]+\.[0-9]+).*/\1/' | head -n1)"
+if [[ -z "${installed_version}" ]]; then
+  fail "Semgrep version check failed (no version output)."
+fi
+if [[ "${installed_version}" != "${SEMGREP_VERSION_INPUT}" ]]; then
+  fail "Semgrep version mismatch (expected ${SEMGREP_VERSION_INPUT}, got ${installed_version})."
+fi
+
+rm -f "${GITHUB_WORKSPACE}/.semgrep-exit-code.txt"
 
 SEMGREP_SEND_METRICS=off \
   bash "${GITHUB_WORKSPACE}/tools/scripts/security/semgrep-scan.sh"
@@ -47,6 +75,7 @@ upload_sarif() {
 
   python3 - <<'PY'
 import base64
+import gzip
 import json
 import os
 import urllib.request
@@ -59,12 +88,14 @@ ref = os.environ["GITHUB_REF"]
 api_url = os.environ.get("GITHUB_API_URL", "https://api.github.com")
 
 with open(sarif_path, "rb") as f:
-    sarif_b64 = base64.b64encode(f.read()).decode("ascii")
+    compressed_data = gzip.compress(f.read())
+    sarif_b64 = base64.b64encode(compressed_data).decode("ascii")
 
 payload = {
     "commit_sha": sha,
     "ref": ref,
     "sarif": sarif_b64,
+    "compression": "gzip",
 }
 
 data = json.dumps(payload).encode("utf-8")
@@ -80,17 +111,24 @@ req = urllib.request.Request(
     method="POST",
 )
 
-with urllib.request.urlopen(req) as resp:
-    if resp.status < 200 or resp.status >= 300:
-        raise SystemExit(f"SARIF upload failed with status {resp.status}")
-    body = resp.read().decode("utf-8")
-    print(f"PS.SEMGREP: upload status={resp.status}")
-    if body:
-        print(body)
+try:
+    with urllib.request.urlopen(req, timeout=60) as resp:
+        if resp.status < 200 or resp.status >= 300:
+            raise SystemExit(f"SARIF upload failed with status {resp.status}")
+        body = resp.read().decode("utf-8")
+        print(f"PS.SEMGREP: upload status={resp.status}")
+        if body:
+            print(body)
+except Exception as exc:
+    raise SystemExit(f"SARIF upload failed: {exc}") from exc
 PY
 }
 
-SARIF_PATH="${output}" upload_sarif "${output}"
+sarif_path="${output}"
+if [[ "${sarif_path}" != /* ]]; then
+  sarif_path="${GITHUB_WORKSPACE}/${sarif_path}"
+fi
+SARIF_PATH="${sarif_path}" upload_sarif "${sarif_path}"
 
 SEMGREP_FAIL_ON_FINDINGS_INPUT="${fail_on_findings}" \
   bash "${GITHUB_WORKSPACE}/tools/scripts/security/semgrep-enforce.sh"

@@ -36,7 +36,7 @@
 # - Deterministic, non-interactive execution
 # - Least privilege at workflow and job level
 # - Validate-CI MUST pass before checks execute
-# - Single canonical bootstrap path (ps-bootstrap)
+# - Single canonical bootstrap path (ps-init)
 # - External actions (if used) must be SHA-pinned
 #
 #
@@ -252,70 +252,28 @@ jobs:
 
           install_tools: "0"
 
-      - name: Setup Node.js (cached)
-        if: ${{ inputs.install_dependencies == '1' && inputs.cache == '1' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+      - name: Node setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-node
         with:
-          node-version: ${{ inputs.node_version }}
-          cache: "npm"
-          cache-dependency-path: "package-lock.json"
-
-      - name: Setup Node.js
-        if: ${{ inputs.install_dependencies != '1' || inputs.cache != '1' }}
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
-        with:
-          node-version: ${{ inputs.node_version }}
-
-      - name: Install repository dependencies
-        if: ${{ inputs.install_dependencies == '1' }}
-        run: npm ci --no-audit --no-fund
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          install_dependencies: ${{ inputs.install_dependencies }}
+          working_directory: "."
+          cache_dependency_path: "package-lock.json"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: License compliance (PS)
-        uses: ./.github/actions/license-check
+        uses: ./.github/actions/ps-task/license-check
         with:
           policy_path: ${{ inputs.policy_path }}
           lock_path: ${{ inputs.lock_path }}
           report_dir: ${{ inputs.report_dir }}
           log_dir: ${{ inputs.log_dir }}
 
-      # ------------------------------------------------------------------------
-      # Evidence & reporting
-      # ------------------------------------------------------------------------
-      - name: Write summary (PS)
-        if: always()
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: "license-compliance"
-          output_path: "reports/summary/license-compliance.json"
-          results: |
-            validate-ci=${{ needs.validate-ci.result }}
-            license=${{ job.status }}
-
-      - name: Upload report artifacts (PS)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: license-compliance-report
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
-      - name: Upload summary artifact (PS)
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: license-compliance-summary
-          path: reports/summary/license-compliance.json
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown
+        uses: ./.github/actions/ps-teardown/ps-exit
         with:
           summary_workflow: license-compliance
           summary_output_path: reports/summary/license-compliance.json
@@ -324,3 +282,5 @@ jobs:
           artifacts_paths: |
             reports/**
             logs/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: ${{ inputs.retention_days }}
