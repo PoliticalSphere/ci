@@ -5,7 +5,6 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot, mktemp, readYamlFile } from './test-utils.js';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 
 const repoRoot = getRepoRoot();
 const actionYaml = path.join(
