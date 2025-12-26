@@ -179,6 +179,18 @@ _lint_any_started() {
   return 1
 }
 
+# True if all steps are still in the "Waiting" state (or not yet set).
+_lint_all_waiting() {
+  local s
+  for s in "${LINT_STATUSES[@]+"${LINT_STATUSES[@]}"}"; do
+    case "${s}" in
+      Waiting|"") ;;
+      *) return 1 ;;
+    esac
+  done
+  return 0
+}
+
 # For printing: show relative path where possible, else basename.
 _short_log_ref() {
   local p="${1:-}"
@@ -197,11 +209,21 @@ _ps_erase_inline_block() {
   _ps_is_interactive_tty || return 0
   [[ "${n}" -gt 0 ]] || return 0
 
-  printf '\033[%dA' "$n"
-  for ((i=0; i<n; i++)); do
-    printf '\r\033[2K\033[1E'
-  done
-  printf '\033[%dA' "$n"
+  # Prefer tput for portability; fall back to raw ANSI if unavailable
+  if command -v tput >/dev/null 2>&1; then
+    tput cuu "$n" 2>/dev/null || true
+    for ((i=0; i<n; i++)); do
+      tput el 2>/dev/null || printf '\033[2K'
+      printf '\n'
+    done
+    tput cuu "$n" 2>/dev/null || true
+  else
+    printf '\033[%dA' "$n"
+    for ((i=0; i<n; i++)); do
+      printf '\r\033[2K\033[1E'
+    done
+    printf '\033[%dA' "$n"
+  fi
   return 0
 }
 
@@ -272,6 +294,13 @@ print_lint_summary() {
   # - running in CI (CI=1)
   # - caller explicitly disabled inline updates (PS_LINT_INLINE=0)
   # - we have a GITHUB_RUN_ID and want to dedupe across processes
+  # If caller explicitly requested inline mode and this terminal supports
+  # inline updates, avoid printing the initial waiting summary — it creates
+  # noisy duplicate output with per-step lines that appear as steps finish.
+  if [[ "${PS_LINT_PRINT_MODE:-}" == "inline" && _ps_is_interactive_tty && _lint_all_waiting ]]; then
+    return 0
+  fi
+
   if [[ -n "${GITHUB_RUN_ID:-}" ]] || [[ "${CI:-0}" == "1" ]] || [[ "${PS_LINT_INLINE:-1}" == "0" ]]; then
     :
   else
@@ -499,6 +528,10 @@ run_lint_step() {
 
   LINT_STATUSES[idx]="${status}"
   LINT_LOGS[idx]="${log_file}"
+
+  # Always emit a compact per-step status line so progress is visible even when
+  # terminal inline updates fail or are unsupported (helps CI and plain logs).
+  printf '%s %s: %s\n' "${PS_FMT_ICON:-▶}" "${title}" "${LINT_STATUSES[$idx]}"
 
   print_lint_summary
 

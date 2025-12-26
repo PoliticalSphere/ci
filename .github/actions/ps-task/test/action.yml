@@ -1,59 +1,75 @@
 # ==============================================================================
-# Political Sphere — Composite Action: Test
+# Political Sphere — Composite Action: Test (ps-task adapter)
 # ------------------------------------------------------------------------------
 # Purpose:
-#   Run deterministic unit tests with platform defaults.
+#   Run deterministic unit tests via PS Task Runner with standardized output.
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: execute the unit test script.
-#   - Does NOT: build artifacts or run integration/e2e tests.
-#
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - CI-safe with structured output
-#   - Delegates to a single script for consistency
-#
-# Dependencies:
-#   - ./.github/actions/ps-task/ps-run
-#   - tools/scripts/tasks/test.sh
-#
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#   - Invoked by: PR gates workflow
-#
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller (read-only expected)
-#   - Constraints: requires Node.js and test tooling installed
-#
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: produced by the test script (reports/**, logs/**)
-#   - CI vs local: same script used by local gates
+# Notes:
+#   - Thin adapter: delegates execution/logging/reporting to ps-run.
+#   - Exposes minimal knobs (script/workdir/coverage expectations).
 # ==============================================================================
 
 name: "Test"
-description: "Run unit tests"
+description: "Run deterministic unit tests with standardized PS reporting"
 
-inputs: {}
+inputs:
+  script:
+    description: "Test script path (repo-relative)"
+    required: false
+    default: "tools/scripts/tasks/test.sh"
+
+  working_directory:
+    description: "Working directory to run from (repo-relative)"
+    required: false
+    default: "."
+
+  ps_full_scan:
+    description: "Enable strict/full scan behaviour (0|1)"
+    required: false
+    default: "1"
+
+  # Optional “evidence expectations” toggles: keep strictness intentional.
+  expect_coverage:
+    description: "Fail if coverage artifacts are missing (0|1)"
+    required: false
+    default: "0"
+
+  expect_test_results:
+    description: "Fail if JUnit/XML test results are missing (0|1)"
+    required: false
+    default: "0"
 
 runs:
   using: "composite"
   steps:
-    - name: Run tests (PS)
+    - name: Run unit tests (PS)
       uses: ./.github/actions/ps-task/ps-run
       with:
         id: "test.unit"
         title: "Unit tests"
         description: "Deterministic unit tests"
-        script: "tools/scripts/tasks/test.sh"
+        script: ${{ inputs.script }}
+        working_directory: ${{ inputs.working_directory }}
+
         require_files: |
-          tools/scripts/tasks/test.sh
+          ${{ inputs.script }}
+
+        # Evidence: always expect standard logs/reports.
+        # Coverage and JUnit are opt-in strictness (some repos legitimately won’t emit them).
+        artifact_paths: |
+          reports/**
+          logs/**
+          ${{ inputs.expect_coverage == '1' && 'coverage/**' || '' }}
+          ${{ inputs.expect_coverage == '1' && 'reports/coverage/**' || '' }}
+          ${{ inputs.expect_coverage == '1' && 'playwright-report/**' || '' }}
+          ${{ inputs.expect_coverage == '1' && 'test-results/**' || '' }}
+          ${{ inputs.expect_test_results == '1' && 'reports/**/junit*.xml' || '' }}
+          ${{ inputs.expect_test_results == '1' && 'reports/**/junit.xml' || '' }}
+          ${{ inputs.expect_test_results == '1' && 'test-results/**/*.xml' || '' }}
+
+        env_kv: |
+          CI=1
+          PS_FULL_SCAN=${{ inputs.ps_full_scan }}
+
+        continue_on_error: "0"
+        allow_args: "0"

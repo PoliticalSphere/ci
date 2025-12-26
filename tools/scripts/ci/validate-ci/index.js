@@ -138,7 +138,15 @@ const quiet =
   String(process.env.PS_VALIDATE_CI_QUIET || '0') === '1' ||
   String(process.env.PS_VALIDATE_CI_QUIET || '0') === 'true';
 
-const validateRemoteAction = createRemoteVerifier({ verifyRemoteShas });
+const baseValidateRemoteAction = createRemoteVerifier({ verifyRemoteShas });
+const remoteVerifyStats = { rateLimitedSoft: 0 };
+const validateRemoteAction = async (...args) => {
+  const result = await baseValidateRemoteAction(...args);
+  if (result?.error === 'rate_limited_soft') {
+    remoteVerifyStats.rateLimitedSoft += 1;
+  }
+  return result;
+};
 
 function assertConfigFile(filePath, label, checks) {
   const text = loadText(filePath);
@@ -363,7 +371,7 @@ if (prOnly) {
 
 const violations = [];
 
-const workflowViolations = await scanWorkflows({
+const workflowResult = await scanWorkflows({
   workflows,
   workspaceRoot,
   allowedActions,
@@ -382,6 +390,7 @@ const workflowViolations = await scanWorkflows({
   localActions,
   quiet,
 });
+const workflowViolations = workflowResult.violations;
 const actionViolations = await scanActions({
   actions,
   platformRoot,
@@ -399,6 +408,26 @@ violations.push(...workflowViolations, ...actionViolations);
   const failedByScore =
     scoreFailThreshold !== null && score < scoreFailThreshold;
 
+  const warnings = [];
+  if (workflowResult.warnings?.length) {
+    warnings.push(
+      ...workflowResult.warnings.map((w) => ({
+        code: w.code || 'PARSE_WARNING',
+        message: w.message,
+        workflow: w.workflow,
+      })),
+    );
+  }
+  if (remoteVerifyStats.rateLimitedSoft > 0) {
+    const message = `Remote SHA verification skipped for ${remoteVerifyStats.rateLimitedSoft} action(s) due to GitHub API rate limits.`;
+    warnings.push({
+      code: 'RATE_LIMIT_SOFT',
+      message,
+      count: remoteVerifyStats.rateLimitedSoft,
+    });
+    detail(`WARN: ${message}`);
+  }
+
   const reportPath =
     process.env.PS_VALIDATE_CI_REPORT ||
     path.join(workspaceRoot, 'reports', 'validate-ci', 'validate-ci.json');
@@ -413,6 +442,7 @@ violations.push(...workflowViolations, ...actionViolations);
           deductionPercent,
           totalWeight,
           threshold: scoreFailThreshold,
+          warnings,
           violations,
         },
         null,

@@ -96,6 +96,12 @@ The model is explicit and predictable: no hidden behavior, no implicit coupling.
   - `npm run typecheck`
   - `npm run test`
   - `npm run jscpd`
+
+Gates convenience scripts:
+
+- `npm run gate:inline` — run the pre-commit gate with an inline updating dashboard (TTY-friendly)
+- `npm run gate:final` — run the pre-commit gate and print only a final summary
+
 - Reproduce `validate-ci` remote SHA verification locally:
 
 ```bash

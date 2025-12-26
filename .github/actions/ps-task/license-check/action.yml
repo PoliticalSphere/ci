@@ -1,44 +1,13 @@
 # ==============================================================================
-# Political Sphere - Composite Action: License Compliance
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Enforce OSS license compliance using the platform policy and lockfile.
-#
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: run the license compliance script and emit reports/logs.
-#   - Does NOT: install dependencies or alter permissions.
-#
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Policy-driven allowlist/denylist logic
-#   - CI-safe, structured outputs
-#
-# Dependencies:
-#   - ./.github/actions/ps-task/ps-run
-#   - tools/scripts/security/license-check.sh
-#   - configs/security/license-policy.yml
-#
-# Dependents:
-#   - ./.github/workflows/license-compliance.yml
-#
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller (read-only expected)
-#
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: reports/** and logs/** emitted by the script
-#   - CI vs local: requires policy + lockfile in CI
+# Political Sphere — Composite Action: License Compliance
 # ==============================================================================
-
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Enforce OSS license compliance using a policy file + dependency lockfile, and
+# emit evidence (reports/logs) in a deterministic, CI-safe manner.
+#
+# ==============================================================================
 name: "License Compliance"
 description: "Check dependency licenses against the platform policy"
 
@@ -47,23 +16,53 @@ inputs:
     description: "Path to license policy (repo-relative)"
     required: false
     default: "configs/security/license-policy.yml"
+
   lock_path:
-    description: "Path to package-lock.json (repo-relative)"
+    description: "Dependency lockfile path (repo-relative)"
     required: false
     default: "package-lock.json"
+
   report_dir:
     description: "Report output directory (repo-relative)"
     required: false
     default: "reports/security"
+
   log_dir:
     description: "Log output directory (repo-relative)"
     required: false
     default: "logs/security"
 
+outputs:
+  status:
+    description: "Task status (success|failure)"
+    value: ${{ steps.license.outputs.status }}
+
+  report_path:
+    description: "Task report JSON path"
+    value: ${{ steps.license.outputs.report_path }}
+
+  log_path:
+    description: "Task log path"
+    value: ${{ steps.license.outputs.log_path }}
+
 runs:
   using: "composite"
   steps:
+    - name: Prepare output directories (PS)
+      shell: bash
+      env:
+        PS_REPORT_DIR_INPUT: ${{ inputs.report_dir }}
+        PS_LOG_DIR_INPUT: ${{ inputs.log_dir }}
+      run: |
+        set -euo pipefail
+        for d in "${PS_REPORT_DIR_INPUT}" "${PS_LOG_DIR_INPUT}"; do
+          [[ -n "${d}" ]] || { echo "ERROR: output dir empty" >&2; exit 1; }
+          [[ "${d}" == /* || "${d}" == *".."* ]] && { echo "ERROR: unsafe dir path: ${d}" >&2; exit 1; }
+          mkdir -p "${GITHUB_WORKSPACE}/${d}"
+        done
+
     - name: License compliance (PS)
+      id: license
       uses: ./.github/actions/ps-task/ps-run
       with:
         id: "security.license"
@@ -74,6 +73,9 @@ runs:
           tools/scripts/security/license-check.sh
           ${{ inputs.policy_path }}
           ${{ inputs.lock_path }}
+        artifact_paths: |
+          ${{ inputs.report_dir }}
+          ${{ inputs.log_dir }}
         env_kv: |
           PS_LICENSE_POLICY=${{ inputs.policy_path }}
           PS_LICENSE_LOCK_PATH=${{ inputs.lock_path }}

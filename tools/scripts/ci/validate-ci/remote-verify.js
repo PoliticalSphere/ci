@@ -133,11 +133,26 @@ export function createRemoteVerifier({
       } else if (status === 404) {
         result = { ok: false, error: 'ref_not_found' };
       } else {
+        const remaining = response.headers.get('x-ratelimit-remaining');
+        const reset = response.headers.get('x-ratelimit-reset');
+        if (
+          (status === 403 || status === 429) &&
+          remaining !== null &&
+          Number(remaining) === 0
+        ) {
+          const resetEpoch = reset ? Number(reset) * 1000 : null;
+          const resetIso = resetEpoch ? new Date(resetEpoch).toISOString() : '';
+          detailImpl(
+            `REMOTE_VERIFY: rate limit hit; verification skipped for ${repo}@${ref.slice(0, 8)}… reset=${resetIso || 'unknown'}`,
+          );
+          result = { ok: true, error: 'rate_limited_soft' };
+        } else {
         const info = mapStatusToInfo(status);
         detailImpl(
           `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
         );
         result = { ok: false, error: info.error };
+        }
       }
     } catch {
       logApiUnreachable(repo, ref);

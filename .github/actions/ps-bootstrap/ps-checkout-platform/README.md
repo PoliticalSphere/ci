@@ -1,7 +1,19 @@
 # PS Checkout (Platform)
 
-Checkout a platform repository into a controlled, repo-relative path with
-validated inputs and stable outputs.
+Security Tier 0: Controlled ingestion of platform-level CI logic. This action
+ensures secondary repositories are checked out into a sanctioned, repo-relative
+path without compromising workspace integrity.
+
+## Security Features
+
+- Owner enforcement: By default, only repositories owned by `PoliticalSphere`
+  are permitted unless an allowlist is supplied.
+- Allowlist guardrails: Optional `allowed_repositories` explicitly permits
+  specific external or cross-org repos.
+- Path traversal protection: Absolute paths and `..` segments are rejected to
+  prevent workspace escape or overwrites.
+- Pre-flight cleanup: `clean_path` removes existing directories to avoid
+  persistence on self-hosted runners.
 
 ## Usage
 
@@ -39,4 +51,24 @@ validated inputs and stable outputs.
 ## Notes
 
 - `path` must be repo-relative and must not contain `..` or be absolute.
+- When `allowed_repositories` is empty, the repository owner must be `PoliticalSphere`.
 - When `require_full_history` is `true`, `fetch_depth` must be `0`.
+
+## Operational Logic
+
+- Identity verification: Owner must be `PoliticalSphere` unless allowlisted.
+- Sandbox validation: Rejects any path that attempts to escape the workspace.
+- Egress compliance: Runs under `ps-harden-runner`; git traffic is subject to
+  the established network policy.
+- Stable telemetry: Emits absolute and relative paths for downstream tools.
+- Deterministic state: If `clean_path` is `false`, `actions/checkout` may reuse
+  an existing directory (fetch/reset instead of a fresh clone). For Tier 0 jobs,
+  prefer `clean_path: true` to guarantee a known-good state.
+
+## Key Differentiators
+
+| Logic Gate | Security Value |
+| :--- | :--- |
+| Owner check | Mitigates repo spoofing by restricting to the trusted org. |
+| Clean path | Defends against dirty workspace attacks on persistent runners. |
+| Traversal guard | Prevents overwriting `.git` or `.github` in the main repo. |

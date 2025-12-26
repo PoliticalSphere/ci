@@ -61,6 +61,9 @@ printf 'PS.CI_VALIDATE: config_path=%q\n' "$config_path"
 # Step: Execute
 # ----------------------------------------------------------------------
 export PS_VALIDATE_CI_CONFIG="${config_path}"
+if type -t ps_detail >/dev/null 2>&1; then
+  ps_detail "Executing Node-based policy engine..."
+fi
 node "${validator}"
 
 echo "PS.CI_VALIDATE: OK"

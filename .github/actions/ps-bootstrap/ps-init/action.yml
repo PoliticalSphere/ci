@@ -1,5 +1,5 @@
 # ==============================================================================
-# Political Sphere — Composite Action: PS Init
+# Political Sphere - Composite Action: PS Init
 # ==============================================================================
 #
 # METADATA
@@ -10,6 +10,17 @@
 # classification: internal
 # created: 2025-12-26
 # last_updated: 2025-12-26
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-bootstrap/ps-harden-runner
+# - ./.github/actions/ps-bootstrap/ps-checkout-repo
+# - ./.github/actions/ps-bootstrap/ps-checkout-platform (optional)
+# - ./.github/actions/ps-bootstrap/ps-tools (optional)
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - Workflow jobs that use ps-init as the entrypoint
 #
 #
 # PURPOSE
@@ -31,9 +42,25 @@
 # - Path inputs are validated (repo-relative, no traversal).
 # - Outputs are stable and telemetry-friendly.
 #
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 0 - Critical (this action influences runner/network configuration and
+#                    environment isolation; treat with high scrutiny)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents unsafe input interpolation, workspace escape, and inadvertent
+#          privilege escalation by validating user-provided inputs and enforcing
+#          deterministic environment setup.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Records major security-related changes locally using the `init_metadata` output
+# and console logs to aid post-incident analysis and auditing.
+#
 # ==============================================================================
 name: "PS Init"
-description: "Canonical CI bootstrap switchboard: harden → checkout → HOME isolation → platform → tools"
+description: "Canonical CI bootstrap switchboard: harden -> checkout -> HOME isolation -> platform -> tools"
 
 inputs:
   # ---------------------------------------------------------------------------
@@ -48,12 +75,12 @@ inputs:
   # Repository checkout
   # ---------------------------------------------------------------------------
   fetch_depth:
-    description: "Git fetch depth for repo checkout (0 = full history, default: 1)"
+    description: "Git fetch depth (0=full)"
     required: false
     default: "1"
 
   checkout_ref:
-    description: "Optional git ref (branch/tag/SHA) to checkout"
+    description: "Optional git ref to checkout"
     required: false
     default: ""
 
@@ -69,6 +96,11 @@ inputs:
     description: "Repo-relative HOME directory to create and use (e.g. .home)"
     required: false
     default: ".home"
+
+  home_isolation:
+    description: "Enable HOME/XDG isolation for the job (0/1/true/false)"
+    required: false
+    default: "true"
 
   # ---------------------------------------------------------------------------
   # Platform checkout (optional)
@@ -130,6 +162,18 @@ outputs:
     description: "Resolved HOME directory (absolute path) used by the job"
     value: ${{ steps.ps_init_outputs.outputs.home_dir }}
 
+  home_original:
+    description: "Original HOME before isolation (absolute path)"
+    value: ${{ steps.ps_init_outputs.outputs.home_original }}
+
+  home_isolation_enabled:
+    description: "Whether HOME isolation was applied (true|false)"
+    value: ${{ steps.ps_init_outputs.outputs.home_isolation_enabled }}
+
+  init_metadata:
+    description: "JSON metadata about the init environment (stringified object)"
+    value: ${{ steps.ps_init_outputs.outputs.init_metadata }}
+
   platform_root:
     description: "Resolved platform root (absolute path), or empty when skipped"
     value: ${{ steps.ps_init_outputs.outputs.platform_root }}
@@ -141,17 +185,21 @@ outputs:
 runs:
   using: "composite"
   steps:
-    # =========================================================================
-    # 1) HARDEN RUNNER — MUST BE FIRST
-    # =========================================================================
+    # -----------------------------------------------------------------------------
+    # PHASE 1: HARDEN RUNNER - MUST BE FIRST
+    # Logic: Lockdown runner configuration prior to any setup steps.
+    # Critical: Level 0 - alters runner security posture.
+    # -----------------------------------------------------------------------------
     - name: Harden runner (PS)
-      uses: ./.github/actions/ps-harden-runner
+      uses: ./.github/actions/ps-bootstrap/ps-harden-runner
       with:
         egress-policy: ${{ inputs.egress_policy }}
 
-    # =========================================================================
-    # 2) VALIDATE + NORMALISE INPUTS (must come after harden)
-    # =========================================================================
+    # -----------------------------------------------------------------------------
+    # PHASE 2: INPUT SANITIZATION & NORMALIZATION
+    # Logic: Rejects non-repo paths; enforces boolean consistency.
+    # Dependency: python3 (internal path resolution)
+    # -----------------------------------------------------------------------------
     - name: Validate + normalise inputs (PS)
       id: ps_init_validate
       shell: bash
@@ -160,6 +208,7 @@ runs:
         PS_CHECKOUT_REF_INPUT: ${{ inputs.checkout_ref }}
         PS_REQUIRE_FULL_HISTORY_INPUT: ${{ inputs.require_full_history }}
         PS_HOME_DIR_INPUT: ${{ inputs.home_dir }}
+        PS_HOME_ISOLATION_INPUT: ${{ inputs.home_isolation }}
 
         PS_PLATFORM_REPO_INPUT: ${{ inputs.platform_repo }}
         PS_PLATFORM_REF_INPUT: ${{ inputs.platform_ref }}
@@ -172,13 +221,64 @@ runs:
         PS_INSTALL_TOOLS_INPUT: ${{ inputs.install_tools }}
         PS_TOOLS_BUNDLE_INPUT: ${{ inputs.tools_bundle }}
       run: |
+        # [PS.INIT.VALIDATE] ---------------------------------------------------------
+        # Intent: Normalize 0/1/true/false and lock environment variables.
+        # Safety: set -euo pipefail (Strict mode enabled)
+        # ----------------------------------------------------------------------------
         set -euo pipefail
 
+        format_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        format_sh="${format_root}/tools/scripts/branding/format.sh"
+        expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
+        if [[ -f "${format_sh}" ]]; then
+          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
+            # shellcheck source=/dev/null
+            . "${format_sh}"
+            if type -t ps_header >/dev/null 2>&1; then
+              ps_header "PS Init: validate inputs"
+            fi
+          else
+            printf 'PS.INIT: branding skipped (format.sh hash mismatch)\n'
+          fi
+        fi
+
         norm_bool() {
-          case "${1:-}" in
-            1|true|TRUE|True)  echo "1" ;;
-            0|false|FALSE|False|"") echo "0" ;;
+          local val
+          val="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+          case "${val}" in
+            1|true|yes|y|on)  echo "1" ;;
+            0|false|no|n|off|"") echo "0" ;;
             *) return 1 ;;
+          esac
+        }
+
+        if ! command -v python3 >/dev/null 2>&1; then
+          printf 'ERROR: python3 is required for ps-init path validation\n' >&2
+          exit 1
+        fi
+
+        validate_safe_path() {
+          local input_path="$1"
+          local resolved
+          if [[ -z "${input_path}" ]]; then
+            printf 'ERROR: path must not be empty\n' >&2
+            exit 1
+          fi
+          if [[ "${input_path}" == "~"* || "${input_path}" == "." || "${input_path}" == "./" || "${input_path}" == ./* || "${input_path}" == */./* || "${input_path}" == */. || "${input_path}" == */ || "${input_path}" == *"$"* || "${input_path}" == *"`"* ]]; then
+            printf 'ERROR: path must be a repo-relative safe path (got %q)\n' "${input_path}" >&2
+            exit 1
+          fi
+          resolved="$(python3 -c "import os; print(os.path.abspath(os.path.join('${GITHUB_WORKSPACE}', '${input_path}')))")"
+          if [[ "${resolved}" != "${GITHUB_WORKSPACE}"* ]]; then
+            printf 'ERROR: path escapes workspace (got %q)\n' "${input_path}" >&2
+            exit 1
+          fi
+          case "${input_path}" in
+            .git|.github|.ps-platform|.git/*|.github/*|.ps-platform/*)
+              printf 'ERROR: %s is a reserved system directory\n' "${input_path}" >&2
+              exit 1
+              ;;
           esac
         }
 
@@ -186,6 +286,7 @@ runs:
         skip_platform="$(norm_bool "${PS_SKIP_PLATFORM_INPUT}")" || { printf 'ERROR: skip_platform_checkout must be 0/1/true/false (got %q)\n' "${PS_SKIP_PLATFORM_INPUT}" >&2; exit 1; }
         clean_platform="$(norm_bool "${PS_PLATFORM_CLEAN_PATH_INPUT}")" || { printf 'ERROR: platform_clean_path must be 0/1/true/false (got %q)\n' "${PS_PLATFORM_CLEAN_PATH_INPUT}" >&2; exit 1; }
         install_tools="$(norm_bool "${PS_INSTALL_TOOLS_INPUT}")" || { printf 'ERROR: install_tools must be 0/1/true/false (got %q)\n' "${PS_INSTALL_TOOLS_INPUT}" >&2; exit 1; }
+        isolate_home="$(norm_bool "${PS_HOME_ISOLATION_INPUT}")" || { printf 'ERROR: home_isolation must be 0/1/true/false (got %q)\n' "${PS_HOME_ISOLATION_INPUT}" >&2; exit 1; }
 
         depth="${PS_FETCH_DEPTH_INPUT:-1}"
         if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
@@ -198,14 +299,7 @@ runs:
         fi
 
         home_rel="${PS_HOME_DIR_INPUT:-.home}"
-        if [[ -z "${home_rel}" ]]; then
-          printf 'ERROR: home_dir must not be empty\n' >&2
-          exit 1
-        fi
-        if [[ "${home_rel}" == /* || "${home_rel}" == *".."* ]]; then
-          printf 'ERROR: home_dir must be a repo-relative safe path (got %q)\n' "${home_rel}" >&2
-          exit 1
-        fi
+        validate_safe_path "${home_rel}"
 
         pdepth="${PS_PLATFORM_FETCH_DEPTH_INPUT:-1}"
         if ! [[ "${pdepth}" =~ ^[0-9]+$ ]]; then
@@ -230,14 +324,7 @@ runs:
             printf 'ERROR: platform_ref must not be empty\n' >&2
             exit 1
           fi
-          if [[ -z "${ppath}" ]]; then
-            printf 'ERROR: platform_path must not be empty\n' >&2
-            exit 1
-          fi
-          if [[ "${ppath}" == /* || "${ppath}" == *".."* ]]; then
-            printf 'ERROR: platform_path must be a repo-relative safe path (got %q)\n' "${ppath}" >&2
-            exit 1
-          fi
+          validate_safe_path "${ppath}"
         fi
 
         bundle="${PS_TOOLS_BUNDLE_INPUT:-none}"
@@ -249,59 +336,113 @@ runs:
             ;;
         esac
 
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+        }
+
         # Persist validated values
-        {
-          echo "PS_FETCH_DEPTH_VALIDATED=${depth}"
-          echo "PS_REQUIRE_FULL_HISTORY_VALIDATED=${require_full}"
-          echo "PS_HOME_DIR_VALIDATED=${home_rel}"
+        emit_env "PS_FETCH_DEPTH_VALIDATED" "${depth}"
+        emit_env "PS_REQUIRE_FULL_HISTORY_VALIDATED" "${require_full}"
+        emit_env "PS_HOME_DIR_VALIDATED" "${home_rel}"
+        emit_env "PS_HOME_ISOLATION_VALIDATED" "${isolate_home}"
+        emit_env "PS_HOME_ORIGINAL" "${HOME}"
 
-          echo "PS_SKIP_PLATFORM_VALIDATED=${skip_platform}"
-          echo "PS_PLATFORM_REPO_VALIDATED=${prepo}"
-          echo "PS_PLATFORM_REF_VALIDATED=${pref}"
-          echo "PS_PLATFORM_PATH_VALIDATED=${ppath}"
-          echo "PS_PLATFORM_FETCH_DEPTH_VALIDATED=${pdepth}"
-          echo "PS_PLATFORM_CLEAN_PATH_VALIDATED=${clean_platform}"
-          echo "PS_PLATFORM_ALLOWLIST_VALIDATED<<__PS_EOF__"
-          printf '%s\n' "${PS_PLATFORM_ALLOWLIST_INPUT:-}"
-          echo "__PS_EOF__"
+        emit_env "PS_SKIP_PLATFORM_VALIDATED" "${skip_platform}"
+        emit_env "PS_PLATFORM_REPO_VALIDATED" "${prepo}"
+        emit_env "PS_PLATFORM_REF_VALIDATED" "${pref}"
+        emit_env "PS_PLATFORM_PATH_VALIDATED" "${ppath}"
+        emit_env "PS_PLATFORM_FETCH_DEPTH_VALIDATED" "${pdepth}"
+        emit_env "PS_PLATFORM_CLEAN_PATH_VALIDATED" "${clean_platform}"
+        emit_env "PS_PLATFORM_ALLOWLIST_VALIDATED" "${PS_PLATFORM_ALLOWLIST_INPUT:-}"
 
-          echo "PS_INSTALL_TOOLS_VALIDATED=${install_tools}"
-          echo "PS_TOOLS_BUNDLE_VALIDATED=${bundle}"
-        } >> "${GITHUB_ENV}"
+        emit_env "PS_INSTALL_TOOLS_VALIDATED" "${install_tools}"
+        emit_env "PS_TOOLS_BUNDLE_VALIDATED" "${bundle}"
 
         printf 'PS.INIT: validated (repo depth=%s, platform=%s, tools=%s)\n' \
           "${depth}" \
           "$([[ "${skip_platform}" == "1" ]] && echo "off" || echo "on")" \
           "$([[ "${install_tools}" == "1" ]] && echo "${bundle}" || echo "off")"
 
-    # =========================================================================
-    # 3) CHECKOUT REPOSITORY
-    # =========================================================================
+    # -----------------------------------------------------------------------------
+    # PHASE 3: CHECKOUT REPOSITORY
+    # Logic: Deterministic repo checkout (validated fetch depth).
+    # Dependency: Git client
+    # -----------------------------------------------------------------------------
+    - name: "Section: Checkout repo (PS)"
+      shell: bash
+      run: |
+        # [PS.INIT.CHECKOUT] --------------------------------------------------------
+        # Intent: Execute deterministic repository checkout with validated inputs.
+        # Safety: set -euo pipefail (Strict mode enabled)
+        # ----------------------------------------------------------------------------
+        set -euo pipefail
+        format_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        format_sh="${format_root}/tools/scripts/branding/format.sh"
+        expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
+        if [[ -f "${format_sh}" ]]; then
+          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
+            # shellcheck source=/dev/null
+            . "${format_sh}"
+            if type -t ps_rule >/dev/null 2>&1; then
+              ps_rule
+            fi
+          else
+            printf 'PS.INIT: branding skipped (format.sh hash mismatch)\n'
+          fi
+        fi
+
     - name: Checkout repo (PS)
-      uses: ./.github/actions/ps-checkout
+      uses: ./.github/actions/ps-bootstrap/ps-checkout-repo
       with:
         fetch_depth: ${{ env.PS_FETCH_DEPTH_VALIDATED }}
         ref: ${{ inputs.checkout_ref }}
 
-    # =========================================================================
-    # 4) HOME ISOLATION
-    # =========================================================================
+    # -----------------------------------------------------------------------------
+    # PHASE 4: HOME ISOLATION
+    # Logic: Create and switch to isolated HOME to contain job artifacts.
+    # -----------------------------------------------------------------------------
     - name: Prepare HOME isolation (PS)
       id: ps_home
+      if: ${{ env.PS_HOME_ISOLATION_VALIDATED == '1' }}
       shell: bash
       run: |
+        # [PS.INIT.HOME] ------------------------------------------------------------
+        # Intent: Prepare and enable HOME/XDG isolation for the job.
+        # Safety: set -euo pipefail (Strict mode enabled)
+        # ----------------------------------------------------------------------------
         set -euo pipefail
+        format_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        format_sh="${format_root}/tools/scripts/branding/format.sh"
+        expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
+        if [[ -f "${format_sh}" ]]; then
+          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
+            # shellcheck source=/dev/null
+            . "${format_sh}"
+            if type -t ps_rule >/dev/null 2>&1; then
+              ps_rule
+            fi
+          else
+            printf 'PS.INIT: branding skipped (format.sh hash mismatch)\n'
+          fi
+        fi
         home_abs="${GITHUB_WORKSPACE}/${PS_HOME_DIR_VALIDATED}"
         mkdir -p "${home_abs}"
 
         # Apply HOME + XDG dirs (keeps tools isolated/deterministic)
         {
           echo "HOME=${home_abs}"
+          echo "HOME_ORIGINAL=${PS_HOME_ORIGINAL}"
           echo "XDG_CACHE_HOME=${home_abs}/.cache"
           echo "XDG_CONFIG_HOME=${home_abs}/.config"
           echo "XDG_STATE_HOME=${home_abs}/.state"
         } >> "${GITHUB_ENV}"
 
+        mkdir -p "${home_abs}/bin"
+        echo "${home_abs}/bin" >> "${GITHUB_PATH}"
         mkdir -p "${home_abs}/.cache" "${home_abs}/.config" "${home_abs}/.state"
         echo "home_abs=${home_abs}" >> "${GITHUB_OUTPUT}"
 
@@ -310,9 +451,34 @@ runs:
     # =========================================================================
     # 5) CHECKOUT PLATFORM (OPTIONAL)
     # =========================================================================
+    - name: "Section: Checkout platform (PS)"
+      if: ${{ env.PS_SKIP_PLATFORM_VALIDATED == '0' }}
+      shell: bash
+      run: |
+        # [PS.INIT.PLATFORM] -------------------------------------------------------
+        # Intent: Prepare environment and validate platform checkout inputs.
+        # Safety: set -euo pipefail (Strict mode enabled)
+        # ----------------------------------------------------------------------------
+        set -euo pipefail
+        format_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        format_sh="${format_root}/tools/scripts/branding/format.sh"
+        expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
+        if [[ -f "${format_sh}" ]]; then
+          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
+            # shellcheck source=/dev/null
+            . "${format_sh}"
+            if type -t ps_rule >/dev/null 2>&1; then
+              ps_rule
+            fi
+          else
+            printf 'PS.INIT: branding skipped (format.sh hash mismatch)\n'
+          fi
+        fi
+
     - name: Checkout platform (PS)
       if: ${{ env.PS_SKIP_PLATFORM_VALIDATED == '0' }}
-      uses: ./.github/actions/ps-checkout-platform
+      uses: ./.github/actions/ps-bootstrap/ps-checkout-platform
       with:
         repository: ${{ env.PS_PLATFORM_REPO_VALIDATED }}
         ref: ${{ env.PS_PLATFORM_REF_VALIDATED }}
@@ -328,17 +494,46 @@ runs:
       if: ${{ env.PS_SKIP_PLATFORM_VALIDATED == '0' }}
       shell: bash
       run: |
+        # [PS.INIT.EXPORT] ---------------------------------------------------------
+        # Intent: Export the resolved platform root into the environment for later steps.
+        # Safety: set -euo pipefail (Strict mode enabled)
+        # ----------------------------------------------------------------------------
         set -euo pipefail
         platform_abs="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
-        echo "PS_PLATFORM_ROOT=${platform_abs}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_ROOT<<__PS_ENV__\n%s\n__PS_ENV__\n' "${platform_abs}" >> "${GITHUB_ENV}"
         printf 'PS.INIT: PS_PLATFORM_ROOT=%s\n' "${platform_abs}"
 
     # =========================================================================
     # 6) INSTALL TOOLS (OPTIONAL)
     # =========================================================================
+    - name: "Section: Install tools (PS)"
+      if: ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
+      shell: bash
+      run: |
+        # [PS.INIT.INSTALL] --------------------------------------------------------
+        # Intent: Install canonical tool bundles if requested by validated inputs.
+        # Safety: set -euo pipefail (Strict mode enabled)
+        # ----------------------------------------------------------------------------
+        set -euo pipefail
+        format_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        format_sh="${format_root}/tools/scripts/branding/format.sh"
+        expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
+        if [[ -f "${format_sh}" ]]; then
+          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
+            # shellcheck source=/dev/null
+            . "${format_sh}"
+            if type -t ps_rule >/dev/null 2>&1; then
+              ps_rule
+            fi
+          else
+            printf 'PS.INIT: branding skipped (format.sh hash mismatch)\n'
+          fi
+        fi
+
     - name: Install canonical tools (PS)
       if: ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
-      uses: ./.github/actions/ps-tools
+      uses: ./.github/actions/ps-bootstrap/ps-tools
       with:
         bundle: ${{ env.PS_TOOLS_BUNDLE_VALIDATED }}
 
@@ -354,22 +549,35 @@ runs:
         set -euo pipefail
 
         repo_root="${GITHUB_WORKSPACE}"
-        platform_root=""
+        platform_root="${PS_PLATFORM_ROOT:-}"
         platform_enabled="false"
+        home_dir=""
+        home_isolation_enabled="false"
+        home_original="${PS_HOME_ORIGINAL:-}"
+
+        if [[ "${PS_HOME_ISOLATION_VALIDATED}" == "1" ]]; then
+          home_dir="${PS_HOME_ABS}"
+          home_isolation_enabled="true"
+        else
+          home_dir="${home_original}"
+        fi
 
         if [[ "${PS_SKIP_PLATFORM_VALIDATED}" == "0" ]]; then
-          platform_root="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
           platform_enabled="true"
         fi
 
         {
           echo "repo_root=${repo_root}"
-          echo "home_dir=${PS_HOME_ABS}"
+          echo "home_dir=${home_dir}"
+          echo "home_original=${home_original}"
+          echo "home_isolation_enabled=${home_isolation_enabled}"
           echo "platform_root=${platform_root}"
           echo "platform_enabled=${platform_enabled}"
+          echo "init_metadata={\"repo_root\":\"${repo_root}\",\"home_dir\":\"${home_dir}\",\"is_isolated\":${home_isolation_enabled},\"platform_enabled\":${platform_enabled},\"timestamp\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}"
         } >> "${GITHUB_OUTPUT}"
 
         printf 'PS.INIT: repo_root=%s\n' "${repo_root}"
+        printf 'PS.INIT: home_isolation=%s\n' "${home_isolation_enabled}"
         printf 'PS.INIT: platform_enabled=%s\n' "${platform_enabled}"
         printf 'PS.INIT: platform_root=%s\n' "${platform_root}"
         printf 'PS.INIT: OK\n'

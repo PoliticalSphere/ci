@@ -35,14 +35,14 @@
 # ------------------------------------------------------------------------------
 # - Deterministic and non-interactive execution
 # - Least privilege (contents: read)
-# - Hardened runner via ps-bootstrap (canonical bootstrap)
+# - Hardened runner via ps-init (canonical bootstrap)
 # - SHA-pinned external actions (enforced by Validate-CI itself)
 # - Evidence artifacts always uploaded (best-effort)
 #
 #
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
-# - ./.github/actions/ps-bootstrap
+# - ./.github/actions/ps-bootstrap/ps-init
 # - ./.github/actions/ci-validate
 # - ./.github/actions/ps-upload-artifacts
 # - tools/scripts/branding/print-section.sh (platform)
@@ -230,26 +230,42 @@ jobs:
 
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           # checkout & platform
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ inputs.checkout_ref }}
+          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
+          platform_allowed_repositories: "PoliticalSphere/ci"
           skip_platform_checkout: "0"
 
           # HOME and harden
           home_dir: ".home"
           egress_policy: audit
 
-          # node/toolchain
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-          install_dependencies: ${{ inputs.install_dependencies }}
+          install_tools: "0"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
-          # ps-bootstrap performs checkout; do not double-checkout.
-          skip_checkout: "0"
+      - name: Setup Node.js (cached)
+        if: ${{ inputs.install_dependencies == '1' && inputs.cache == '1' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: "npm"
+          cache-dependency-path: "package-lock.json"
+
+      - name: Setup Node.js
+        if: ${{ inputs.install_dependencies != '1' || inputs.cache != '1' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install repository dependencies
+        if: ${{ inputs.install_dependencies == '1' }}
+        run: npm ci --no-audit --no-fund
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 

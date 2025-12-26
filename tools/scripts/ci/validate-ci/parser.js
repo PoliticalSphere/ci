@@ -42,6 +42,7 @@ function createResult() {
     workflowPermissionsMeta: {},
     jobs: {},
     triggers: new Set(),
+    parseWarnings: [],
   };
 }
 
@@ -338,9 +339,10 @@ export function parseWorkflow(raw) {
   const lines = raw.split(/\r?\n/);
   const result = createResult();
   const state = createState();
+  let parsedDoc = null;
   try {
-    const doc = yaml.parse(raw);
-    applyTriggersFromDoc(result, doc);
+    parsedDoc = yaml.parse(raw);
+    applyTriggersFromDoc(result, parsedDoc);
   } catch {
     // Fall back to the line-based parser if YAML parsing fails.
   }
@@ -373,6 +375,28 @@ export function parseWorkflow(raw) {
   }
 
   finishStep(state, result);
+
+  if (/\s[&*][A-Za-z0-9_-]+/.test(raw)) {
+    result.parseWarnings.push({
+      code: 'YAML_ALIAS',
+      message:
+        'YAML anchor/alias detected; line-based parsing may miss overrides.',
+    });
+  }
+
+  if (parsedDoc && typeof parsedDoc === 'object' && parsedDoc.jobs) {
+    for (const [jobId, job] of Object.entries(parsedDoc.jobs)) {
+      const docSteps = Array.isArray(job?.steps) ? job.steps.length : 0;
+      const parsedSteps = result.jobs[jobId]?.steps?.length || 0;
+      if (docSteps !== parsedSteps) {
+        result.parseWarnings.push({
+          code: 'STEP_COUNT_MISMATCH',
+          message: `Step count mismatch for job '${jobId}': yaml=${docSteps} parsed=${parsedSteps}`,
+        });
+      }
+    }
+  }
+
   return result;
 }
 

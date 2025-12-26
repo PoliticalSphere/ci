@@ -20,6 +20,9 @@ meta:
   last_reviewed: 2025-12-19
   review_interval_days: 180
   governance_doc: docs/ci-policy-governance.md
+  requirements:
+    ps_init_platform_allowlist_required: true
+    ps_init_platform_allowlist_hint: "Set platform_allowed_repositories to internal CI repos only."
 
 rule_defaults: &rule_defaults
   enabled: true

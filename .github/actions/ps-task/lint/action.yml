@@ -1,49 +1,37 @@
 # ==============================================================================
-# Political Sphere — Composite Action: Lint
+# Political Sphere — Composite Action: Lint (ps-task adapter)
 # ------------------------------------------------------------------------------
 # Purpose:
-#   Run the fast lint/validation gate with platform defaults.
+#   Run the fast lint/validation gate with platform defaults via PS Task Runner.
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: execute the pre-commit lint gate script.
-#   - Does NOT: run tests, builds, or security scans.
-#
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - CI-safe with structured output
-#   - Delegates to a single script for consistency
-#
-# Dependencies:
-#   - ./.github/actions/ps-task/ps-run
-#   - tools/scripts/gates/gate-pre-commit.sh
-#
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#   - Invoked by: PR gates workflow
-#
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller (read-only expected)
-#   - Constraints: must be run after Node setup
-#
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: produced by the lint scripts (reports/**, logs/**)
-#   - CI vs local: same script used by local gates
+# Notes:
+#   - Intentionally thin: delegates execution, logging, and reporting to ps-run.
+#   - Provides safe defaults aligned with PR-gates (fast lint; no secrets scan).
 # ==============================================================================
 
 name: "Lint"
-description: "Run all lint gates"
+description: "Run fast lint gate (pre-commit style) with standardized PS reporting"
 
-inputs: {}
+inputs:
+  script:
+    description: "Gate script path (repo-relative)"
+    required: false
+    default: "tools/scripts/gates/gate-pre-commit.sh"
+
+  working_directory:
+    description: "Working directory to run from (repo-relative)"
+    required: false
+    default: "."
+
+  ps_full_scan:
+    description: "Force full scan behaviour for the lint gate (0|1)"
+    required: false
+    default: "0"
+
+  skip_secrets_scan:
+    description: "Skip secrets scan within lint gate (0|1). PR gates runs secrets separately."
+    required: false
+    default: "1"
 
 runs:
   using: "composite"
@@ -54,6 +42,23 @@ runs:
         id: "lint.gate"
         title: "Lint gate"
         description: "Run the pre-commit gate (fast lint + validation)"
-        script: "tools/scripts/gates/gate-pre-commit.sh"
+        script: ${{ inputs.script }}
+        working_directory: ${{ inputs.working_directory }}
+
+        # Preconditions (fail fast if the gate script isn't present)
         require_files: |
-          tools/scripts/gates/gate-pre-commit.sh
+          ${{ inputs.script }}
+
+        # Evidence expectations (glob-aware in upgraded ps-run)
+        artifact_paths: |
+          reports/**
+          logs/**
+
+        # Stable, explicit behaviour
+        env_kv: |
+          CI=1
+          PS_FULL_SCAN=${{ inputs.ps_full_scan }}
+          PS_SKIP_SECRETS_SCAN=${{ inputs.skip_secrets_scan }}
+
+        continue_on_error: "0"
+        allow_args: "0"

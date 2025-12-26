@@ -8,8 +8,12 @@
 #   - Validate inputs and path safety
 #   - Enforce deterministic execution
 #   - Validate required files before running
-#   - Execute script and capture logs/report JSON
+#   - Execute script and capture logs + report JSON (best-effort)
+#   - Optionally validate expected outputs via glob-aware artifact_paths
 #
+# Notes:
+#   - artifact_paths entries are treated as globs (newline-separated).
+#   - A report is written best-effort even when validation fails early.
 # ==============================================================================
 
 name: "PS Task Runner"
@@ -49,7 +53,7 @@ inputs:
     default: ""
 
   artifact_paths:
-    description: "Newline-separated list of expected output paths (repo-relative)"
+    description: "Newline-separated list of expected output paths/globs (repo-relative)"
     required: false
     default: ""
 
@@ -124,41 +128,64 @@ runs:
           fi
         }
 
+        trim() {
+          # shellcheck disable=SC2001
+          printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
+        }
+
         fail() {
           printf 'ERROR: %s\n' "$*" >&2
           exit 1
         }
 
+        # Safe repo-relative path:
+        # - not empty
+        # - not absolute
+        # - no traversal segments (/../ or ../ or ..\)
         safe_relpath() {
-          case "$1" in
-            "") return 1 ;;
-            /*) return 1 ;;
-            *".."*) return 1 ;;
-            *) return 0 ;;
+          local p="$1"
+          [[ -n "${p}" ]] || return 1
+          [[ "${p}" != /* ]] || return 1
+          [[ "${p}" != *".."* ]] || true
+          # Reject traversal segments rather than any ".." substring.
+          case "${p}" in
+            *"/../"*|../*|*/..|*"\../"*|..\\*|*\\..|*"/.."|*"..\\" ) return 1 ;;
           esac
+          return 0
         }
 
+        # ----------------------------------------------------------------------------
+        # Inputs
+        # ----------------------------------------------------------------------------
         id="${PS_TASK_ID:-}"
         title="${PS_TASK_TITLE:-}"
         desc="${PS_TASK_DESC:-}"
         script_rel="${PS_TASK_SCRIPT:-}"
-        working_directory_input="${PS_TASK_WORKDIR:-}"
-        working_directory_dash="${PS_TASK_WORKDIR_DASH:-}"
-        working_directory="${working_directory_input:-${working_directory_dash:-.}}"
+
+        workdir_input="${PS_TASK_WORKDIR:-}"
+        workdir_dash="${PS_TASK_WORKDIR_DASH:-}"
+        working_directory="${workdir_input:-${workdir_dash:-.}}"
+
         continue_on_error="${PS_TASK_CONTINUE_ON_ERROR:-0}"
         env_kv="${PS_TASK_ENV_KV:-}"
         args="${PS_TASK_ARGS:-}"
         allow_args="${PS_TASK_ALLOW_ARGS:-1}"
+        require_files="${PS_TASK_REQUIRE_FILES:-}"
+        artifact_paths="${PS_TASK_ARTIFACT_PATHS:-}"
 
         [[ -n "${id}" ]] || fail "inputs.id must not be empty"
         [[ -n "${title}" ]] || fail "inputs.title must not be empty"
         [[ -n "${script_rel}" ]] || fail "inputs.script must not be empty"
 
+        if [[ -n "${workdir_dash}" && -z "${workdir_input}" ]]; then
+          printf 'WARN: inputs.working-directory is deprecated; use inputs.working_directory\n'
+        fi
+
         if ! [[ "${id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
           fail "inputs.id must match [A-Za-z0-9._-]+ (got: ${id})"
         fi
-        if [[ "${id}" == *".."* || "${id}" == *"/"* || "${id}" == *"\\"* ]]; then
-          fail "inputs.id must not contain path separators or traversal"
+        if [[ "${id}" == *"/"* || "${id}" == *"\\"* ]]; then
+          fail "inputs.id must not contain path separators"
         fi
 
         case "${continue_on_error}" in
@@ -182,13 +209,9 @@ runs:
         script_abs="${repo_root}/${script_rel}"
         working_directory_abs="${repo_root}/${working_directory}"
 
-        if [[ ! -f "${script_abs}" ]]; then
-          fail "script not found: ${script_rel}"
-        fi
-        if [[ ! -d "${working_directory_abs}" ]]; then
-          fail "working_directory not found: ${working_directory}"
-        fi
-
+        # ----------------------------------------------------------------------------
+        # Canonical paths (declare early so we can write a report even on failure)
+        # ----------------------------------------------------------------------------
         log_rel="logs/ps-task/${id}.log"
         report_rel="reports/ps-task/${id}.report.json"
         log_abs="${repo_root}/${log_rel}"
@@ -197,24 +220,106 @@ runs:
         mkdir -p "${repo_root}/logs/ps-task" "${repo_root}/reports/ps-task"
         : > "${log_abs}"
 
+        # Tee everything into the task log
         exec > >(tee -a "${log_abs}") 2>&1
 
-        require_files="${PS_TASK_REQUIRE_FILES:-}"
+        start_ms="$(now_ms)"
+        exit_code=0
+        status="success"
+
+        write_report_best_effort() {
+          local s="${1:-failure}"
+          local ec="${2:-1}"
+          local end_ms dur
+          end_ms="$(now_ms)"
+          dur=$((end_ms - start_ms))
+
+          if command -v python3 >/dev/null 2>&1; then
+            REPORT_PATH="${report_abs}" \
+            TASK_ID="${id}" \
+            TASK_TITLE="${title}" \
+            TASK_DESC="${desc}" \
+            TASK_STATUS="${s}" \
+            TASK_EXIT_CODE="${ec}" \
+            TASK_DURATION_MS="${dur}" \
+            TASK_LOG_PATH="${log_rel}" \
+            TASK_REPORT_PATH="${report_rel}" \
+            TASK_SCRIPT="${script_rel}" \
+            TASK_WORKDIR="${working_directory}" \
+            python3 - <<'PY'
+        import json, os
+        p = {
+          "id": os.environ.get("TASK_ID",""),
+          "title": os.environ.get("TASK_TITLE",""),
+          "description": os.environ.get("TASK_DESC",""),
+          "status": os.environ.get("TASK_STATUS",""),
+          "exit_code": int(os.environ.get("TASK_EXIT_CODE","0")),
+          "duration_ms": int(os.environ.get("TASK_DURATION_MS","0")),
+          "log_path": os.environ.get("TASK_LOG_PATH",""),
+          "report_path": os.environ.get("TASK_REPORT_PATH",""),
+          "script": os.environ.get("TASK_SCRIPT",""),
+          "working_directory": os.environ.get("TASK_WORKDIR",""),
+        }
+        with open(os.environ["REPORT_PATH"], "w", encoding="utf-8") as f:
+          json.dump(p, f, indent=2, sort_keys=True)
+          f.write("\n")
+        PY
+          else
+            # Minimal fallback JSON (no python dependency)
+            cat > "${report_abs}" <<EOF
+        {
+          "id": "$(printf '%s' "${id}" | sed 's/"/\\"/g')",
+          "title": "$(printf '%s' "${title}" | sed 's/"/\\"/g')",
+          "description": "$(printf '%s' "${desc}" | sed 's/"/\\"/g')",
+          "status": "${s}",
+          "exit_code": ${ec},
+          "duration_ms": ${dur},
+          "log_path": "${log_rel}",
+          "report_path": "${report_rel}",
+          "script": "${script_rel}",
+          "working_directory": "${working_directory}"
+        }
+        EOF
+          fi
+        }
+
+        on_exit() {
+          local ec="$?"
+          if [[ "${ec}" -ne 0 ]]; then
+            status="failure"
+            exit_code="${ec}"
+          fi
+          write_report_best_effort "${status}" "${exit_code}"
+
+          {
+            echo "status=${status}"
+            echo "log_path=${log_rel}"
+            echo "report_path=${report_rel}"
+            echo "duration_ms=$(( $(now_ms) - start_ms ))"
+            echo "exit_code=${exit_code}"
+          } >> "${GITHUB_OUTPUT}"
+        }
+        trap on_exit EXIT
+
+        # ----------------------------------------------------------------------------
+        # Preconditions
+        # ----------------------------------------------------------------------------
+        [[ -f "${script_abs}" ]] || fail "script not found: ${script_rel}"
+        [[ -d "${working_directory_abs}" ]] || fail "working_directory not found: ${working_directory}"
+
         if [[ -n "${require_files}" ]]; then
           while IFS= read -r line; do
-            item="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            item="$(trim "${line}")"
             [[ -z "${item}" ]] && continue
             safe_relpath "${item}" || fail "require_files entry must be repo-relative without traversal (got: ${item})"
-            if [[ ! -f "${repo_root}/${item}" ]]; then
-              fail "required file missing: ${item}"
-            fi
+            [[ -f "${repo_root}/${item}" ]] || fail "required file missing: ${item}"
           done <<< "${require_files}"
         fi
 
-        artifact_paths="${PS_TASK_ARTIFACT_PATHS:-}"
+        # Validate artifact_paths are safe globs (we'll match them later)
         if [[ -n "${artifact_paths}" ]]; then
           while IFS= read -r line; do
-            item="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            item="$(trim "${line}")"
             [[ -z "${item}" ]] && continue
             safe_relpath "${item}" || fail "artifact_paths entry must be repo-relative without traversal (got: ${item})"
           done <<< "${artifact_paths}"
@@ -222,117 +327,80 @@ runs:
 
         printf 'PS.TASK: id=%s\n' "${id}"
         printf 'PS.TASK: title=%s\n' "${title}"
-        if [[ -n "${desc}" ]]; then
-          printf 'PS.TASK: description=%s\n' "${desc}"
-        fi
+        [[ -n "${desc}" ]] && printf 'PS.TASK: description=%s\n' "${desc}"
         printf 'PS.TASK: script=%s\n' "${script_rel}"
         printf 'PS.TASK: working_directory=%s\n' "${working_directory}"
 
-        start_ms="$(now_ms)"
-
+        # ----------------------------------------------------------------------------
+        # env_kv parsing
+        # ----------------------------------------------------------------------------
         env_args=()
         if [[ -n "${env_kv}" ]]; then
           while IFS= read -r line; do
-            entry="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+            entry="$(trim "${line}")"
             [[ -z "${entry}" ]] && continue
-            if [[ "${entry}" != *=* ]]; then
-              fail "env_kv entries must be KEY=VALUE (got: ${entry})"
-            fi
+            [[ "${entry}" == *=* ]] || fail "env_kv entries must be KEY=VALUE (got: ${entry})"
             key="${entry%%=*}"
             value="${entry#*=}"
-            if ! [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]]; then
-              fail "env_kv key must be a valid identifier (got: ${key})"
-            fi
+            [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || fail "env_kv key must be a valid identifier (got: ${key})"
             env_args+=("${key}=${value}")
           done <<< "${env_kv}"
         fi
 
+        # ----------------------------------------------------------------------------
+        # args parsing (simple; space-separated)
+        # ----------------------------------------------------------------------------
         args_array=()
         if [[ -n "${args}" ]]; then
           read -r -a args_array <<< "${args}"
         fi
 
-        exit_code=0
-        status="success"
-
+        # ----------------------------------------------------------------------------
+        # Execute
+        # ----------------------------------------------------------------------------
         set +e
         (
           cd "${working_directory_abs}"
           env "${env_args[@]}" bash "${script_abs}" "${args_array[@]}"
         )
-        exit_code=$?
+        exit_code="$?"
         set -e
 
         if [[ "${exit_code}" -ne 0 ]]; then
           status="failure"
         fi
 
-        artifact_missing=0
+        # ----------------------------------------------------------------------------
+        # Glob-aware artifact validation
+        # ----------------------------------------------------------------------------
         if [[ -n "${artifact_paths}" ]]; then
+          shopt -s globstar nullglob
+          artifact_missing=0
+
           while IFS= read -r line; do
-            item="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
-            [[ -z "${item}" ]] && continue
-            if [[ ! -e "${repo_root}/${item}" ]]; then
-              printf 'PS.TASK: missing artifact path: %s\n' "${item}"
+            pat="$(trim "${line}")"
+            [[ -z "${pat}" ]] && continue
+
+            # Evaluate glob relative to repo root
+            matches=( "${repo_root}"/${pat} )
+            if [[ "${#matches[@]}" -eq 0 ]]; then
+              printf 'PS.TASK: missing artifact glob match: %s\n' "${pat}"
               artifact_missing=1
             fi
           done <<< "${artifact_paths}"
-        fi
 
-        if [[ "${artifact_missing}" -eq 1 ]]; then
-          status="failure"
-          if [[ "${exit_code}" -eq 0 ]]; then
-            exit_code=1
+          if [[ "${artifact_missing}" -eq 1 ]]; then
+            status="failure"
+            [[ "${exit_code}" -eq 0 ]] && exit_code=1
           fi
         fi
 
-        end_ms="$(now_ms)"
-        duration_ms=$((end_ms - start_ms))
-
-        export REPORT_PATH="${report_abs}"
-        export TASK_ID="${id}"
-        export TASK_TITLE="${title}"
-        export TASK_DESC="${desc}"
-        export TASK_STATUS="${status}"
-        export TASK_EXIT_CODE="${exit_code}"
-        export TASK_DURATION_MS="${duration_ms}"
-        export TASK_LOG_PATH="${log_rel}"
-        export TASK_REPORT_PATH="${report_rel}"
-        export TASK_SCRIPT="${script_rel}"
-        export TASK_WORKDIR="${working_directory}"
-
-        python3 - <<'PY'
-import json
-import os
-
-report_path = os.environ["REPORT_PATH"]
-
-payload = {
-    "id": os.environ.get("TASK_ID", ""),
-    "title": os.environ.get("TASK_TITLE", ""),
-    "description": os.environ.get("TASK_DESC", ""),
-    "status": os.environ.get("TASK_STATUS", ""),
-    "exit_code": int(os.environ.get("TASK_EXIT_CODE", "0")),
-    "duration_ms": int(os.environ.get("TASK_DURATION_MS", "0")),
-    "log_path": os.environ.get("TASK_LOG_PATH", ""),
-    "report_path": os.environ.get("TASK_REPORT_PATH", ""),
-    "script": os.environ.get("TASK_SCRIPT", ""),
-    "working_directory": os.environ.get("TASK_WORKDIR", ""),
-}
-
-with open(report_path, "w", encoding="utf-8") as f:
-    json.dump(payload, f, indent=2, sort_keys=True)
-    f.write("\n")
-PY
-
-        {
-          echo "status=${status}"
-          echo "log_path=${log_rel}"
-          echo "report_path=${report_rel}"
-          echo "duration_ms=${duration_ms}"
-          echo "exit_code=${exit_code}"
-        } >> "${GITHUB_OUTPUT}"
-
+        # ----------------------------------------------------------------------------
+        # Exit behaviour
+        # ----------------------------------------------------------------------------
         if [[ "${status}" != "success" && "${continue_on_error}" == "0" ]]; then
           exit "${exit_code}"
         fi
+
+        # If continue_on_error=1 we still exit 0; trap will write report + outputs.
+        exit 0

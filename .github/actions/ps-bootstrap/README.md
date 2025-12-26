@@ -28,3 +28,19 @@ blocks.
 ```
 
 For full contracts, see each action's README in its directory.
+# ==============================================================================
+# Political Sphere — PS Bootstrap (README)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Security contract and operational overview for Political Sphere bootstrap actions.
+#
+# Dependencies:
+#   - ./.github/actions/ps-bootstrap/ps-harden-runner
+#   - ./.github/actions/ps-bootstrap/ps-checkout-repo
+#   - ./.github/actions/ps-bootstrap/ps-checkout-platform
+#   - ./.github/actions/ps-bootstrap/ps-init
+#   - ./.github/actions/ps-bootstrap/ps-tools
+#
+# Dependents:
+#   - Workflow jobs using the Political Sphere bootstrap sequence
+# ==============================================================================

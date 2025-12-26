@@ -47,6 +47,8 @@
     "lint:knip": "bash tools/scripts/lint/knip.sh",
     "lint:knip:affected": "bash tools/scripts/lint/affected.sh knip",
     "gate:pre-commit": "bash tools/scripts/gates/gate-pre-commit.sh",
+    "gate:inline": "PS_LINT_PRINT_MODE=inline npm run gate:pre-commit",
+    "gate:final": "PS_LINT_PRINT_MODE=final npm run gate:pre-commit",
     "gate:pre-push": "bash tools/scripts/gates/gate-pre-push.sh",
     "typecheck": "bash tools/scripts/tasks/typecheck.sh",
     "test": "bash tools/scripts/tasks/test.sh",

@@ -9,7 +9,7 @@ import fs from 'node:fs';
 import { createRequire } from 'node:module';
 import path from 'node:path';
 
-import { section } from './console.js';
+import { detail, section } from './console.js';
 import {
   extractUploadPaths,
   isActionUpload,
@@ -608,7 +608,15 @@ async function checkStepUses({
   const localActionsEnabled = localActions?.enabled !== false;
   if (isLocalAction(uses)) {
     if (!localActionsEnabled) return violations;
-    return checkLocalActionStep({ rel, uses, step, workspaceRoot });
+    const localViolations = checkLocalActionStep({
+      rel,
+      uses,
+      step,
+      workspaceRoot,
+    });
+    violations.push(...localViolations);
+    violations.push(...checkLocalActionInputs({ rel, jobId, step }));
+    return violations;
   }
 
   const remoteViolations = await checkRemoteActionStep({
@@ -622,6 +630,35 @@ async function checkStepUses({
     validateRemoteAction,
   });
   violations.push(...remoteViolations);
+
+  return violations;
+}
+
+function checkLocalActionInputs({ rel, jobId, step }) {
+  const violations = [];
+  const uses = step.uses || '';
+  const normalized = uses.startsWith('./') ? uses : `./${uses}`;
+  const allowlistRequiredFor = new Set([
+    './.github/actions/ps-bootstrap/ps-init',
+    './.github/actions/ps-init',
+  ]);
+
+  if (!allowlistRequiredFor.has(normalized)) {
+    return violations;
+  }
+
+  const allowlist = String(step.with?.platform_allowed_repositories || '');
+  if (!allowlist.trim()) {
+    violations.push(
+      makeViolation(
+        rel,
+        `ps-init requires platform_allowed_repositories allowlist in job '${jobId}'`,
+        step.startLine || 1,
+        step.startColumn || null,
+        2,
+      ),
+    );
+  }
 
   return violations;
 }
@@ -1112,11 +1149,20 @@ export async function scanWorkflows({
   quiet = false,
 }) {
   const violations = [];
+  const warnings = [];
 
   for (const wfPath of workflows) {
     const rel = path.relative(workspaceRoot, wfPath);
     const rawWf = fs.readFileSync(wfPath, 'utf8');
     const parsed = parseWorkflow(rawWf);
+    if (parsed.parseWarnings?.length) {
+      for (const warn of parsed.parseWarnings) {
+        warnings.push({ workflow: rel, ...warn });
+        if (!quiet) {
+          detail(`WARN: ${warn.message}`);
+        }
+      }
+    }
     const workflowKey = workflowKeyFromPath(rel);
 
     if (!quiet) {
@@ -1197,7 +1243,7 @@ export async function scanWorkflows({
     );
   }
 
-  return violations;
+  return { violations, warnings };
 }
 
 export async function scanActions({

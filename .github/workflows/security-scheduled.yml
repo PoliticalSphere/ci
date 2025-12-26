@@ -161,12 +161,14 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: 0
+          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
-          home_dir: ${{ runner.temp }}
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          home_dir: ".home"
           egress_policy: audit
           cache: ${{ inputs.cache || '1' }}
           install_tools: "1"
@@ -189,17 +191,17 @@ jobs:
             logs/**
           if_no_files_found: "warn"
           retention_days: 14
-        - name: Job teardown (PS)
-          if: always()
-          uses: ./.github/actions/ps-teardown
-          with:
-            summary_workflow: security-scheduled
-            summary_output_path: reports/summary/security-secrets.json
-            summary_results: secrets=${{ job.status }}
-            artifacts_name: security-secrets
-            artifacts_paths: |
-              reports/**
-              logs/**
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/security-secrets.json
+          summary_results: secrets=${{ job.status }}
+          artifacts_name: security-secrets
+          artifacts_paths: |
+            reports/**
+            logs/**
 
   # ============================================================================
   # CODEQL
@@ -214,12 +216,14 @@ jobs:
       security-events: write
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: 1
+          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
-          home_dir: ${{ runner.temp }}
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          home_dir: ".home"
           egress_policy: audit
 
       - name: Initialize CodeQL
@@ -243,16 +247,16 @@ jobs:
           path: codeql-results/**
           if_no_files_found: "warn"
           retention_days: 14
-        - name: Job teardown (PS)
-          if: always()
-          uses: ./.github/actions/ps-teardown
-          with:
-            summary_workflow: security-scheduled
-            summary_output_path: reports/summary/codeql.json
-            summary_results: codeql=${{ job.status }}
-            artifacts_name: codeql-sarif
-            artifacts_paths: |
-              codeql-results/**
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/codeql.json
+          summary_results: codeql=${{ job.status }}
+          artifacts_name: codeql-sarif
+          artifacts_paths: |
+            codeql-results/**
 
   # ============================================================================
   # SEMGREP
@@ -267,12 +271,14 @@ jobs:
       security-events: write
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: 1
+          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
-          home_dir: ${{ runner.temp }}
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          home_dir: ".home"
           egress_policy: audit
 
       - name: Run Semgrep (SARIF)
@@ -290,16 +296,16 @@ jobs:
           path: semgrep.sarif
           if_no_files_found: "warn"
           retention_days: 14
-        - name: Job teardown (PS)
-          if: always()
-          uses: ./.github/actions/ps-teardown
-          with:
-            summary_workflow: security-scheduled
-            summary_output_path: reports/summary/semgrep.json
-            summary_results: semgrep=${{ job.status }}
-            artifacts_name: semgrep-sarif
-            artifacts_paths: |
-              semgrep-results/**
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/semgrep.json
+          summary_results: semgrep=${{ job.status }}
+          artifacts_name: semgrep-sarif
+          artifacts_paths: |
+            semgrep-results/**
 
   # ============================================================================
   # FINAL AGGREGATION — SUMMARY
@@ -314,11 +320,13 @@ jobs:
       contents: read
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: 1
+          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref || 'main' }}
           platform_path: ".ps-platform"
+          platform_allowed_repositories: "PoliticalSphere/ci"
           home_dir: ".home"
           egress_policy: audit
 
@@ -340,17 +348,17 @@ jobs:
           path: reports/summary/security-scheduled.json
           if_no_files_found: "warn"
           retention_days: 14
-        - name: Job teardown (PS)
-          if: always()
-          uses: ./.github/actions/ps-teardown
-          with:
-            summary_workflow: security-scheduled
-            summary_output_path: reports/summary/security-scheduled.json
-            summary_results: |
-              validate-ci=${{ needs.validate-ci.result }}
-              secrets=${{ needs.secrets.result }}
-              codeql=${{ needs.codeql.result }}
-              semgrep=${{ needs.semgrep.result }}
-            artifacts_name: security-summary
-            artifacts_paths: |
-              reports/summary/**
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/security-scheduled.json
+          summary_results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            secrets=${{ needs.secrets.result }}
+            codeql=${{ needs.codeql.result }}
+            semgrep=${{ needs.semgrep.result }}
+          artifacts_name: security-summary
+          artifacts_paths: |
+            reports/summary/**

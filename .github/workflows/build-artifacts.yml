@@ -40,7 +40,7 @@
 # - Deterministic, non-interactive execution
 # - Least privilege at workflow and job level
 # - Validate-CI MUST pass before any build executes
-# - Single canonical bootstrap path for build (ps-bootstrap)
+# - Single canonical bootstrap path for build (ps-init)
 # - Evidence-first: artifacts + summary best-effort even on failure
 #
 # ==============================================================================
@@ -227,15 +227,37 @@ jobs:
     steps:
       - name: Job setup (PS)
         id: job_setup
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
-          skip_checkout: "0"          # Handles source checkout automatically
-          platform_repository: ${{ inputs.platform_repository }}
+          fetch_depth: ${{ inputs.fetch_depth }}
+          checkout_ref: ""
+          platform_repo: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          install_dependencies: "1"   # Install dependencies (npm ci) so build scripts can run
-          egress_policy: audit         # Allow outbound network as needed for builds (telemetry, registries)
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: ${{ inputs.platform_repository }}
+          skip_platform_checkout: "0"
+          egress_policy: audit        # Allow outbound network as needed for builds (telemetry, registries)
+          install_tools: "0"
+
+      - name: Setup Node.js (cached)
+        if: ${{ inputs.cache == '1' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
+          cache: "npm"
+          cache-dependency-path: ${{ inputs.working_directory }}/package-lock.json
+
+      - name: Setup Node.js
+        if: ${{ inputs.cache != '1' }}
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
+
+      - name: Install repository dependencies
+        run: npm ci --no-audit --no-fund
+        working-directory: ${{ inputs.working_directory }}
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
       - name: Build (PS)
         id: build
@@ -249,7 +271,7 @@ jobs:
         uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
         with:
           name: platform-snapshot
-          path: ${{ steps.job_setup.outputs.platform_path }}/tools/scripts/branding/**
+          path: ${{ steps.job_setup.outputs.platform_root }}/tools/scripts/branding/**
           if-no-files-found: "warn"
           retention-days: ${{ inputs.retention_days }}
 
@@ -299,15 +321,12 @@ jobs:
         # ps-bootstrap will download a platform snapshot when invoked with
         # skip_platform_checkout: "true". This centralizes snapshot handling
         # and sets PS_PLATFORM_ROOT when the snapshot is present.
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
-          skip_checkout: "0"                # Let ps-bootstrap checkout the consumer repo
           fetch_depth: ${{ inputs.fetch_depth }}
           skip_platform_checkout: "true"    # Do not checkout the platform repo in summary (we use artifact snapshot)
-          install_dependencies: "0"         # No npm ci
-          install_tools: "0"                # No extra binaries
           egress_policy: block
-          home_dir: ${{ runner.temp }}
+          install_tools: "0"
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary
@@ -328,16 +347,15 @@ jobs:
           retention_days: ${{ inputs.retention_days }}
           compression_level: 9 # Max compression for small JSON reports
 
-        - name: Job teardown (PS)
-          if: always()
-          uses: ./.github/actions/ps-teardown
-          with:
-            summary_workflow: build-artifacts
-            summary_output_path: reports/summary/build-artifacts.json
-            summary_results: |
-              validate-ci=${{ needs.validate-ci.result }}
-              build=${{ needs.build.result }}
-            artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
-            artifacts_paths: |
-              ${{ inputs.artifact_paths }}
-          output_path: "reports/summary/build-artifacts.json"
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: build-artifacts
+          summary_output_path: reports/summary/build-artifacts.json
+          summary_results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            build=${{ needs.build.result }}
+          artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}

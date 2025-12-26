@@ -6,6 +6,7 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 # Purpose:
 #   Install pinned CLI tools for CI gates (lint/security) using tooling.env.
+#   Tools must be installed as real binaries inside install_dir (no external symlinks).
 #
 # Usage:
 #   install-tools.sh <tool> [<tool> ...]
@@ -52,6 +53,22 @@ if [[ "${RUNNER_OS:-}" != "Linux" ]]; then
   error "install-tools supports Linux runners only."
   exit 1
 fi
+
+detect_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) return 1 ;;
+  esac
+}
+
+ARCH="$(detect_arch)" || { error "unsupported architecture: $(uname -m)"; exit 1; }
+
+ACTIONLINT_ARCH="${ARCH}"
+SHELLCHECK_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "x86_64" || echo "aarch64")"
+HADOLINT_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "x86_64" || echo "arm64")"
+GITLEAKS_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "x64" || echo "arm64")"
+TRIVY_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "64bit" || echo "ARM64")"
 
 if [[ "${#}" -eq 0 ]]; then
   error "install-tools requires at least one tool name."
@@ -107,10 +124,16 @@ install_actionlint() {
   require_cmd curl
   require_cmd sha256sum
   require_var ACTIONLINT_VERSION
-  require_var ACTIONLINT_SHA256
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var ACTIONLINT_SHA256_ARM64
+    ACTIONLINT_SHA="${ACTIONLINT_SHA256_ARM64}"
+  else
+    require_var ACTIONLINT_SHA256
+    ACTIONLINT_SHA="${ACTIONLINT_SHA256}"
+  fi
   curl -fsSL -o "${_tmpdir}/actionlint.tar.gz" \
-    "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-  printf '%s\n' "${ACTIONLINT_SHA256}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
+    "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ACTIONLINT_ARCH}.tar.gz"
+  printf '%s\n' "${ACTIONLINT_SHA}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/actionlint.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/actionlint" "${install_dir}/actionlint"
 
@@ -122,10 +145,16 @@ install_shellcheck() {
   require_cmd curl
   require_cmd sha256sum
   require_var SHELLCHECK_VERSION
-  require_var SHELLCHECK_SHA256
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var SHELLCHECK_SHA256_ARM64
+    SHELLCHECK_SHA="${SHELLCHECK_SHA256_ARM64}"
+  else
+    require_var SHELLCHECK_SHA256
+    SHELLCHECK_SHA="${SHELLCHECK_SHA256}"
+  fi
   curl -fsSL -o "${_tmpdir}/shellcheck.tar.xz" \
-    "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-  printf '%s\n' "${SHELLCHECK_SHA256}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
+    "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SHELLCHECK_ARCH}.tar.xz"
+  printf '%s\n' "${SHELLCHECK_SHA}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
   tar -xJf "${_tmpdir}/shellcheck.tar.xz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${install_dir}/shellcheck"
 
@@ -137,10 +166,16 @@ install_hadolint() {
   require_cmd curl
   require_cmd sha256sum
   require_var HADOLINT_VERSION
-  require_var HADOLINT_SHA256
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var HADOLINT_SHA256_ARM64
+    HADOLINT_SHA="${HADOLINT_SHA256_ARM64}"
+  else
+    require_var HADOLINT_SHA256
+    HADOLINT_SHA="${HADOLINT_SHA256}"
+  fi
   curl -fsSL -o "${_tmpdir}/hadolint" \
-    "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
-  printf '%s\n' "${HADOLINT_SHA256}  ${_tmpdir}/hadolint" | sha256sum -c -
+    "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HADOLINT_ARCH}"
+  printf '%s\n' "${HADOLINT_SHA}  ${_tmpdir}/hadolint" | sha256sum -c -
   install -m 0755 "${_tmpdir}/hadolint" "${install_dir}/hadolint"
 
   return 0
@@ -190,10 +225,16 @@ install_gitleaks() {
   require_cmd curl
   require_cmd sha256sum
   require_var GITLEAKS_VERSION
-  require_var GITLEAKS_SHA256
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var GITLEAKS_SHA256_ARM64
+    GITLEAKS_SHA="${GITLEAKS_SHA256_ARM64}"
+  else
+    require_var GITLEAKS_SHA256
+    GITLEAKS_SHA="${GITLEAKS_SHA256}"
+  fi
   curl -fsSL -o "${_tmpdir}/gitleaks.tar.gz" \
-    "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-  printf '%s\n' "${GITLEAKS_SHA256}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
+    "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz"
+  printf '%s\n' "${GITLEAKS_SHA}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/gitleaks.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/gitleaks" "${install_dir}/gitleaks"
 
@@ -205,10 +246,16 @@ install_trivy() {
   require_cmd curl
   require_cmd sha256sum
   require_var TRIVY_VERSION
-  require_var TRIVY_SHA256
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var TRIVY_SHA256_ARM64
+    TRIVY_SHA="${TRIVY_SHA256_ARM64}"
+  else
+    require_var TRIVY_SHA256
+    TRIVY_SHA="${TRIVY_SHA256}"
+  fi
   curl -fsSL -o "${_tmpdir}/trivy.tar.gz" \
-    "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-  printf '%s\n' "${TRIVY_SHA256}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
+    "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz"
+  printf '%s\n' "${TRIVY_SHA}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/trivy.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/trivy" "${install_dir}/trivy"
 

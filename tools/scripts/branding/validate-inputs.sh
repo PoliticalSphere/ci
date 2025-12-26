@@ -19,7 +19,13 @@ v_error() {
   if type -t ps_error >/dev/null 2>&1; then
     ps_error "$*"
   else
-    echo "ERROR: $*" >&2
+    if [[ "${GITHUB_ACTIONS:-}" == "true" ]]; then
+      echo "::error::$*" >&2
+    elif [[ -t 2 && -z "${NO_COLOR:-}" ]]; then
+      printf '\033[31mERROR:\033[0m %s\n' "$*" >&2
+    else
+      echo "ERROR: $*" >&2
+    fi
   fi
   return 0
 }

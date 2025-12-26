@@ -11,13 +11,19 @@
 # created: 2025-12-26
 # last_updated: 2025-12-26
 #
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-bootstrap/ps-init
 #
 # PURPOSE
 # ------------------------------------------------------------------------------
 # Standardise *platform repository* checkout with validated inputs, pinned
 # dependencies, and stable outputs. This is intentionally separate from target
 # repository checkout to keep semantics unambiguous and contracts stable.
-#
 #
 # DESIGN PRINCIPLES
 # ------------------------------------------------------------------------------
@@ -26,6 +32,21 @@
 # - Safe path handling (repo-relative, no traversal)
 # - Optional guardrails for internal-only platform repos
 # - Emits stable outputs for downstream steps (telemetry + reuse)
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 0 — Critical (this action controls platform repo ingress and trust
+#                    boundaries for shared CI scripts)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents unauthorized platform repository access, workspace escape,
+#          and stale artifact reuse through strict allowlisting and path checks.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Records validated platform checkout parameters via logs and outputs to
+# support traceability in CI audits.
 #
 # ==============================================================================
 
@@ -112,6 +133,26 @@ runs:
       run: |
         set -euo pipefail
 
+        format_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh"
+        if [[ -f "${format_sh}" ]]; then
+          # shellcheck source=/dev/null
+          . "${format_sh}"
+        fi
+
+        log_info() {
+          if type -t ps_detail >/dev/null 2>&1; then
+            ps_detail "$*"
+          else
+            printf 'PS.CHECKOUT.PLATFORM: %s\n' "$*"
+          fi
+        }
+
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+        }
+
         repo="${PS_REPOSITORY_INPUT:-}"
         if [[ -z "${repo}" ]]; then
           printf 'ERROR: inputs.repository is required\n' >&2
@@ -122,14 +163,23 @@ runs:
           exit 1
         fi
 
-        # Optional allowlist guard (high value for internal platform safety)
         allowlist="${PS_ALLOWED_REPOSITORIES_INPUT:-}"
+        if [[ -z "${allowlist}" ]]; then
+          owner="${repo%%/*}"
+          if [[ "${owner}" != "PoliticalSphere" ]]; then
+            printf 'ERROR: inputs.repository owner must be PoliticalSphere unless allowlisted (got %q)\n' "${repo}" >&2
+            exit 1
+          fi
+        fi
+
+        # Optional allowlist guard (high value for internal platform safety)
         if [[ -n "${allowlist}" ]]; then
           allowed="0"
           while IFS= read -r line; do
-            [[ -z "${line}" ]] && continue
-            [[ "${line}" =~ ^[[:space:]]*# ]] && continue
-            if [[ "${line}" == "${repo}" ]]; then
+            tool_trim="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
+            [[ -z "${tool_trim}" ]] && continue
+            [[ "${tool_trim}" == "#"* ]] && continue
+            if [[ "${tool_trim}" == "${repo}" ]]; then
               allowed="1"
               break
             fi
@@ -191,23 +241,23 @@ runs:
           exit 1 ;;
         esac
 
-        printf 'PS_PLATFORM_REPO_VALIDATED=%s\n' "${repo}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_REF_VALIDATED=%s\n' "${ref}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_PATH_VALIDATED=%s\n' "${path}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_FETCH_DEPTH_VALIDATED=%s\n' "${depth}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_PERSIST_CREDENTIALS_VALIDATED=%s\n' "${pc}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_SUBMODULES_VALIDATED=%s\n' "${sm}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_REQUIRE_FULL_HISTORY_VALIDATED=%s\n' "${req}" >> "${GITHUB_ENV}"
-        printf 'PS_PLATFORM_CLEAN_PATH_VALIDATED=%s\n' "${clean}" >> "${GITHUB_ENV}"
+        emit_env "PS_PLATFORM_REPO_VALIDATED" "${repo}"
+        emit_env "PS_PLATFORM_REF_VALIDATED" "${ref}"
+        emit_env "PS_PLATFORM_PATH_VALIDATED" "${path}"
+        emit_env "PS_PLATFORM_FETCH_DEPTH_VALIDATED" "${depth}"
+        emit_env "PS_PLATFORM_PERSIST_CREDENTIALS_VALIDATED" "${pc}"
+        emit_env "PS_PLATFORM_SUBMODULES_VALIDATED" "${sm}"
+        emit_env "PS_PLATFORM_REQUIRE_FULL_HISTORY_VALIDATED" "${req}"
+        emit_env "PS_PLATFORM_CLEAN_PATH_VALIDATED" "${clean}"
 
-        printf 'PS.CHECKOUT.PLATFORM: repository=%s\n' "${repo}"
-        printf 'PS.CHECKOUT.PLATFORM: ref=%s\n' "${ref}"
-        printf 'PS.CHECKOUT.PLATFORM: path=%s\n' "${path}"
-        printf 'PS.CHECKOUT.PLATFORM: fetch_depth=%s\n' "${depth}"
-        printf 'PS.CHECKOUT.PLATFORM: require_full_history=%s\n' "${req}"
-        printf 'PS.CHECKOUT.PLATFORM: persist_credentials=%s\n' "${pc}"
-        printf 'PS.CHECKOUT.PLATFORM: submodules=%s\n' "${sm}"
-        printf 'PS.CHECKOUT.PLATFORM: clean_path=%s\n' "${clean}"
+        log_info "repository=${repo}"
+        log_info "ref=${ref}"
+        log_info "path=${path}"
+        log_info "fetch_depth=${depth}"
+        log_info "require_full_history=${req}"
+        log_info "persist_credentials=${pc}"
+        log_info "submodules=${sm}"
+        log_info "clean_path=${clean}"
 
     - name: Clean platform path (optional)
       if: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == 'true' }}

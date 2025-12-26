@@ -23,7 +23,7 @@
 #
 # Dependencies:
 #   - actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
-#   - tools/scripts/actions/ps-upload-artifacts-validate.sh
+#   - tools/scripts/actions/ps-teardown/ps-upload-artifacts/ps-upload-artifacts-validate.sh
 #   - tools/scripts/branding/validate-inputs.sh
 #
 # Dependents:
@@ -90,7 +90,7 @@ runs:
         PS_NOFILES: ${{ inputs.if_no_files_found }}
         PS_PATHS: ${{ inputs.path }}
         PS_COMPRESSION_LEVEL: ${{ inputs.compression_level }}
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-upload-artifacts-validate.sh"
+      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown/ps-upload-artifacts/ps-upload-artifacts-validate.sh"
     - name: Upload artifacts
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
       with:

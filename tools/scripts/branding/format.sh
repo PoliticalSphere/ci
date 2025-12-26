@@ -61,7 +61,10 @@ PS_FMT_BOLD="${PS_FMT_BOLD:-$'\033[1m'}"
 # Build the shared rule line exactly once
 PS_FMT_RULE="${PS_FMT_RULE:-}"
 if [[ -z "${PS_FMT_RULE}" ]]; then
-  PS_FMT_RULE="$(printf "%*s" "${PS_FMT_WIDTH}" "" | tr " " "${PS_FMT_RULE_CHAR}")"
+  PS_FMT_RULE=""
+  for ((i = 0; i < PS_FMT_WIDTH; i++)); do
+    PS_FMT_RULE+="${PS_FMT_RULE_CHAR}"
+  done
 fi
 
 # ----------------------------
@@ -74,6 +77,10 @@ ps_supports_color() {
   fi
   # FORCE_COLOR: treat any non-zero as "enable"
   if [[ "${FORCE_COLOR:-0}" != "0" ]]; then
+    return 0
+  fi
+  # COLORTERM: common modern color indicator
+  if [[ "${COLORTERM:-}" == "truecolor" || "${COLORTERM:-}" == "24bit" ]]; then
     return 0
   fi
   [[ -t 1 && -n "${TERM:-}" && "${TERM}" != "dumb" ]] && return 0 || return 1
@@ -134,6 +141,14 @@ ps_info() {
   return 0
 }
 
+ps_header() {
+  local msg="${PS_FMT_DETAIL_INDENT}$*"
+  ps_rule
+  _ps_print 1 "${PS_FMT_BOLD}" "${PS_FMT_RESET}" "${msg}"
+  ps_rule
+  return 0
+}
+
 ps_ok() {
   if ps_supports_color; then
     _ps_print 1 $'\033[1m\033[32m' "${PS_FMT_RESET}" "${PS_FMT_ICON} OK: $*"
@@ -162,6 +177,10 @@ ps_error() {
 }
 
 ps_die() {
-  ps_error "$*"
+  local loc=""
+  if [[ -n "${BASH_SOURCE[1]:-}" && -n "${BASH_LINENO[0]:-}" ]]; then
+    loc=" (${BASH_SOURCE[1]}:${BASH_LINENO[0]})"
+  fi
+  ps_error "$*${loc}"
   exit 1
 }

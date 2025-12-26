@@ -11,6 +11,21 @@
 # created: 2025-12-26
 # last_updated: 2025-12-26
 #
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh
+# - tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh
+# - tools/scripts/actions/ps-tools/ps-tools-assemble.sh
+# - tools/scripts/actions/ps-tools/ps-tools-install.sh
+# - tools/scripts/ci/install-tools.sh
+# - configs/security/*.env (version pins for tooling)
+# - actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 (optional, when cache_tools=1)
+# - ./.github/actions/ps-task/ps-run (optional, when run_security_scans=1)
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-bootstrap/ps-init (optional tools install)
+#
 #
 # PURPOSE
 # ------------------------------------------------------------------------------
@@ -43,6 +58,21 @@
 #       tools (explicit) > bundle + extra_tools
 # - Safe-by-default path handling (deny traversal/absolute paths)
 # - Delegation to versioned scripts for complex logic
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 0 — Critical (this action installs executable tooling that will run
+#                    inside the job)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents tool supply-chain attacks, stale binary reuse, and path
+#          traversal/symlink escapes by enforcing deterministic installs.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Records tool selection, cache status, and install outputs via logs, outputs,
+# and step summary to support auditability.
 #
 # ==============================================================================
 
@@ -84,6 +114,11 @@ inputs:
     required: false
     default: "0"
 
+  cache_tools:
+    description: "Enable caching for installed tools (0/1/true/false)"
+    required: false
+    default: "false"
+
 outputs:
   resolved_tools:
     description: "Final newline-separated tool ids selected for install (post validation/assembly)"
@@ -100,8 +135,12 @@ runs:
     # 0) ROOT RESOLUTION (STANDARD CONTRACT)
     # ==========================================================================
     - name: Resolve platform/workspace roots (PS)
+      id: ps_tools_resolve_root
       shell: bash
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-resolve-root.sh"
+      run: |
+        set -euo pipefail
+        scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh"
 
     # ==========================================================================
     # 1) INPUT VALIDATION (DEFENSIVE)
@@ -114,28 +153,36 @@ runs:
         PS_EXTRA_INPUT: ${{ inputs.extra_tools }}
         PS_TOOLS_INPUT: ${{ inputs.tools }}
         PS_RUN_SECURITY_SCANS_INPUT: ${{ inputs.run_security_scans }}
+        PS_CACHE_TOOLS_INPUT: ${{ inputs.cache_tools }}
       run: |
         set -euo pipefail
 
-        # --- install_dir hardening (defense-in-depth; scripts may also validate) ---
-        install_dir="${PS_INSTALL_DIR_INPUT:-.tooling/bin}"
-        if [[ -z "${install_dir}" ]]; then
-          echo "ERROR: inputs.install_dir must not be empty" >&2
-          exit 1
-        fi
-        if [[ "${install_dir}" == /* || "${install_dir}" == *".."* ]]; then
-          echo "ERROR: inputs.install_dir must be repo-relative and must not contain '..' or be absolute (got: ${install_dir})" >&2
-          exit 1
-        fi
+        norm_bool() {
+          local val
+          val="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+          case "${val}" in
+            1|true|yes|y|on)  echo "1" ;;
+            0|false|no|n|off|"") echo "0" ;;
+            *) return 1 ;;
+          esac
+        }
 
-        # --- basic toggle validation ---
-        case "${PS_RUN_SECURITY_SCANS_INPUT}" in
-          0|1) ;;
-          *) echo "ERROR: inputs.run_security_scans must be '0' or '1' (got: ${PS_RUN_SECURITY_SCANS_INPUT})" >&2; exit 1 ;;
-        esac
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+        }
+
+        # --- basic toggle validation (GitHub-specific sanitization) ---
+        run_scans="$(norm_bool "${PS_RUN_SECURITY_SCANS_INPUT}")" || { echo "ERROR: inputs.run_security_scans must be 0/1/true/false (got: ${PS_RUN_SECURITY_SCANS_INPUT})" >&2; exit 1; }
+        cache_tools="$(norm_bool "${PS_CACHE_TOOLS_INPUT}")" || { echo "ERROR: inputs.cache_tools must be 0/1/true/false (got: ${PS_CACHE_TOOLS_INPUT})" >&2; exit 1; }
 
         # Delegate canonical validation + normalisation to scripts
-        bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-validate-inputs.sh"
+        scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh"
+
+        emit_env "PS_RUN_SECURITY_SCANS_VALIDATED" "${run_scans}"
+        emit_env "PS_CACHE_TOOLS_VALIDATED" "${cache_tools}"
 
         printf 'PS.TOOLS: inputs validated\n'
 
@@ -143,46 +190,171 @@ runs:
     # 2) TOOL LIST ASSEMBLY (PRECEDENCE + DEDUP)
     # ==========================================================================
     - name: Assemble tool list (PS)
+      id: ps_tools_assemble
       shell: bash
       env:
-        PS_BUNDLE_INPUT: ${{ inputs.bundle }}
-        PS_EXTRA_INPUT: ${{ inputs.extra_tools }}
+        PS_BUNDLE_INPUT: ${{ inputs.tools != '' && '' || inputs.bundle }}
+        PS_EXTRA_INPUT: ${{ inputs.tools != '' && '' || inputs.extra_tools }}
         PS_TOOLS_INPUT: ${{ inputs.tools }}
+        PS_TOOLS_OUTPUT_NAME: tools
       run: |
         set -euo pipefail
-        bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-assemble.sh"
+        scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-assemble.sh"
 
-        if [[ -z "${PS_TOOLS:-}" ]]; then
-          echo "PS.TOOLS: nothing to install (PS_TOOLS empty)"
-        else
-          echo "PS.TOOLS: resolved tool list:"
-          printf '%s\n' "${PS_TOOLS}"
+    - name: Prepare tools bin path (PS)
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+      run: |
+        set -euo pipefail
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+        }
+
+        install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+        emit_env "PS_TOOLS_BIN" "${install_dir_abs}"
+        printf '%s\n' "${install_dir_abs}" >> "${GITHUB_PATH}"
+
+    - name: Compute cache key (PS)
+      id: ps_tools_cache
+      if: ${{ env.PS_CACHE_TOOLS_VALIDATED == '1' }}
+      shell: bash
+      env:
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${PS_RESOLVED_TOOLS}" ]]; then
+          echo "PS.TOOLS: no tools resolved, skipping cache key"
+          echo "cache_key=" >> "${GITHUB_OUTPUT}"
+          echo "cache_path=" >> "${GITHUB_OUTPUT}"
+          exit 0
         fi
+
+        while IFS= read -r tool || [[ -n "${tool}" ]]; do
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          [[ -z "${tool_trim}" ]] && continue
+          if ! printf '%s' "${tool_trim}" | grep -Eq '^[a-z0-9-]+$'; then
+            echo "ERROR: invalid tool id in resolved tools: ${tool_trim}" >&2
+            exit 1
+          fi
+        done <<< "${PS_RESOLVED_TOOLS}"
+
+        tools_hash="$(python3 -c "import hashlib, os; print(hashlib.sha256(os.environ.get('PS_RESOLVED_TOOLS','').encode('utf-8')).hexdigest())")"
+        export PS_SCRIPTS_ROOT="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        installer_hash="$(python3 -c "import hashlib, os; root=os.environ.get('PS_SCRIPTS_ROOT') or os.environ.get('GITHUB_WORKSPACE',''); path=os.path.join(root, 'tools/scripts/actions/ps-tools/ps-tools-install.sh'); print(hashlib.sha256(open(path,'rb').read()).hexdigest()) if os.path.exists(path) else print('default-version')")"
+        helper_hash="$(python3 -c $'import glob,hashlib,os\nroot=os.environ.get(\"PS_SCRIPTS_ROOT\") or os.environ.get(\"GITHUB_WORKSPACE\",\"\")\npaths=[os.path.join(root,\"tools/scripts/ci/install-tools.sh\")]\npaths+=glob.glob(os.path.join(root,\"configs/security\",\"*.env\"))\npaths=sorted(set(paths))\nh=hashlib.sha256()\nfound=False\nfor p in paths:\n    if os.path.exists(p):\n        with open(p,\"rb\") as f: h.update(f.read()); found=True\nprint(h.hexdigest() if found else \"default-version\")')"
+        cache_key="ps-tools-${RUNNER_OS}-${installer_hash}-${helper_hash}-${tools_hash}"
+        cache_path="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+
+        echo "cache_key=${cache_key}" >> "${GITHUB_OUTPUT}"
+        echo "cache_path=${cache_path}" >> "${GITHUB_OUTPUT}"
+
+    - name: Restore tools cache (PS)
+      if: ${{ env.PS_CACHE_TOOLS_VALIDATED == '1' && steps.ps_tools_cache.outputs.cache_key != '' }}
+      id: restore_tools_cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      with:
+        path: ${{ steps.ps_tools_cache.outputs.cache_path }}
+        key: ${{ steps.ps_tools_cache.outputs.cache_key }}
 
     # ==========================================================================
     # 3) INSTALL (PINNED INSTALLER)
     # ==========================================================================
     - name: Install tools (PS)
+      if: ${{ env.PS_CACHE_TOOLS_VALIDATED != '1' || steps.restore_tools_cache.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         PS_SCRIPTS_ROOT: ${{ env.PS_SCRIPTS_ROOT }}
         PS_INSTALL_DIR: ${{ inputs.install_dir }}
-        PS_TOOLS: ${{ env.PS_TOOLS }}
+        PS_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
       run: |
         set -euo pipefail
 
         # Ensure install directory exists (repo-relative)
         mkdir -p "${GITHUB_WORKSPACE}/${PS_INSTALL_DIR}"
 
-        bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-install.sh"
+        scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-install.sh"
 
         printf 'PS.TOOLS: install complete\n'
+
+    - name: Verify tools install (PS)
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+      run: |
+        set -euo pipefail
+
+        install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+
+        if [[ -z "${PS_RESOLVED_TOOLS}" ]]; then
+          echo "PS.TOOLS: no tools resolved for verification"
+          exit 0
+        fi
+
+        while IFS= read -r tool || [[ -n "${tool}" ]]; do
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          [[ -z "${tool_trim}" ]] && continue
+          tool_path="${install_dir_abs}/${tool_trim}"
+          if [[ ! -e "${tool_path}" ]]; then
+            echo "ERROR: tool not found after install/cache restore: ${tool_trim}" >&2
+            exit 1
+          fi
+          if [[ -L "${tool_path}" && ! -e "${tool_path}" ]]; then
+            echo "ERROR: broken symlink for tool: ${tool_trim}" >&2
+            exit 1
+          fi
+          if [[ -L "${tool_path}" ]]; then
+            link_target="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "${tool_path}")"
+            if [[ "${link_target}" != "${install_dir_abs}/"* ]]; then
+              echo "ERROR: tool symlink escapes install_dir: ${tool_trim}" >&2
+              exit 1
+            fi
+          fi
+          chmod +x "${tool_path}" || true
+        done <<< "${PS_RESOLVED_TOOLS}"
+
+    - name: Write summary (PS)
+      shell: bash
+      env:
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+        PS_CACHE_ENABLED: ${{ env.PS_CACHE_TOOLS_VALIDATED }}
+        PS_CACHE_HIT: ${{ steps.restore_tools_cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+
+        echo "### PS Tools Summary" >> "${GITHUB_STEP_SUMMARY}"
+
+        status="installed"
+        if [[ "${PS_CACHE_ENABLED}" == "1" && "${PS_CACHE_HIT}" == "true" ]]; then
+          status="restored"
+        fi
+
+        if [[ -z "${PS_RESOLVED_TOOLS}" ]]; then
+          echo "- Tools: none" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- Status: skipped" >> "${GITHUB_STEP_SUMMARY}"
+          exit 0
+        fi
+
+        echo "- Status: ${status}" >> "${GITHUB_STEP_SUMMARY}"
+        echo "- Tools:" >> "${GITHUB_STEP_SUMMARY}"
+        while IFS= read -r tool || [[ -n "${tool}" ]]; do
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          [[ -z "${tool_trim}" ]] && continue
+          echo "  - ${tool_trim}" >> "${GITHUB_STEP_SUMMARY}"
+        done <<< "${PS_RESOLVED_TOOLS}"
 
     # ==========================================================================
     # 4) OPTIONAL: FAST SECURITY TASKS
     # ==========================================================================
     - name: Run secrets scan (fast) (PS)
-      if: ${{ inputs.run_security_scans == '1' }}
+      if: ${{ env.PS_RUN_SECURITY_SCANS_VALIDATED == '1' }}
       uses: ./.github/actions/ps-task/ps-run
       with:
         id: "secrets.fast"
@@ -191,6 +363,8 @@ runs:
         script: "tools/scripts/security/secret-scan-pr.sh"
         require_files: |
           tools/scripts/security/secret-scan-pr.sh
+      env:
+        PS_TOOLS_BIN: ${{ env.PS_TOOLS_BIN }}
 
     # ==========================================================================
     # 5) OUTPUTS (STABLE CONTRACT)
@@ -200,16 +374,17 @@ runs:
       shell: bash
       env:
         PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
       run: |
         set -euo pipefail
 
         install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
         printf 'install_dir_abs=%s\n' "${install_dir_abs}" >> "${GITHUB_OUTPUT}"
 
-        # PS_TOOLS is expected to be newline-separated (may be empty)
+        # PS_RESOLVED_TOOLS is expected to be newline-separated (may be empty)
         {
           echo "resolved_tools<<'EOF'"
-          printf '%s\n' "${PS_TOOLS:-}"
+          printf '%s\n' "${PS_RESOLVED_TOOLS:-}"
           echo "EOF"
         } >> "${GITHUB_OUTPUT}"
 

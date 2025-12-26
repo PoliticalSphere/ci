@@ -238,25 +238,24 @@ jobs:
       PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          checkout_ref: ${{ inputs.release_ref }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: "0"
-
-          skip_checkout: "0"
-          checkout_ref: ${{ inputs.release_ref }}
-
-          install_dependencies: "0"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
+
+      - name: Setup Node.js (PS)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
 
       - name: Compute release plan (no mutation)
         uses: ./.github/actions/ps-run
@@ -298,25 +297,24 @@ jobs:
       PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          checkout_ref: ${{ inputs.release_ref }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: "0"
-
-          skip_checkout: "0"
-          checkout_ref: ${{ inputs.release_ref }}
-
-          install_dependencies: "0"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
+
+      - name: Setup Node.js (PS)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
 
       - name: Validate release inputs (publish)
         uses: ./.github/actions/ps-run
@@ -397,25 +395,24 @@ jobs:
     timeout-minutes: 10
     steps:
       - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap
+        uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: 1
+          checkout_ref: ${{ inputs.release_ref }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          node_version: ${{ inputs.node_version }}
-          cache: "0"
-
-          skip_checkout: "0"
-          checkout_ref: ${{ inputs.release_ref }}
-
-          install_dependencies: "0"
+          platform_allowed_repositories: PoliticalSphere/ci
+          skip_platform_checkout: "false"
           install_tools: "0"
           tools_bundle: "none"
+
+      - name: Setup Node.js (PS)
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
+        with:
+          node-version: ${{ inputs.node_version }}
 
       - name: Write summary (PS)
         uses: ./.github/actions/ps-write-summary

@@ -15,6 +15,28 @@
 # created: 2025-12-26
 # last_updated: 2025-12-26
 #
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-bootstrap/ps-init
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 0 — Critical (this action controls repository ingress into the job)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents unsafe checkout parameters, enforces deterministic history
+#          depth, and reduces credential persistence risk before build steps run.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Records validated checkout parameters via logs and environment outputs for
+# traceability in CI audits.
+#
 # ==============================================================================
 name: "PS Checkout (Repo)"
 description: "Checkout current repository with validated inputs and a pinned action"
@@ -59,6 +81,26 @@ runs:
       run: |
         set -euo pipefail
 
+        format_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh"
+        if [[ -f "${format_sh}" ]]; then
+          # shellcheck source=/dev/null
+          . "${format_sh}"
+        fi
+
+        log_info() {
+          if type -t ps_detail >/dev/null 2>&1; then
+            ps_detail "$*"
+          else
+            printf 'PS.CHECKOUT.REPO: %s\n' "$*"
+          fi
+        }
+
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+        }
+
         depth="${PS_FETCH_DEPTH_INPUT:-1}"
         if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
           printf 'ERROR: inputs.fetch_depth must be a non-negative integer (got %q)\n' "${depth}" >&2
@@ -96,20 +138,20 @@ runs:
             ;;
         esac
 
-        printf 'PS_FETCH_DEPTH_VALIDATED=%s\n' "${depth}" >> "${GITHUB_ENV}"
-        printf 'PS_PERSIST_CREDENTIALS_VALIDATED=%s\n' "${pc}" >> "${GITHUB_ENV}"
-        printf 'PS_SUBMODULES_VALIDATED=%s\n' "${sm}" >> "${GITHUB_ENV}"
-        printf 'PS_REQUIRE_FULL_HISTORY_VALIDATED=%s\n' "${req}" >> "${GITHUB_ENV}"
+        emit_env "PS_FETCH_DEPTH_VALIDATED" "${depth}"
+        emit_env "PS_PERSIST_CREDENTIALS_VALIDATED" "${pc}"
+        emit_env "PS_SUBMODULES_VALIDATED" "${sm}"
+        emit_env "PS_REQUIRE_FULL_HISTORY_VALIDATED" "${req}"
 
         ref="${PS_REF_INPUT:-}"
-        printf 'PS.CHECKOUT.REPO: fetch_depth=%s\n' "${depth}"
-        printf 'PS.CHECKOUT.REPO: require_full_history=%s\n' "${req}"
-        printf 'PS.CHECKOUT.REPO: persist_credentials=%s\n' "${pc}"
-        printf 'PS.CHECKOUT.REPO: submodules=%s\n' "${sm}"
+        log_info "fetch_depth=${depth}"
+        log_info "require_full_history=${req}"
+        log_info "persist_credentials=${pc}"
+        log_info "submodules=${sm}"
         if [[ -n "${ref}" ]]; then
-          printf 'PS.CHECKOUT.REPO: ref=%s\n' "${ref}"
+          log_info "ref=${ref}"
         else
-          printf 'PS.CHECKOUT.REPO: ref=<default>\n'
+          log_info "ref=<default>"
         fi
 
     - name: Checkout repository (PS)

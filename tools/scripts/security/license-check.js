@@ -7,6 +7,7 @@
 //   Validate dependency licenses against a policy allowlist/denylist.
 // ==============================================================================
 
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -29,7 +30,18 @@ function normalizeLicense(raw) {
 
 function nameFromPath(entryPath) {
   const parts = entryPath.split('node_modules/').filter(Boolean);
-  return parts.length > 0 ? parts[parts.length - 1] : entryPath;
+  if (parts.length === 0) return entryPath;
+  const tail = parts[parts.length - 1].replace(/\/+$/, '');
+  const segments = tail.split('/').filter(Boolean);
+  if (segments.length === 0) return entryPath;
+  if (segments[0].startsWith('@') && segments.length >= 2) {
+    return `${segments[0]}/${segments[1]}`;
+  }
+  return segments[0];
+}
+
+function sha256(text) {
+  return crypto.createHash('sha256').update(text, 'utf8').digest('hex');
 }
 
 function compileRegex(list, label) {
@@ -85,6 +97,7 @@ function loadPolicy(policyPath) {
     failOnUnknown: policy.fail_on_unknown !== false,
     failOnUnlicensed: policy.fail_on_unlicensed !== false,
     allowFileReference: policy.allow_file_reference === true,
+    policyHash: sha256(raw),
   };
 }
 
@@ -98,18 +111,14 @@ function resolvePackagePolicy(basePolicy, name) {
   const denylist = Array.isArray(exception.denylist)
     ? exception.denylist
     : basePolicy.denylist;
-  const allowRegex = compileRegex(
-    Array.isArray(exception.allowlist_regex)
-      ? exception.allowlist_regex
-      : basePolicy.allowRegex.map((rx) => rx.source),
-    'allowlist',
-  );
-  const denyRegex = compileRegex(
-    Array.isArray(exception.denylist_regex)
-      ? exception.denylist_regex
-      : basePolicy.denyRegex.map((rx) => rx.source),
-    'denylist',
-  );
+
+  const allowRegex = Array.isArray(exception.allowlist_regex)
+    ? compileRegex(exception.allowlist_regex, 'allowlist')
+    : basePolicy.allowRegex;
+
+  const denyRegex = Array.isArray(exception.denylist_regex)
+    ? compileRegex(exception.denylist_regex, 'denylist')
+    : basePolicy.denyRegex;
 
   return {
     ...basePolicy,
@@ -165,24 +174,157 @@ function evaluateSimpleLicense(policy, license) {
   return { ok: false, reason: 'not-allowlisted', match: null };
 }
 
-function evaluateOrExpression(policy, expr) {
-  const parts = expr.split(/\s+OR\s+/i).map((p) => p.trim());
-  for (const part of parts) {
-    const res = evaluateSimpleLicense(policy, part);
-    if (res.ok) {
-      return { ok: true, reason: 'allowlisted-expression', match: res.match };
+function isOperatorToken(token) {
+  return token === 'AND' || token === 'OR';
+}
+
+function tokenizeSpdxExpression(expr) {
+  const tokens = [];
+  let i = 0;
+  while (i < expr.length) {
+    const ch = expr[i];
+    if (/\s/.test(ch)) {
+      i += 1;
+      continue;
     }
+    if (ch === '(' || ch === ')') {
+      tokens.push(ch);
+      i += 1;
+      continue;
+    }
+    const start = i;
+    while (i < expr.length && !/\s|\(|\)/.test(expr[i])) {
+      i += 1;
+    }
+    tokens.push(expr.slice(start, i));
   }
+
+  const merged = [];
+  for (let idx = 0; idx < tokens.length; idx += 1) {
+    const token = tokens[idx];
+    if (/^WITH$/i.test(token) && merged.length > 0 && idx + 1 < tokens.length) {
+      const prev = merged.pop();
+      const next = tokens[idx + 1];
+      if (
+        prev !== '(' &&
+        prev !== ')' &&
+        !isOperatorToken(String(prev).toUpperCase()) &&
+        next !== '(' &&
+        next !== ')' &&
+        !isOperatorToken(String(next).toUpperCase())
+      ) {
+        merged.push(`${prev} WITH ${next}`);
+        idx += 1;
+        continue;
+      }
+      merged.push(prev);
+    }
+    merged.push(token);
+  }
+
+  return merged;
+}
+
+function toRpn(tokens) {
+  const output = [];
+  const ops = [];
+  const prec = { OR: 1, AND: 2 };
+
+  for (const token of tokens) {
+    if (token === '(') {
+      ops.push(token);
+      continue;
+    }
+    if (token === ')') {
+      while (ops.length > 0 && ops[ops.length - 1] !== '(') {
+        output.push(ops.pop());
+      }
+      if (ops.length === 0) return null;
+      ops.pop();
+      continue;
+    }
+
+    const upper = String(token).toUpperCase();
+    if (isOperatorToken(upper)) {
+      while (
+        ops.length > 0 &&
+        isOperatorToken(ops[ops.length - 1]) &&
+        prec[ops[ops.length - 1]] >= prec[upper]
+      ) {
+        output.push(ops.pop());
+      }
+      ops.push(upper);
+      continue;
+    }
+
+    output.push(token);
+  }
+
+  while (ops.length > 0) {
+    const op = ops.pop();
+    if (op === '(' || op === ')') return null;
+    output.push(op);
+  }
+
+  return output;
+}
+
+function mergeFailure(left, right) {
+  if (left.reason === 'denied-license') return left;
+  if (right.reason === 'denied-license') return right;
   return { ok: false, reason: 'not-allowlisted', match: null };
 }
 
-function evaluateAndExpression(policy, expr) {
-  const parts = expr.split(/\s+AND\s+/i).map((p) => p.trim());
-  for (const part of parts) {
-    const res = evaluateSimpleLicense(policy, part);
-    if (!res.ok) return { ok: false, reason: 'not-allowlisted', match: null };
+function evaluateSpdxExpression(policy, expr) {
+  const tokens = tokenizeSpdxExpression(expr);
+  if (tokens.length === 0) {
+    return { ok: false, reason: 'missing-license', match: null };
   }
-  return { ok: true, reason: 'allowlisted-expression', match: null };
+  const rpn = toRpn(tokens);
+  if (!rpn) {
+    return { ok: false, reason: 'invalid-expression', match: null };
+  }
+
+  const stack = [];
+  for (const token of rpn) {
+    if (isOperatorToken(token)) {
+      const right = stack.pop();
+      const left = stack.pop();
+      if (!left || !right) {
+        return { ok: false, reason: 'invalid-expression', match: null };
+      }
+      if (token === 'AND') {
+        if (left.ok && right.ok) {
+          stack.push({
+            ok: true,
+            reason: 'allowlisted-expression',
+            match: left.match || right.match,
+          });
+        } else {
+          stack.push(mergeFailure(left, right));
+        }
+      } else if (token === 'OR') {
+        if (left.ok || right.ok) {
+          const match = left.ok ? left.match : right.match;
+          stack.push({
+            ok: true,
+            reason: 'allowlisted-expression',
+            match,
+          });
+        } else {
+          stack.push(mergeFailure(left, right));
+        }
+      }
+      continue;
+    }
+    stack.push(evaluateSimpleLicense(policy, token));
+  }
+
+  if (stack.length !== 1) {
+    return { ok: false, reason: 'invalid-expression', match: null };
+  }
+
+  return stack[0];
 }
 
 function evaluateLicense(policy, license) {
@@ -190,20 +332,12 @@ function evaluateLicense(policy, license) {
     return { ok: false, reason: 'missing-license', match: null };
   }
 
-  // Normalize parentheses and common separators then evaluate expressions
-  // Support simple SPDX expressions using OR / AND (case-insensitive)
   const raw = String(license).trim();
-  // If it contains OR/AND, handle as an expression
-  if (/\bOR\b/i.test(raw) || /\bAND\b/i.test(raw)) {
-    // Remove outer parentheses if present (explicitly remove leading/trailing parens)
-    const expr = raw.replace(/^\(+/, '').replace(/\)+$/, '').trim();
-
-    if (/\bOR\b/i.test(expr)) return evaluateOrExpression(policy, expr);
-    if (/\bAND\b/i.test(expr)) return evaluateAndExpression(policy, expr);
+  if (/\bOR\b/i.test(raw) || /\bAND\b/i.test(raw) || raw.includes('(')) {
+    return evaluateSpdxExpression(policy, raw);
   }
 
-  // Fallback: single token evaluation
-  return evaluateSimpleLicense(policy, license);
+  return evaluateSimpleLicense(policy, raw);
 }
 
 function collectPackages(lockData) {
@@ -291,8 +425,25 @@ try {
   fatal(`lockfile is not valid JSON: ${err.message}`);
 }
 
-const packages = collectPackages(lockData).filter(
-  (pkg) => pkg.name && !policy.ignore.has(pkg.name),
+const seen = new Set();
+const packages = collectPackages(lockData)
+  .map((pkg) => ({
+    ...pkg,
+    license: normalizeLicense(pkg.license),
+  }))
+  .filter((pkg) => pkg.name && !policy.ignore.has(pkg.name))
+  .filter((pkg) => {
+    const key = `${pkg.name}@${pkg.version || ''}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+
+packages.sort(
+  (a, b) =>
+    (a.name || '').localeCompare(b.name || '') ||
+    (a.version || '').localeCompare(b.version || '') ||
+    (a.license || '').localeCompare(b.license || ''),
 );
 
 detail(`License check: scanning ${packages.length} package(s).`);
@@ -313,7 +464,6 @@ for (const pkg of packages) {
       reason: 'missing-license',
       match: null,
     });
-    unknown.push(pkg);
     continue;
   }
 
@@ -349,6 +499,12 @@ for (const pkg of packages) {
   }
 }
 
+violations.sort(
+  (a, b) =>
+    a.name.localeCompare(b.name) ||
+    (a.version || '').localeCompare(b.version || ''),
+);
+
 const summaryLines = [
   'License check summary',
   `Total packages: ${packages.length}`,
@@ -378,6 +534,8 @@ writeOutputs({
       allowFileReference: policy.allowFileReference,
       failOnUnknown: policy.failOnUnknown,
       failOnUnlicensed: policy.failOnUnlicensed,
+      policy_path: path.relative(repoRoot, policyPath),
+      policy_sha256: policy.policyHash,
     },
     summary: {
       total: packages.length,

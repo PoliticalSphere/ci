@@ -21,7 +21,7 @@
 #   - CI-safe, machine-readable output
 #
 # Dependencies:
-#   - tools/scripts/actions/ps-write-summary.sh
+#   - tools/scripts/actions/ps-teardown/ps-write-summary/ps-write-summary.sh
 #
 # Dependents:
 #   - ./.github/workflows/pr-gates.yml
@@ -67,4 +67,4 @@ runs:
         PS_SUMMARY_WORKFLOW: ${{ inputs.workflow }}
         PS_SUMMARY_OUTPUT_PATH: ${{ inputs.output_path }}
         PS_SUMMARY_RESULTS: ${{ inputs.results }}
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-write-summary.sh"
+      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown/ps-write-summary/ps-write-summary.sh"
