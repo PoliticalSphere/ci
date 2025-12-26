@@ -151,6 +151,84 @@ function _hasUnboundedQuantifierIn(str) {
   return false;
 }
 
+// Detect nested unbounded quantifiers: moved to module scope to improve
+// testability and reduce nested function complexity inside `compileRegex`.
+// Examples: `(.+)+`, `(a+){1,}`.
+function _detectNestedUnbounded(pat) {
+  const len = pat.length;
+  let i = 0;
+
+  function skipCharClass(idx) {
+    idx++;
+    while (idx < len) {
+      if (pat[idx] === '\\') {
+        idx += 2;
+        continue;
+      }
+      if (pat[idx] === ']') {
+        idx++;
+        break;
+      }
+      idx++;
+    }
+    return idx;
+  }
+
+  function skipGroup(idx) {
+    let depth = 1;
+    let j = idx + 1;
+    while (j < len && depth > 0) {
+      if (pat[j] === '\\') {
+        j += 2;
+        continue;
+      }
+      if (pat[j] === '[') {
+        j = skipCharClass(j);
+        continue;
+      }
+      if (pat[j] === '(') {
+        depth++;
+      } else if (pat[j] === ')') {
+        depth--;
+      }
+      j++;
+    }
+    if (depth !== 0) return -1; // unbalanced
+    return j - 1; // matching ')'
+  }
+
+  while (i < len) {
+    const ch = pat[i];
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === '[') {
+      i = skipCharClass(i);
+      continue;
+    }
+    if (ch === '(') {
+      const end = skipGroup(i);
+      if (end === -1) return true; // unbalanced; conservative reject
+      const inner = pat.slice(i + 1, end);
+      if (_hasUnboundedQuantifierIn(inner)) {
+        // look for outer quantifier
+        let k = end + 1;
+        while (k < len && /\s/.test(pat[k])) k++;
+        if (k < len && (pat[k] === '+' || pat[k] === '*')) return true;
+        if (k < len && pat[k] === '{') {
+          const q = parseBraceQuantifier(pat, k);
+          if (q.isQuantifier && q.isUnbounded) return true;
+        }
+      }
+      i = end + 1;
+      continue;
+    }
+    i++;
+  }
+  return false;
+}
+
 function compileRegex(reStr) {
   let pattern = reStr;
   let flags = '';
@@ -179,82 +257,8 @@ function compileRegex(reStr) {
   // _hasUnboundedQuantifierIn moved to module scope above to reduce nested
   // function complexity in `compileRegex`.
 
-  // Refactored nested detection to use small helpers to keep cognitive
-  // complexity low and make the logic clearer.
-  function _detectNestedUnbounded(pat) {
-    const len = pat.length;
-    let i = 0;
-
-    function skipCharClass(idx) {
-      idx++;
-      while (idx < len) {
-        if (pat[idx] === '\\') {
-          idx += 2;
-          continue;
-        }
-        if (pat[idx] === ']') {
-          idx++;
-          break;
-        }
-        idx++;
-      }
-      return idx;
-    }
-
-    function skipGroup(idx) {
-      let depth = 1;
-      let j = idx + 1;
-      while (j < len && depth > 0) {
-        if (pat[j] === '\\') {
-          j += 2;
-          continue;
-        }
-        if (pat[j] === '[') {
-          j = skipCharClass(j);
-          continue;
-        }
-        if (pat[j] === '(') {
-          depth++;
-        } else if (pat[j] === ')') {
-          depth--;
-        }
-        j++;
-      }
-      if (depth !== 0) return -1; // unbalanced
-      return j - 1; // return index of matching ')'
-    }
-
-    while (i < len) {
-      const ch = pat[i];
-      if (ch === '\\') {
-        i += 2;
-        continue;
-      }
-      if (ch === '[') {
-        i = skipCharClass(i);
-        continue;
-      }
-      if (ch === '(') {
-        const end = skipGroup(i);
-        if (end === -1) return true; // unbalanced; conservative reject
-        const inner = pat.slice(i + 1, end);
-        if (_hasUnboundedQuantifierIn(inner)) {
-          // look for outer quantifier
-          let k = end + 1;
-          while (k < len && /\s/.test(pat[k])) k++;
-          if (k < len && (pat[k] === '+' || pat[k] === '*')) return true;
-          if (k < len && pat[k] === '{') {
-            const q = parseBraceQuantifier(pat, k);
-            if (q.isQuantifier && q.isUnbounded) return true;
-          }
-        }
-        i = end + 1;
-        continue;
-      }
-      i++;
-    }
-    return false;
-  }
+  // Nested detection moved to module scope: `_detectNestedUnbounded` is defined
+  // above `compileRegex` to improve testability and reduce nested complexity.
 
   if (_detectNestedUnbounded(pattern)) {
     throw new Error(
