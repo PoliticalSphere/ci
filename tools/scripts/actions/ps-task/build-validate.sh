@@ -9,7 +9,15 @@ set -euo pipefail
 # ==============================================================================
 
 
-fail() { echo "ERROR: $*" >&2; exit 1; }
+fail() {
+  echo "ERROR: $*" >&2
+  # When sourced, return to the caller; when executed directly, exit the process.
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 1
+  else
+    exit 1
+  fi
+}
 
 # Required-ish: non-empty strings
 [[ -n "${PS_ID:-}" ]] || fail "inputs.id must not be empty"
