@@ -92,7 +92,7 @@ The model is explicit and predictable: no hidden behavior, no implicit coupling.
 - Install dependencies: `npm install`
 - Run lint, typecheck, tests, and duplication checks locally: `npm run preflight`
 - Run individual checks as needed:
-  - `npm run lint`
+  - `npm run lint` (or `npm run lint:affected` for PRs)
   - `npm run typecheck`
   - `npm run test`
   - `npm run jscpd`

@@ -237,12 +237,6 @@ jobs:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
 
-      - name: Validate build inputs (paths)
-        uses: ./.github/actions/validate-paths
-        with:
-          working-directory: ${{ inputs.working_directory }}
-          script: ${{ inputs.build_script }}
-
       - name: Build (PS)
         id: build
         uses: ./.github/actions/build
@@ -269,29 +263,16 @@ jobs:
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
 
-      - name: Build artifacts complete
+      - name: Job teardown (PS)
         if: always()
-        - name: Build artifacts complete (PS)
-          if: always()
-          uses: ./.github/actions/ps-run
-          with:
-            id: build-complete
-            title: Build artifacts complete
-            script: tools/scripts/ci/build-complete.sh
-          env:
-            BUILD_OUTCOME: ${{ steps.build.outcome }}
-            UPLOAD_OUTCOME: ${{ steps.upload.outcome }}
-
-        - name: Job teardown (PS)
-          if: always()
-          uses: ./.github/actions/ps-teardown
-          with:
-            summary_workflow: build-artifacts
-            summary_output_path: reports/summary/build-artifacts-job.json
-            summary_results: build=${{ job.status }}
-            artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
-            artifacts_paths: |
-              ${{ inputs.artifact_paths }}
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: build-artifacts
+          summary_output_path: reports/summary/build-artifacts-job.json
+          summary_results: build=${{ job.status }}
+          artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # AGGREGATION & REPORTING — BUILD ARTIFACTS SUMMARY

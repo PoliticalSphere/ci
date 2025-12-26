@@ -1,0 +1,107 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Upload Artifacts
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Upload workflow artifacts with platform defaults and explicit, validated inputs.
+#
+# Metadata:
+#   - id: ps-upload-artifacts
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+# Scope & Responsibilities:
+#   - Does: validate inputs and upload artifacts with configured retention/behaviour.
+#   - Does NOT: decide which files to include or when to run.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Explicit inputs + validation
+#   - SHA-pinned dependency
+#   - CI-safe behaviour (sane defaults, clear failures)
+#
+# Dependencies:
+#   - actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
+#   - tools/scripts/actions/ps-upload-artifacts-validate.sh
+#   - tools/scripts/branding/validate-inputs.sh
+#
+# Dependents:
+#   - ./.github/workflows/validate-ci.yml
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/build-artifacts.yml
+#   - ./.github/workflows/security-scheduled.yml
+#   - ./.github/workflows/release.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: workflows (often with if: always())
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller
+#   - Constraints:
+#       - Artifact name must be CI-safe (validated here)
+#       - No path traversal restrictions are imposed here (caller controls path)
+#
+# Operational Notes:
+#   - Allowlist enforcement is handled by Validate-CI (configs/ci/policies/artifact-policy.yml)
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: uploads caller-specified paths only
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Upload Artifacts"
+description: "Upload workflow artifacts with platform defaults"
+
+inputs:
+  name:
+    description: "Artifact name (must be CI-safe)"
+    required: true
+
+  path:
+    description: "Paths to upload (newline-separated globs supported)"
+    required: true
+
+  retention_days:
+    description: "Retention days (positive integer)"
+    required: false
+    default: "7"
+
+  if_no_files_found:
+    description: "Behavior when no files are found: warn | error | ignore"
+    required: false
+    default: "warn"
+
+  compression_level:
+    description: "Zlib compression level (0-9)"
+    required: false
+    default: "6"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_NAME: ${{ inputs.name }}
+        PS_RETENTION: ${{ inputs.retention_days }}
+        PS_NOFILES: ${{ inputs.if_no_files_found }}
+        PS_PATHS: ${{ inputs.path }}
+        PS_COMPRESSION_LEVEL: ${{ inputs.compression_level }}
+      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-upload-artifacts-validate.sh"
+    - name: Upload artifacts
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      with:
+        name: ${{ inputs.name }}
+        path: ${{ inputs.path }}
+        retention-days: ${{ inputs.retention_days }}
+        if-no-files-found: ${{ inputs.if_no_files_found }}
+        compression-level: ${{ inputs.compression_level }}
+
+    - name: Upload artifacts complete
+      shell: bash
+      run: |
+        set -euo pipefail
+        echo "PS.ARTIFACTS: OK"

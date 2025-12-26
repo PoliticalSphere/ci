@@ -42,7 +42,7 @@ else
 fi
 
 # Pass-through args safely (e.g. --write, --unsafe, etc.)
-BIOME_ARGS=("$@")
+declare -a BIOME_ARGS=("$@")
 
 # Determine targets:
 # - Full repo when full_scan=1
@@ -86,5 +86,11 @@ else
   fi
 fi
 
-# Execute
-"${BIOME_BIN}" check --config-path "${config_path}" "${BIOME_ARGS[@]}" "${targets[@]}"
+# Execute (handle empty/unset args safely)
+declare -a cmd_args=()
+if [[ "${#BIOME_ARGS[@]:-0}" -ne 0 ]]; then
+  cmd_args+=("${BIOME_ARGS[@]}")
+fi
+cmd_args+=("${targets[@]}")
+
+"${BIOME_BIN}" check --config-path "${config_path}" "${cmd_args[@]}"

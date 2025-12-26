@@ -1,0 +1,98 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Semgrep CLI (SARIF)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run Semgrep CLI and publish SARIF to GitHub code scanning.
+#
+# Metadata:
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+#
+# Scope & Responsibilities:
+#   - Does: install Semgrep, scan, upload SARIF, enforce exit policy.
+#   - Does NOT: manage CodeQL or dependency scanning.
+#
+# Design Principles:
+#   - Deterministic version pinning
+#   - Non-interactive execution (no prompts/telemetry)
+#   - CI-safe SARIF upload
+#
+# Dependencies:
+#   - ./.github/actions/ps-task/ps-run
+#   - tools/scripts/security/semgrep-cli.sh
+#   - tools/scripts/security/semgrep-validate-inputs.sh
+#   - tools/scripts/security/semgrep-install.sh
+#   - tools/scripts/security/semgrep-scan.sh
+#   - tools/scripts/security/semgrep-enforce.sh
+#
+# Dependents:
+#   - ./.github/workflows/security-scheduled.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#   - Invoked by: security workflows
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: requires security-events: write in the calling job
+#   - Constraints: SARIF must be uploaded even when findings exist
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: produces SARIF at inputs.output
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "Semgrep CLI (SARIF)"
+description: "Run Semgrep via CLI and upload SARIF to code scanning"
+
+inputs:
+  version:
+    description: "Pinned Semgrep version to install (e.g. 1.461.0)"
+    required: true
+
+  config:
+    description: "Semgrep config (e.g. p/ci or a local config path)"
+    required: false
+    default: "p/ci"
+
+  path:
+    description: "Scan path (relative to repo root)"
+    required: false
+    default: "."
+
+  output:
+    description: "SARIF output file path"
+    required: false
+    default: "reports/semgrep/semgrep.sarif"
+
+  fail_on_findings:
+    description: "If true, fail when Semgrep reports findings (exit 1)"
+    required: false
+    default: "true"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run Semgrep (PS)
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "security.semgrep"
+        title: "Semgrep CLI"
+        description: "Run Semgrep and upload SARIF"
+        script: "tools/scripts/security/semgrep-cli.sh"
+        require_files: |
+          tools/scripts/security/semgrep-cli.sh
+          tools/scripts/security/semgrep-validate-inputs.sh
+          tools/scripts/security/semgrep-install.sh
+          tools/scripts/security/semgrep-scan.sh
+          tools/scripts/security/semgrep-enforce.sh
+        artifact_paths: |
+          ${{ inputs.output }}
+        env_kv: |
+          SEMGREP_VERSION=${{ inputs.version }}
+          SEMGREP_CONFIG=${{ inputs.config }}
+          SEMGREP_PATH=${{ inputs.path }}
+          SEMGREP_OUTPUT=${{ inputs.output }}
+          SEMGREP_FAIL_ON_FINDINGS=${{ inputs.fail_on_findings }}

@@ -275,14 +275,6 @@ jobs:
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
 
-      - name: Validate CI complete (PS)
-        if: always()
-        uses: ./.github/actions/ps-run
-        with:
-          id: validate-ci-complete
-          title: Validate-CI complete
-          script: tools/scripts/ci/validate-ci-complete.sh
-
       - name: Job teardown (PS)
         if: always()
         uses: ./.github/actions/ps-teardown

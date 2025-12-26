@@ -76,14 +76,15 @@ Risky changes require an explicit, documented decision.
 
 Baseline building blocks:
 
-- `ps-run`: standard banner + section wrapper for script execution
-- `ps-preflight`: shared preflight checks for common requirements
+- `ps-task/ps-run`: canonical task runner with uniform logs/reports
+- `ps-harden-runner`: wrapper for runner hardening with validated inputs
+- `ps-checkout`: canonical checkout with validated inputs and pinned action
+- `ps-task/<task>`: thin task modules delegating to `ps-task/ps-run`
 - `ps-upload-artifacts`: artifact upload with input validation
 - `ps-pr-comment`: post PR comments with input validation
 - `ps-write-summary`: write structured JSON summary artifacts
 - `ps-teardown`: canonical job teardown (write summary, upload artifacts, optional PR comment)
 - `ps-tools`: canonical tools installer supporting `bundle` (lint|security|none) and `extra_tools` (newline list)
-- `validate-paths`: validate repo-relative `working-directory` and `script` inputs for workflows/actions
 
 Node toolchain:
 
@@ -104,6 +105,8 @@ Example: use `ps-bootstrap` to run lint with installs/tools:
     tools_bundle: "lint"
     skip_checkout: "1"
     skip_harden: "1"
+    allow_unsafe: "1"
+    unsafe_reason: "runner already hardened earlier in the job"
 ```
 
 Security-only bootstrap example:

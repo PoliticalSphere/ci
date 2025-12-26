@@ -1,0 +1,245 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Checkout (Platform)
+# ==============================================================================
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: ps-checkout-platform
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Standardise *platform repository* checkout with validated inputs, pinned
+# dependencies, and stable outputs. This is intentionally separate from target
+# repository checkout to keep semantics unambiguous and contracts stable.
+#
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Minimal stable input surface with explicit validation
+# - Safe path handling (repo-relative, no traversal)
+# - Optional guardrails for internal-only platform repos
+# - Emits stable outputs for downstream steps (telemetry + reuse)
+#
+# ==============================================================================
+
+name: "PS Checkout (Platform)"
+description: "Checkout platform repository into a controlled path (validated + pinned)"
+
+inputs:
+  repository:
+    description: "Platform repository in OWNER/REPO form (e.g. PoliticalSphere/ci)"
+    required: true
+
+  ref:
+    description: "Git ref (branch, tag, or SHA) to checkout"
+    required: false
+    default: "main"
+
+  path:
+    description: "Checkout path relative to github.workspace (e.g. .ps-platform)"
+    required: false
+    default: ".ps-platform"
+
+  fetch_depth:
+    description: "Git fetch depth (0 = full history, default: 1)"
+    required: false
+    default: "1"
+
+  persist_credentials:
+    description: "Whether to persist credentials in the git config (true|false)"
+    required: false
+    default: "false"
+
+  submodules:
+    description: "Submodules mode: false|true|recursive"
+    required: false
+    default: "false"
+
+  require_full_history:
+    description: "Require fetch_depth=0 (true|false)"
+    required: false
+    default: "false"
+
+  clean_path:
+    description: "Delete the target path before checkout (true|false). Use true to avoid dirty-tree conflicts."
+    required: false
+    default: "false"
+
+  allowed_repositories:
+    description: "Optional newline-separated allowlist of OWNER/REPO values. If set, repository must be in the list."
+    required: false
+    default: ""
+
+outputs:
+  platform_path:
+    description: "Repo-relative path used for platform checkout"
+    value: ${{ steps.ps_checkout_platform_outputs.outputs.platform_path }}
+
+  platform_path_abs:
+    description: "Absolute path to the platform checkout directory"
+    value: ${{ steps.ps_checkout_platform_outputs.outputs.platform_path_abs }}
+
+  platform_repository:
+    description: "Validated platform repository (OWNER/REPO)"
+    value: ${{ steps.ps_checkout_platform_outputs.outputs.platform_repository }}
+
+  platform_ref:
+    description: "Validated platform ref"
+    value: ${{ steps.ps_checkout_platform_outputs.outputs.platform_ref }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_REPOSITORY_INPUT: ${{ inputs.repository }}
+        PS_REF_INPUT: ${{ inputs.ref }}
+        PS_PATH_INPUT: ${{ inputs.path }}
+        PS_FETCH_DEPTH_INPUT: ${{ inputs.fetch_depth }}
+        PS_PERSIST_CREDENTIALS_INPUT: ${{ inputs.persist_credentials }}
+        PS_SUBMODULES_INPUT: ${{ inputs.submodules }}
+        PS_REQUIRE_FULL_HISTORY_INPUT: ${{ inputs.require_full_history }}
+        PS_CLEAN_PATH_INPUT: ${{ inputs.clean_path }}
+        PS_ALLOWED_REPOSITORIES_INPUT: ${{ inputs.allowed_repositories }}
+      run: |
+        set -euo pipefail
+
+        repo="${PS_REPOSITORY_INPUT:-}"
+        if [[ -z "${repo}" ]]; then
+          printf 'ERROR: inputs.repository is required\n' >&2
+          exit 1
+        fi
+        if ! [[ "${repo}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+          printf 'ERROR: inputs.repository must be OWNER/REPO (got %q)\n' "${repo}" >&2
+          exit 1
+        fi
+
+        # Optional allowlist guard (high value for internal platform safety)
+        allowlist="${PS_ALLOWED_REPOSITORIES_INPUT:-}"
+        if [[ -n "${allowlist}" ]]; then
+          allowed="0"
+          while IFS= read -r line; do
+            [[ -z "${line}" ]] && continue
+            [[ "${line}" =~ ^[[:space:]]*# ]] && continue
+            if [[ "${line}" == "${repo}" ]]; then
+              allowed="1"
+              break
+            fi
+          done <<< "${allowlist}"
+          if [[ "${allowed}" != "1" ]]; then
+            printf 'ERROR: repository %q not in allowed_repositories allowlist\n' "${repo}" >&2
+            exit 1
+          fi
+        fi
+
+        ref="${PS_REF_INPUT:-main}"
+        if [[ -z "${ref}" ]]; then
+          printf 'ERROR: inputs.ref must not be empty\n' >&2
+          exit 1
+        fi
+
+        path="${PS_PATH_INPUT:-.ps-platform}"
+        if [[ -z "${path}" ]]; then
+          printf 'ERROR: inputs.path must not be empty\n' >&2
+          exit 1
+        fi
+        # Path traversal guard (defense-in-depth): forbid absolute + any '..' segment.
+        if [[ "${path}" == /* || "${path}" == *".."* ]]; then
+          printf 'ERROR: inputs.path must be a repo-relative safe path (got %q)\n' "${path}" >&2
+          exit 1
+        fi
+
+        depth="${PS_FETCH_DEPTH_INPUT:-1}"
+        if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
+          printf 'ERROR: inputs.fetch_depth must be a non-negative integer (got %q)\n' "${depth}" >&2
+          exit 1
+        fi
+
+        req="${PS_REQUIRE_FULL_HISTORY_INPUT:-false}"
+        case "${req}" in true|false) ;; *)
+          printf 'ERROR: inputs.require_full_history must be true|false (got %q)\n' "${req}" >&2
+          exit 1 ;;
+        esac
+        if [[ "${req}" == "true" && "${depth}" != "0" ]]; then
+          printf 'ERROR: full history required but fetch_depth=%s (expected 0)\n' "${depth}" >&2
+          exit 1
+        fi
+
+        pc="${PS_PERSIST_CREDENTIALS_INPUT:-false}"
+        case "${pc}" in true|false) ;; *)
+          printf 'ERROR: inputs.persist_credentials must be true|false (got %q)\n' "${pc}" >&2
+          exit 1 ;;
+        esac
+
+        sm="${PS_SUBMODULES_INPUT:-false}"
+        case "${sm}" in false|true|recursive) ;; *)
+          printf 'ERROR: inputs.submodules must be false|true|recursive (got %q)\n' "${sm}" >&2
+          exit 1 ;;
+        esac
+
+        clean="${PS_CLEAN_PATH_INPUT:-false}"
+        case "${clean}" in true|false) ;; *)
+          printf 'ERROR: inputs.clean_path must be true|false (got %q)\n' "${clean}" >&2
+          exit 1 ;;
+        esac
+
+        printf 'PS_PLATFORM_REPO_VALIDATED=%s\n' "${repo}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_REF_VALIDATED=%s\n' "${ref}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_PATH_VALIDATED=%s\n' "${path}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_FETCH_DEPTH_VALIDATED=%s\n' "${depth}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_PERSIST_CREDENTIALS_VALIDATED=%s\n' "${pc}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_SUBMODULES_VALIDATED=%s\n' "${sm}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_REQUIRE_FULL_HISTORY_VALIDATED=%s\n' "${req}" >> "${GITHUB_ENV}"
+        printf 'PS_PLATFORM_CLEAN_PATH_VALIDATED=%s\n' "${clean}" >> "${GITHUB_ENV}"
+
+        printf 'PS.CHECKOUT.PLATFORM: repository=%s\n' "${repo}"
+        printf 'PS.CHECKOUT.PLATFORM: ref=%s\n' "${ref}"
+        printf 'PS.CHECKOUT.PLATFORM: path=%s\n' "${path}"
+        printf 'PS.CHECKOUT.PLATFORM: fetch_depth=%s\n' "${depth}"
+        printf 'PS.CHECKOUT.PLATFORM: require_full_history=%s\n' "${req}"
+        printf 'PS.CHECKOUT.PLATFORM: persist_credentials=%s\n' "${pc}"
+        printf 'PS.CHECKOUT.PLATFORM: submodules=%s\n' "${sm}"
+        printf 'PS.CHECKOUT.PLATFORM: clean_path=%s\n' "${clean}"
+
+    - name: Clean platform path (optional)
+      if: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == 'true' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        target="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
+        if [[ -e "${target}" ]]; then
+          printf 'PS.CHECKOUT.PLATFORM: cleaning %s\n' "${target}"
+          rm -rf "${target}"
+        fi
+
+    - name: Checkout platform repository (PS)
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+      with:
+        repository: ${{ env.PS_PLATFORM_REPO_VALIDATED }}
+        ref: ${{ env.PS_PLATFORM_REF_VALIDATED }}
+        path: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
+        fetch-depth: ${{ env.PS_PLATFORM_FETCH_DEPTH_VALIDATED }}
+        persist-credentials: ${{ env.PS_PLATFORM_PERSIST_CREDENTIALS_VALIDATED }}
+        submodules: ${{ env.PS_PLATFORM_SUBMODULES_VALIDATED }}
+
+    - name: Emit outputs (PS)
+      id: ps_checkout_platform_outputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        {
+          echo "platform_repository=${PS_PLATFORM_REPO_VALIDATED}"
+          echo "platform_ref=${PS_PLATFORM_REF_VALIDATED}"
+          echo "platform_path=${PS_PLATFORM_PATH_VALIDATED}"
+          echo "platform_path_abs=${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
+        } >> "${GITHUB_OUTPUT}"
+
+        printf 'PS.CHECKOUT.PLATFORM: OK\n'

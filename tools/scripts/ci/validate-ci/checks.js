@@ -247,7 +247,10 @@ function _detectNestedUnbounded(pat) {
       const end = findGroupEnd(pat, i);
       if (end === -1) return true; // unbalanced; conservative reject
       const inner = pat.slice(i + 1, end);
-      if (_hasUnboundedQuantifierIn(inner) && hasOuterUnboundedAt(pat, end + 1)) {
+      if (
+        _hasUnboundedQuantifierIn(inner) &&
+        hasOuterUnboundedAt(pat, end + 1)
+      ) {
         return true;
       }
       i = end + 1;

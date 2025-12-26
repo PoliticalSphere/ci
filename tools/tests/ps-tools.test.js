@@ -6,7 +6,7 @@ import { fail, getRepoRoot, SAFE_PATH } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
-// Validate that ps-tools assembles the correct tool lists and delegates to ps-install-tools
+// Validate that ps-tools assembles the correct tool lists and delegates to install-tools.sh
 // We exercise the internal assembly by invoking the action's Prepare/Assemble logic
 // in a small harness: source the validate script and emulate inputs in a temporary shell.
 

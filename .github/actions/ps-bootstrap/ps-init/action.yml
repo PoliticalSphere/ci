@@ -1,0 +1,375 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Init
+# ==============================================================================
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: ps-init
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Canonical CI bootstrap switchboard for the Political Sphere ecosystem.
+# Enforces a hardened, deterministic environment and delegates concerns to
+# narrowly-scoped sub-actions:
+#   - ps-harden-runner (MUST be first)
+#   - ps-checkout (repo)
+#   - HOME isolation
+#   - ps-checkout-platform (optional)
+#   - ps-tools (optional)
+#
+#
+# CONTRACT
+# ------------------------------------------------------------------------------
+# - Harden runner MUST run first (no steps before it).
+# - All toggles accept 0/1/true/false and are normalised.
+# - Path inputs are validated (repo-relative, no traversal).
+# - Outputs are stable and telemetry-friendly.
+#
+# ==============================================================================
+name: "PS Init"
+description: "Canonical CI bootstrap switchboard: harden → checkout → HOME isolation → platform → tools"
+
+inputs:
+  # ---------------------------------------------------------------------------
+  # Security hardening
+  # ---------------------------------------------------------------------------
+  egress_policy:
+    description: "Egress policy for harden-runner (audit|block)"
+    required: false
+    default: "audit"
+
+  # ---------------------------------------------------------------------------
+  # Repository checkout
+  # ---------------------------------------------------------------------------
+  fetch_depth:
+    description: "Git fetch depth for repo checkout (0 = full history, default: 1)"
+    required: false
+    default: "1"
+
+  checkout_ref:
+    description: "Optional git ref (branch/tag/SHA) to checkout"
+    required: false
+    default: ""
+
+  require_full_history:
+    description: "Require fetch_depth=0 (0/1/true/false)"
+    required: false
+    default: "false"
+
+  # ---------------------------------------------------------------------------
+  # HOME isolation
+  # ---------------------------------------------------------------------------
+  home_dir:
+    description: "Repo-relative HOME directory to create and use (e.g. .home)"
+    required: false
+    default: ".home"
+
+  # ---------------------------------------------------------------------------
+  # Platform checkout (optional)
+  # ---------------------------------------------------------------------------
+  platform_repo:
+    description: "Platform repository OWNER/REPO (e.g. PoliticalSphere/ci)"
+    required: false
+    default: "PoliticalSphere/ci"
+
+  platform_ref:
+    description: "Platform ref (branch/tag/SHA)"
+    required: false
+    default: "main"
+
+  platform_path:
+    description: "Repo-relative path for platform checkout"
+    required: false
+    default: ".ps-platform"
+
+  skip_platform_checkout:
+    description: "Skip platform checkout (0/1/true/false)"
+    required: false
+    default: "false"
+
+  platform_fetch_depth:
+    description: "Platform checkout fetch depth (0 = full history, default: 1)"
+    required: false
+    default: "1"
+
+  platform_clean_path:
+    description: "Delete platform_path before checkout (0/1/true/false)"
+    required: false
+    default: "false"
+
+  platform_allowed_repositories:
+    description: "Optional newline-separated allowlist for platform_repo (OWNER/REPO). If set, platform_repo must be listed."
+    required: false
+    default: ""
+
+  # ---------------------------------------------------------------------------
+  # Tools (optional)
+  # ---------------------------------------------------------------------------
+  install_tools:
+    description: "Install canonical tool bundles (0/1/true/false)"
+    required: false
+    default: "0"
+
+  tools_bundle:
+    description: "Tools bundle passed to ps-tools (lint|security|none)"
+    required: false
+    default: "none"
+
+outputs:
+  repo_root:
+    description: "Resolved repository root (github.workspace)"
+    value: ${{ steps.ps_init_outputs.outputs.repo_root }}
+
+  home_dir:
+    description: "Resolved HOME directory (absolute path) used by the job"
+    value: ${{ steps.ps_init_outputs.outputs.home_dir }}
+
+  platform_root:
+    description: "Resolved platform root (absolute path), or empty when skipped"
+    value: ${{ steps.ps_init_outputs.outputs.platform_root }}
+
+  platform_enabled:
+    description: "Whether platform checkout ran (true|false)"
+    value: ${{ steps.ps_init_outputs.outputs.platform_enabled }}
+
+runs:
+  using: "composite"
+  steps:
+    # =========================================================================
+    # 1) HARDEN RUNNER — MUST BE FIRST
+    # =========================================================================
+    - name: Harden runner (PS)
+      uses: ./.github/actions/ps-harden-runner
+      with:
+        egress-policy: ${{ inputs.egress_policy }}
+
+    # =========================================================================
+    # 2) VALIDATE + NORMALISE INPUTS (must come after harden)
+    # =========================================================================
+    - name: Validate + normalise inputs (PS)
+      id: ps_init_validate
+      shell: bash
+      env:
+        PS_FETCH_DEPTH_INPUT: ${{ inputs.fetch_depth }}
+        PS_CHECKOUT_REF_INPUT: ${{ inputs.checkout_ref }}
+        PS_REQUIRE_FULL_HISTORY_INPUT: ${{ inputs.require_full_history }}
+        PS_HOME_DIR_INPUT: ${{ inputs.home_dir }}
+
+        PS_PLATFORM_REPO_INPUT: ${{ inputs.platform_repo }}
+        PS_PLATFORM_REF_INPUT: ${{ inputs.platform_ref }}
+        PS_PLATFORM_PATH_INPUT: ${{ inputs.platform_path }}
+        PS_SKIP_PLATFORM_INPUT: ${{ inputs.skip_platform_checkout }}
+        PS_PLATFORM_FETCH_DEPTH_INPUT: ${{ inputs.platform_fetch_depth }}
+        PS_PLATFORM_CLEAN_PATH_INPUT: ${{ inputs.platform_clean_path }}
+        PS_PLATFORM_ALLOWLIST_INPUT: ${{ inputs.platform_allowed_repositories }}
+
+        PS_INSTALL_TOOLS_INPUT: ${{ inputs.install_tools }}
+        PS_TOOLS_BUNDLE_INPUT: ${{ inputs.tools_bundle }}
+      run: |
+        set -euo pipefail
+
+        norm_bool() {
+          case "${1:-}" in
+            1|true|TRUE|True)  echo "1" ;;
+            0|false|FALSE|False|"") echo "0" ;;
+            *) return 1 ;;
+          esac
+        }
+
+        require_full="$(norm_bool "${PS_REQUIRE_FULL_HISTORY_INPUT}")" || { printf 'ERROR: require_full_history must be 0/1/true/false (got %q)\n' "${PS_REQUIRE_FULL_HISTORY_INPUT}" >&2; exit 1; }
+        skip_platform="$(norm_bool "${PS_SKIP_PLATFORM_INPUT}")" || { printf 'ERROR: skip_platform_checkout must be 0/1/true/false (got %q)\n' "${PS_SKIP_PLATFORM_INPUT}" >&2; exit 1; }
+        clean_platform="$(norm_bool "${PS_PLATFORM_CLEAN_PATH_INPUT}")" || { printf 'ERROR: platform_clean_path must be 0/1/true/false (got %q)\n' "${PS_PLATFORM_CLEAN_PATH_INPUT}" >&2; exit 1; }
+        install_tools="$(norm_bool "${PS_INSTALL_TOOLS_INPUT}")" || { printf 'ERROR: install_tools must be 0/1/true/false (got %q)\n' "${PS_INSTALL_TOOLS_INPUT}" >&2; exit 1; }
+
+        depth="${PS_FETCH_DEPTH_INPUT:-1}"
+        if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
+          printf 'ERROR: fetch_depth must be a non-negative integer (got %q)\n' "${depth}" >&2
+          exit 1
+        fi
+        if [[ "${require_full}" == "1" && "${depth}" != "0" ]]; then
+          printf 'ERROR: require_full_history enabled but fetch_depth=%s (expected 0)\n' "${depth}" >&2
+          exit 1
+        fi
+
+        home_rel="${PS_HOME_DIR_INPUT:-.home}"
+        if [[ -z "${home_rel}" ]]; then
+          printf 'ERROR: home_dir must not be empty\n' >&2
+          exit 1
+        fi
+        if [[ "${home_rel}" == /* || "${home_rel}" == *".."* ]]; then
+          printf 'ERROR: home_dir must be a repo-relative safe path (got %q)\n' "${home_rel}" >&2
+          exit 1
+        fi
+
+        pdepth="${PS_PLATFORM_FETCH_DEPTH_INPUT:-1}"
+        if ! [[ "${pdepth}" =~ ^[0-9]+$ ]]; then
+          printf 'ERROR: platform_fetch_depth must be a non-negative integer (got %q)\n' "${pdepth}" >&2
+          exit 1
+        fi
+
+        prepo="${PS_PLATFORM_REPO_INPUT:-}"
+        pref="${PS_PLATFORM_REF_INPUT:-main}"
+        ppath="${PS_PLATFORM_PATH_INPUT:-.ps-platform}"
+
+        if [[ "${skip_platform}" == "0" ]]; then
+          if [[ -z "${prepo}" ]]; then
+            printf 'ERROR: platform_repo must not be empty when platform checkout is enabled\n' >&2
+            exit 1
+          fi
+          if ! [[ "${prepo}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            printf 'ERROR: platform_repo must be OWNER/REPO (got %q)\n' "${prepo}" >&2
+            exit 1
+          fi
+          if [[ -z "${pref}" ]]; then
+            printf 'ERROR: platform_ref must not be empty\n' >&2
+            exit 1
+          fi
+          if [[ -z "${ppath}" ]]; then
+            printf 'ERROR: platform_path must not be empty\n' >&2
+            exit 1
+          fi
+          if [[ "${ppath}" == /* || "${ppath}" == *".."* ]]; then
+            printf 'ERROR: platform_path must be a repo-relative safe path (got %q)\n' "${ppath}" >&2
+            exit 1
+          fi
+        fi
+
+        bundle="${PS_TOOLS_BUNDLE_INPUT:-none}"
+        case "${bundle}" in
+          lint|security|none) ;;
+          *)
+            printf 'ERROR: tools_bundle must be lint|security|none (got %q)\n' "${bundle}" >&2
+            exit 1
+            ;;
+        esac
+
+        # Persist validated values
+        {
+          echo "PS_FETCH_DEPTH_VALIDATED=${depth}"
+          echo "PS_REQUIRE_FULL_HISTORY_VALIDATED=${require_full}"
+          echo "PS_HOME_DIR_VALIDATED=${home_rel}"
+
+          echo "PS_SKIP_PLATFORM_VALIDATED=${skip_platform}"
+          echo "PS_PLATFORM_REPO_VALIDATED=${prepo}"
+          echo "PS_PLATFORM_REF_VALIDATED=${pref}"
+          echo "PS_PLATFORM_PATH_VALIDATED=${ppath}"
+          echo "PS_PLATFORM_FETCH_DEPTH_VALIDATED=${pdepth}"
+          echo "PS_PLATFORM_CLEAN_PATH_VALIDATED=${clean_platform}"
+          echo "PS_PLATFORM_ALLOWLIST_VALIDATED<<__PS_EOF__"
+          printf '%s\n' "${PS_PLATFORM_ALLOWLIST_INPUT:-}"
+          echo "__PS_EOF__"
+
+          echo "PS_INSTALL_TOOLS_VALIDATED=${install_tools}"
+          echo "PS_TOOLS_BUNDLE_VALIDATED=${bundle}"
+        } >> "${GITHUB_ENV}"
+
+        printf 'PS.INIT: validated (repo depth=%s, platform=%s, tools=%s)\n' \
+          "${depth}" \
+          "$([[ "${skip_platform}" == "1" ]] && echo "off" || echo "on")" \
+          "$([[ "${install_tools}" == "1" ]] && echo "${bundle}" || echo "off")"
+
+    # =========================================================================
+    # 3) CHECKOUT REPOSITORY
+    # =========================================================================
+    - name: Checkout repo (PS)
+      uses: ./.github/actions/ps-checkout
+      with:
+        fetch_depth: ${{ env.PS_FETCH_DEPTH_VALIDATED }}
+        ref: ${{ inputs.checkout_ref }}
+
+    # =========================================================================
+    # 4) HOME ISOLATION
+    # =========================================================================
+    - name: Prepare HOME isolation (PS)
+      id: ps_home
+      shell: bash
+      run: |
+        set -euo pipefail
+        home_abs="${GITHUB_WORKSPACE}/${PS_HOME_DIR_VALIDATED}"
+        mkdir -p "${home_abs}"
+
+        # Apply HOME + XDG dirs (keeps tools isolated/deterministic)
+        {
+          echo "HOME=${home_abs}"
+          echo "XDG_CACHE_HOME=${home_abs}/.cache"
+          echo "XDG_CONFIG_HOME=${home_abs}/.config"
+          echo "XDG_STATE_HOME=${home_abs}/.state"
+        } >> "${GITHUB_ENV}"
+
+        mkdir -p "${home_abs}/.cache" "${home_abs}/.config" "${home_abs}/.state"
+        echo "home_abs=${home_abs}" >> "${GITHUB_OUTPUT}"
+
+        printf 'PS.INIT: HOME=%s\n' "${home_abs}"
+
+    # =========================================================================
+    # 5) CHECKOUT PLATFORM (OPTIONAL)
+    # =========================================================================
+    - name: Checkout platform (PS)
+      if: ${{ env.PS_SKIP_PLATFORM_VALIDATED == '0' }}
+      uses: ./.github/actions/ps-checkout-platform
+      with:
+        repository: ${{ env.PS_PLATFORM_REPO_VALIDATED }}
+        ref: ${{ env.PS_PLATFORM_REF_VALIDATED }}
+        path: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
+        fetch_depth: ${{ env.PS_PLATFORM_FETCH_DEPTH_VALIDATED }}
+        clean_path: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == '1' && 'true' || 'false' }}
+        allowed_repositories: ${{ env.PS_PLATFORM_ALLOWLIST_VALIDATED }}
+        require_full_history: "false"
+        persist_credentials: "false"
+        submodules: "false"
+
+    - name: Export PS_PLATFORM_ROOT (PS)
+      if: ${{ env.PS_SKIP_PLATFORM_VALIDATED == '0' }}
+      shell: bash
+      run: |
+        set -euo pipefail
+        platform_abs="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
+        echo "PS_PLATFORM_ROOT=${platform_abs}" >> "${GITHUB_ENV}"
+        printf 'PS.INIT: PS_PLATFORM_ROOT=%s\n' "${platform_abs}"
+
+    # =========================================================================
+    # 6) INSTALL TOOLS (OPTIONAL)
+    # =========================================================================
+    - name: Install canonical tools (PS)
+      if: ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
+      uses: ./.github/actions/ps-tools
+      with:
+        bundle: ${{ env.PS_TOOLS_BUNDLE_VALIDATED }}
+
+    # =========================================================================
+    # OUTPUTS
+    # =========================================================================
+    - name: Emit outputs (PS)
+      id: ps_init_outputs
+      shell: bash
+      env:
+        PS_HOME_ABS: ${{ steps.ps_home.outputs.home_abs }}
+      run: |
+        set -euo pipefail
+
+        repo_root="${GITHUB_WORKSPACE}"
+        platform_root=""
+        platform_enabled="false"
+
+        if [[ "${PS_SKIP_PLATFORM_VALIDATED}" == "0" ]]; then
+          platform_root="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
+          platform_enabled="true"
+        fi
+
+        {
+          echo "repo_root=${repo_root}"
+          echo "home_dir=${PS_HOME_ABS}"
+          echo "platform_root=${platform_root}"
+          echo "platform_enabled=${platform_enabled}"
+        } >> "${GITHUB_OUTPUT}"
+
+        printf 'PS.INIT: repo_root=%s\n' "${repo_root}"
+        printf 'PS.INIT: platform_enabled=%s\n' "${platform_enabled}"
+        printf 'PS.INIT: platform_root=%s\n' "${platform_root}"
+        printf 'PS.INIT: OK\n'

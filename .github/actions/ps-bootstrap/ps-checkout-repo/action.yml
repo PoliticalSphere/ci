@@ -1,0 +1,127 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Checkout (Repo)
+# ==============================================================================
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Standardize *repository* checkout with validated inputs and consistent logging.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: ps-checkout-repo
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+# ==============================================================================
+name: "PS Checkout (Repo)"
+description: "Checkout current repository with validated inputs and a pinned action"
+
+inputs:
+  fetch_depth:
+    description: "Git fetch depth (0 = full history, default: 1)"
+    required: false
+    default: "1"
+
+  ref:
+    description: "Optional git ref (branch, tag, or SHA) to checkout"
+    required: false
+    default: ""
+
+  persist_credentials:
+    description: "Whether to persist credentials in the git config (true|false)"
+    required: false
+    default: "false"
+
+  submodules:
+    description: "Submodules mode: false|true|recursive"
+    required: false
+    default: "false"
+
+  require_full_history:
+    description: "Require fetch_depth=0 (true|false). Use for history-based scans."
+    required: false
+    default: "false"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_FETCH_DEPTH_INPUT: ${{ inputs.fetch_depth }}
+        PS_REF_INPUT: ${{ inputs.ref }}
+        PS_PERSIST_CREDENTIALS_INPUT: ${{ inputs.persist_credentials }}
+        PS_SUBMODULES_INPUT: ${{ inputs.submodules }}
+        PS_REQUIRE_FULL_HISTORY_INPUT: ${{ inputs.require_full_history }}
+      run: |
+        set -euo pipefail
+
+        depth="${PS_FETCH_DEPTH_INPUT:-1}"
+        if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
+          printf 'ERROR: inputs.fetch_depth must be a non-negative integer (got %q)\n' "${depth}" >&2
+          exit 1
+        fi
+
+        req="${PS_REQUIRE_FULL_HISTORY_INPUT:-false}"
+        case "${req}" in
+          true|false) ;;
+          *)
+            printf 'ERROR: inputs.require_full_history must be true|false (got %q)\n' "${req}" >&2
+            exit 1
+            ;;
+        esac
+        if [[ "${req}" == "true" && "${depth}" != "0" ]]; then
+          printf 'ERROR: full history required but fetch_depth=%s (expected 0)\n' "${depth}" >&2
+          exit 1
+        fi
+
+        pc="${PS_PERSIST_CREDENTIALS_INPUT:-false}"
+        case "${pc}" in
+          true|false) ;;
+          *)
+            printf 'ERROR: inputs.persist_credentials must be true|false (got %q)\n' "${pc}" >&2
+            exit 1
+            ;;
+        esac
+
+        sm="${PS_SUBMODULES_INPUT:-false}"
+        case "${sm}" in
+          false|true|recursive) ;;
+          *)
+            printf 'ERROR: inputs.submodules must be false|true|recursive (got %q)\n' "${sm}" >&2
+            exit 1
+            ;;
+        esac
+
+        printf 'PS_FETCH_DEPTH_VALIDATED=%s\n' "${depth}" >> "${GITHUB_ENV}"
+        printf 'PS_PERSIST_CREDENTIALS_VALIDATED=%s\n' "${pc}" >> "${GITHUB_ENV}"
+        printf 'PS_SUBMODULES_VALIDATED=%s\n' "${sm}" >> "${GITHUB_ENV}"
+        printf 'PS_REQUIRE_FULL_HISTORY_VALIDATED=%s\n' "${req}" >> "${GITHUB_ENV}"
+
+        ref="${PS_REF_INPUT:-}"
+        printf 'PS.CHECKOUT.REPO: fetch_depth=%s\n' "${depth}"
+        printf 'PS.CHECKOUT.REPO: require_full_history=%s\n' "${req}"
+        printf 'PS.CHECKOUT.REPO: persist_credentials=%s\n' "${pc}"
+        printf 'PS.CHECKOUT.REPO: submodules=%s\n' "${sm}"
+        if [[ -n "${ref}" ]]; then
+          printf 'PS.CHECKOUT.REPO: ref=%s\n' "${ref}"
+        else
+          printf 'PS.CHECKOUT.REPO: ref=<default>\n'
+        fi
+
+    - name: Checkout repository (PS)
+      uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+      with:
+        fetch-depth: ${{ env.PS_FETCH_DEPTH_VALIDATED }}
+        persist-credentials: ${{ env.PS_PERSIST_CREDENTIALS_VALIDATED }}
+        submodules: ${{ env.PS_SUBMODULES_VALIDATED }}
+        ref: ${{ inputs.ref }}
+
+    - name: Checkout complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.CHECKOUT.REPO: OK\n'

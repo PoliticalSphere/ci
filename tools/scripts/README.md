@@ -29,6 +29,9 @@ Scripts in this directory exist to:
 - `/tools/scripts/branding`
   - Output helpers (banner + section headers).
 
+- `/tools/scripts/actions`
+  - Composite action helper scripts (validation + orchestration).
+
 - `/tools/scripts/gates`
   - Lefthook gate entrypoints and shared gate helpers.
 

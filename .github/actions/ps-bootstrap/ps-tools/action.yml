@@ -1,0 +1,216 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Tools
+# ==============================================================================
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: ps-tools
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Install pinned CLI tools in a deterministic, policy-aligned way.
+# Supports:
+#   - bundle-based installs (lint/security)
+#   - optional extra_tools (newline-separated)
+#   - explicit tools list (newline-separated, takes precedence)
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Resolve workspace/platform roots (standard contract)
+#   - Validate and normalise tool selection inputs
+#   - Assemble a final, de-duplicated tool list
+#   - Install pinned tooling into a deterministic install dir
+#   - Optionally run fast PR-oriented security scans (e.g., secrets)
+#
+# DOES NOT:
+#   - Change job permissions
+#   - Perform checkout
+#   - Install project dependencies (npm/pnpm/yarn)
+#
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Small stable input surface with explicit precedence:
+#       tools (explicit) > bundle + extra_tools
+# - Safe-by-default path handling (deny traversal/absolute paths)
+# - Delegation to versioned scripts for complex logic
+#
+# ==============================================================================
+
+name: "PS Tools"
+description: "Install pinned CLI tools (bundle/extra/explicit) using the PS installer"
+
+inputs:
+  # ============================================================================
+  # INSTALL TARGET
+  # ============================================================================
+  install_dir:
+    description: "Repo-relative directory for CLI tools (e.g., .tooling/bin)"
+    required: false
+    default: ".tooling/bin"
+
+  # ============================================================================
+  # TOOL SELECTION
+  # ============================================================================
+  bundle:
+    description: "Predefined tools bundle to install (lint|security|none)"
+    required: false
+    default: "none"
+
+  extra_tools:
+    description: "Optional newline-separated list of extra tool ids (one per line)"
+    required: false
+    default: ""
+
+  tools:
+    description: "Optional explicit newline-separated tool list (one id per line). Takes precedence over bundle/extra_tools."
+    required: false
+    default: ""
+
+  # ============================================================================
+  # OPTIONAL POST-INSTALL TASKS
+  # ============================================================================
+  run_security_scans:
+    description: "Run fast PR-oriented security scans after installing tools (1 = run, 0 = skip)"
+    required: false
+    default: "0"
+
+outputs:
+  resolved_tools:
+    description: "Final newline-separated tool ids selected for install (post validation/assembly)"
+    value: ${{ steps.ps_tools_outputs.outputs.resolved_tools }}
+
+  install_dir_abs:
+    description: "Absolute path to the install directory"
+    value: ${{ steps.ps_tools_outputs.outputs.install_dir_abs }}
+
+runs:
+  using: "composite"
+  steps:
+    # ==========================================================================
+    # 0) ROOT RESOLUTION (STANDARD CONTRACT)
+    # ==========================================================================
+    - name: Resolve platform/workspace roots (PS)
+      shell: bash
+      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-resolve-root.sh"
+
+    # ==========================================================================
+    # 1) INPUT VALIDATION (DEFENSIVE)
+    # ==========================================================================
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+        PS_BUNDLE_INPUT: ${{ inputs.bundle }}
+        PS_EXTRA_INPUT: ${{ inputs.extra_tools }}
+        PS_TOOLS_INPUT: ${{ inputs.tools }}
+        PS_RUN_SECURITY_SCANS_INPUT: ${{ inputs.run_security_scans }}
+      run: |
+        set -euo pipefail
+
+        # --- install_dir hardening (defense-in-depth; scripts may also validate) ---
+        install_dir="${PS_INSTALL_DIR_INPUT:-.tooling/bin}"
+        if [[ -z "${install_dir}" ]]; then
+          echo "ERROR: inputs.install_dir must not be empty" >&2
+          exit 1
+        fi
+        if [[ "${install_dir}" == /* || "${install_dir}" == *".."* ]]; then
+          echo "ERROR: inputs.install_dir must be repo-relative and must not contain '..' or be absolute (got: ${install_dir})" >&2
+          exit 1
+        fi
+
+        # --- basic toggle validation ---
+        case "${PS_RUN_SECURITY_SCANS_INPUT}" in
+          0|1) ;;
+          *) echo "ERROR: inputs.run_security_scans must be '0' or '1' (got: ${PS_RUN_SECURITY_SCANS_INPUT})" >&2; exit 1 ;;
+        esac
+
+        # Delegate canonical validation + normalisation to scripts
+        bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-validate-inputs.sh"
+
+        printf 'PS.TOOLS: inputs validated\n'
+
+    # ==========================================================================
+    # 2) TOOL LIST ASSEMBLY (PRECEDENCE + DEDUP)
+    # ==========================================================================
+    - name: Assemble tool list (PS)
+      shell: bash
+      env:
+        PS_BUNDLE_INPUT: ${{ inputs.bundle }}
+        PS_EXTRA_INPUT: ${{ inputs.extra_tools }}
+        PS_TOOLS_INPUT: ${{ inputs.tools }}
+      run: |
+        set -euo pipefail
+        bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-assemble.sh"
+
+        if [[ -z "${PS_TOOLS:-}" ]]; then
+          echo "PS.TOOLS: nothing to install (PS_TOOLS empty)"
+        else
+          echo "PS.TOOLS: resolved tool list:"
+          printf '%s\n' "${PS_TOOLS}"
+        fi
+
+    # ==========================================================================
+    # 3) INSTALL (PINNED INSTALLER)
+    # ==========================================================================
+    - name: Install tools (PS)
+      shell: bash
+      env:
+        PS_SCRIPTS_ROOT: ${{ env.PS_SCRIPTS_ROOT }}
+        PS_INSTALL_DIR: ${{ inputs.install_dir }}
+        PS_TOOLS: ${{ env.PS_TOOLS }}
+      run: |
+        set -euo pipefail
+
+        # Ensure install directory exists (repo-relative)
+        mkdir -p "${GITHUB_WORKSPACE}/${PS_INSTALL_DIR}"
+
+        bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-tools-install.sh"
+
+        printf 'PS.TOOLS: install complete\n'
+
+    # ==========================================================================
+    # 4) OPTIONAL: FAST SECURITY TASKS
+    # ==========================================================================
+    - name: Run secrets scan (fast) (PS)
+      if: ${{ inputs.run_security_scans == '1' }}
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "secrets.fast"
+        title: "Secrets scan (fast)"
+        description: "Fast PR secret detection"
+        script: "tools/scripts/security/secret-scan-pr.sh"
+        require_files: |
+          tools/scripts/security/secret-scan-pr.sh
+
+    # ==========================================================================
+    # 5) OUTPUTS (STABLE CONTRACT)
+    # ==========================================================================
+    - name: Emit outputs (PS)
+      id: ps_tools_outputs
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+      run: |
+        set -euo pipefail
+
+        install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+        printf 'install_dir_abs=%s\n' "${install_dir_abs}" >> "${GITHUB_OUTPUT}"
+
+        # PS_TOOLS is expected to be newline-separated (may be empty)
+        {
+          echo "resolved_tools<<'EOF'"
+          printf '%s\n' "${PS_TOOLS:-}"
+          echo "EOF"
+        } >> "${GITHUB_OUTPUT}"
+
+        printf 'PS.TOOLS: OK\n'

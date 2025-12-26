@@ -1,0 +1,70 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Write Summary
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Write a structured JSON summary artifact for workflow results.
+#
+# Metadata:
+#   - id: ps-write-summary
+#   - version: 1.0.0
+#   - owner: political-sphere
+#   - classification: internal
+#   - Created: 2025-12-20
+#   - Last updated: 2025-12-20
+# Scope & Responsibilities:
+#   - Does: compute overall status and write a JSON summary file.
+#   - Does NOT: upload artifacts or alter workflow permissions.
+#
+# Design Principles:
+#   - Deterministic and non-interactive execution
+#   - Explicit inputs with validation
+#   - CI-safe, machine-readable output
+#
+# Dependencies:
+#   - tools/scripts/actions/ps-write-summary.sh
+#
+# Dependents:
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/security-scheduled.yml
+#   - ./.github/workflows/build-artifacts.yml
+#   - ./.github/workflows/release.yml
+#
+# Execution Model:
+#   - Trigger: N/A (invoked by workflow steps)
+#   - Type: composite action (internal-only)
+#
+# Security & Policy Notes:
+#   - Secrets: none
+#   - Permissions: inherited from the caller
+#   - Constraints: results must be simple key=value pairs
+#
+# Operational Notes:
+#   - Timeouts: controlled by the calling job
+#   - Artifacts: writes a JSON file at inputs.output_path
+#   - CI vs local: identical behavior
+# ==============================================================================
+
+name: "PS Write Summary"
+description: "Write structured summary JSON for workflow results"
+
+inputs:
+  workflow:
+    description: "Workflow identifier for the summary payload"
+    required: true
+  output_path:
+    description: "Output path for the summary JSON (repo-relative)"
+    required: true
+  results:
+    description: "Newline-separated key=value result pairs"
+    required: true
+
+runs:
+  using: "composite"
+  steps:
+    - name: Write summary
+      shell: bash
+      env:
+        PS_SUMMARY_WORKFLOW: ${{ inputs.workflow }}
+        PS_SUMMARY_OUTPUT_PATH: ${{ inputs.output_path }}
+        PS_SUMMARY_RESULTS: ${{ inputs.results }}
+      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-write-summary.sh"
