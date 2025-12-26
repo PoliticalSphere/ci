@@ -77,11 +77,6 @@ run_lint_step "lint.cspell" "CSPELL" "Spelling checks" \
 run_lint_step "lint.knip" "KNIP" "Dependency audit (knip)" \
   bash "${PS_LINT_SCRIPTS}/knip.sh"
 
-# Typecheck is part of the pre-commit gate, but `lint` historically included
-# only linters; keep parity with gate output by including it as a step.
-run_lint_step "lint.typecheck" "TYPECHECK" "Type checking (tsc)" \
-  bash "${PS_TASKS_SCRIPTS}/typecheck.sh"
-
 # If configured to print only at the end, do it here (and only here).
 if [[ "${PS_LINT_PRINT_MODE}" == "final" ]]; then
   lint_print_final || true
