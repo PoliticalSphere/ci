@@ -647,6 +647,18 @@ function checkLocalActionInputs({ rel, jobId, step }) {
     return violations;
   }
 
+  const skipRaw = String(step.with?.skip_platform_checkout || '')
+    .split('#')[0]
+    .replaceAll('"', '')
+    .replaceAll("'", '')
+    .trim();
+  const skipLower = skipRaw.toLowerCase();
+  const skipPlatform =
+    skipLower === '1' || skipLower === 'true' || skipLower === 'yes';
+  if (skipPlatform) {
+    return violations;
+  }
+
   const allowlist = String(step.with?.platform_allowed_repositories || '');
   if (!allowlist.trim()) {
     violations.push(
@@ -1120,6 +1132,8 @@ async function processStep({
   if (step.uses && isActionUpload(step.uses)) {
     if (step.with.name) {
       uploadNames.push(String(step.with.name).replaceAll('"', ''));
+    } else if (step.with.artifacts_name) {
+      uploadNames.push(String(step.with.artifacts_name).replaceAll('"', ''));
     }
     for (const p of extractUploadPaths(step)) {
       uploadPaths.push(p);

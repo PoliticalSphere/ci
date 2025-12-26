@@ -339,7 +339,19 @@ runs:
         emit_env() {
           local key="$1"
           local val="$2"
-          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              exit 1
+            fi
+            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
         }
 
         # Persist validated values
@@ -429,17 +441,32 @@ runs:
             printf 'PS.INIT: branding skipped (format.sh hash mismatch)\n'
           fi
         fi
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              exit 1
+            fi
+            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+        }
         home_abs="${GITHUB_WORKSPACE}/${PS_HOME_DIR_VALIDATED}"
         mkdir -p "${home_abs}"
 
         # Apply HOME + XDG dirs (keeps tools isolated/deterministic)
-        {
-          echo "HOME=${home_abs}"
-          echo "HOME_ORIGINAL=${PS_HOME_ORIGINAL}"
-          echo "XDG_CACHE_HOME=${home_abs}/.cache"
-          echo "XDG_CONFIG_HOME=${home_abs}/.config"
-          echo "XDG_STATE_HOME=${home_abs}/.state"
-        } >> "${GITHUB_ENV}"
+        emit_env "HOME" "${home_abs}"
+        emit_env "HOME_ORIGINAL" "${PS_HOME_ORIGINAL}"
+        emit_env "XDG_CACHE_HOME" "${home_abs}/.cache"
+        emit_env "XDG_CONFIG_HOME" "${home_abs}/.config"
+        emit_env "XDG_STATE_HOME" "${home_abs}/.state"
 
         mkdir -p "${home_abs}/bin"
         echo "${home_abs}/bin" >> "${GITHUB_PATH}"
@@ -499,8 +526,25 @@ runs:
         # Safety: set -euo pipefail (Strict mode enabled)
         # ----------------------------------------------------------------------------
         set -euo pipefail
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              exit 1
+            fi
+            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+        }
         platform_abs="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
-        printf 'PS_PLATFORM_ROOT<<__PS_ENV__\n%s\n__PS_ENV__\n' "${platform_abs}" >> "${GITHUB_ENV}"
+        emit_env "PS_PLATFORM_ROOT" "${platform_abs}"
         printf 'PS.INIT: PS_PLATFORM_ROOT=%s\n' "${platform_abs}"
 
     # =========================================================================

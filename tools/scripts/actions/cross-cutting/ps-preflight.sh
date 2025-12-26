@@ -22,6 +22,7 @@ error() {
   else
     printf 'ERROR: %q\n' "$*" >&2
   fi
+  return 0
 }
 
 detail() {
@@ -30,6 +31,7 @@ detail() {
   else
     printf '%s\n' "$*"
   fi
+  return 0
 }
 
 check_lines() {
@@ -73,6 +75,7 @@ check_lines() {
         ;;
     esac
   done <<< "${list}"
+  return 0
 }
 
 check_lines "Required file" "${PS_REQUIRE_FILES:-}" "file"

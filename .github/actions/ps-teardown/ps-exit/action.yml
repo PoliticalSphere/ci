@@ -117,6 +117,24 @@ runs:
           printf '%s' "${s}"
         }
 
+        emit_output() {
+          local key="$1"
+          local val="$2"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_OUT_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              echo "ERROR: output value for ${key} contains an unsafe heredoc delimiter" >&2
+              exit 1
+            fi
+            delimiter="__PS_OUT_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_OUTPUT}"
+        }
+
         summary_workflow="$(trim "${PS_SUMMARY_WORKFLOW}")"
         summary_output_path="$(trim "${PS_SUMMARY_OUTPUT_PATH}")"
         summary_results="$(trim "${PS_SUMMARY_RESULTS}")"
@@ -177,14 +195,10 @@ runs:
           fi
         fi
 
-        {
-          echo "run_summary=${run_summary}"
-          echo "run_artifacts=${run_artifacts}"
-          echo "run_pr_comment=${run_pr_comment}"
-          echo "pr_body<<'EOF'"
-          echo "${pr_body}"
-          echo "EOF"
-        } >> "${GITHUB_OUTPUT}"
+        emit_output "run_summary" "${run_summary}"
+        emit_output "run_artifacts" "${run_artifacts}"
+        emit_output "run_pr_comment" "${run_pr_comment}"
+        emit_output "pr_body" "${pr_body}"
 
     - name: Write summary (PS)
       if: ${{ steps.ps_teardown_inputs.outputs.run_summary == '1' }}

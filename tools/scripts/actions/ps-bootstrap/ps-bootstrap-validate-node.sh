@@ -58,8 +58,26 @@ if [[ "${PS_INSTALL_DEP_INPUT}" == "1" ]]; then
 fi
 
 # Persist validated node version and working dir for downstream steps
-printf 'PS_NODE_VERSION_VALIDATED=%s\n' "${PS_NODE_VERSION_INPUT}" >> "${GITHUB_ENV}"
-printf 'PS_WORKING_DIRECTORY=%s\n' "${wd}" >> "${GITHUB_ENV}"
+emit_env() {
+  local key="$1"
+  local val="$2"
+  local sanitized delimiter attempts
+  sanitized="${val//$'\r'/}"
+  delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+  attempts=0
+  while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 6 ]]; then
+      printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+      exit 1
+    fi
+    delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+  done
+  printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+}
+
+emit_env "PS_NODE_VERSION_VALIDATED" "${PS_NODE_VERSION_INPUT}"
+emit_env "PS_WORKING_DIRECTORY" "${wd}"
 
 printf 'PS.NODE_SETUP: node_version=%q\n' "${PS_NODE_VERSION_INPUT}"
 printf 'PS.NODE_SETUP: cache=%q\n' "${PS_CACHE_INPUT}"

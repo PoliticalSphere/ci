@@ -310,7 +310,8 @@ runs:
         safe_relpath "${script_rel}" || fail "inputs.script must be repo-relative without traversal (got: ${script_rel})"
         safe_relpath "${working_directory}" || fail "inputs.working_directory must be repo-relative without traversal (got: ${working_directory})"
 
-        repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
+        repo_root_input="${GITHUB_WORKSPACE:-$(pwd)}"
+        repo_root="$(resolve_abs_path "${repo_root_input}" 2>/dev/null || printf '%s' "${repo_root_input}")"
         script_abs="${repo_root}/${script_rel}"
         working_directory_abs="${repo_root}/${working_directory}"
         check_under_root "${script_abs}"
@@ -325,7 +326,13 @@ runs:
         report_abs="${repo_root}/${report_rel}"
 
         mkdir -p "${repo_root}/logs/ps-task" "${repo_root}/reports/ps-task"
+        # Prevent symlink attacks and ensure restricted permissions on the log file
+        if [[ -L "${log_abs}" ]]; then
+          fail "unsafe log path: ${log_rel} is a symlink"
+        fi
+        umask 077
         : > "${log_abs}"
+        chmod 600 "${log_abs}"
 
         # Tee everything into the task log
         exec > >(tee -a "${log_abs}") 2>&1
@@ -461,6 +468,7 @@ runs:
         # env_kv parsing
         # ----------------------------------------------------------------------------
         env_args=()
+        total_env_kv_bytes=0
         if [[ -n "${env_kv}" ]]; then
           while IFS= read -r line; do
             entry="$(trim "${line}")"
@@ -469,8 +477,28 @@ runs:
             key="${entry%%=*}"
             value="${entry#*=}"
             [[ "${key}" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || fail "env_kv key must be a valid identifier (got: ${key})"
+            # strip CR
+            value="${value//$'\r'/}"
+            [[ "${value}" != *$'\0'* ]] || fail "env_kv value must not contain NUL bytes (key: ${key})"
+
+            # enforce per-value and total size limits
+            val_len=${#value}
+            if (( val_len > 65536 )); then
+              fail "env_kv value too large (key: ${key})"
+            fi
+            total_env_kv_bytes=$((total_env_kv_bytes + val_len))
+            if (( total_env_kv_bytes > 262144 )); then
+              fail "env_kv total size too large"
+            fi
+
             env_args+=("${key}=${value}")
           done <<< "${env_kv}"
+        fi
+
+        # Limit the number of env entries to prevent resource abuse
+        env_kv_count=${#env_args[@]:-0}
+        if (( env_kv_count > 100 )); then
+          fail "env_kv has too many entries (${env_kv_count})"
         fi
 
         # Basic security logging for env_kv and args counts

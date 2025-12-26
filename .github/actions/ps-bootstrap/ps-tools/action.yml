@@ -170,7 +170,19 @@ runs:
         emit_env() {
           local key="$1"
           local val="$2"
-          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              exit 1
+            fi
+            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
         }
 
         # --- basic toggle validation (GitHub-specific sanitization) ---
@@ -211,7 +223,19 @@ runs:
         emit_env() {
           local key="$1"
           local val="$2"
-          printf '%s<<__PS_ENV__\n%s\n__PS_ENV__\n' "${key}" "${val}" >> "${GITHUB_ENV}"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              exit 1
+            fi
+            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
         }
 
         install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"

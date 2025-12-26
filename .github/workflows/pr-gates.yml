@@ -290,7 +290,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      issues: write
+      issues: write # Justification: post lint failure comment via ps-exit
     env:
       PS_FULL_SCAN: "0"
       PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
@@ -772,10 +772,14 @@ jobs:
       - name: SonarCloud scan (PS)
         if: steps.sonar_cfg.outputs.enabled == 'true'
         uses: ./.github/actions/ps-task/sonarcloud
+        env:
+          SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
+          SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
         with:
-          organization: ${{ secrets.SONAR_ORGANIZATION }}
-          project_key: ${{ secrets.SONAR_PROJECT_KEY }}
-          token: ${{ secrets.SONAR_TOKEN }}
+          organization: ${{ env.SONAR_ORGANIZATION }}
+          project_key: ${{ env.SONAR_PROJECT_KEY }}
+          token: ${{ env.SONAR_TOKEN }}
 
       - name: Job teardown (PS)
         if: always()
@@ -811,7 +815,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write # Justification: post PR failure summary comment
     steps:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap/ps-init

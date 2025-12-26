@@ -90,9 +90,27 @@ if [[ -z "${PS_TITLE:-}" ]]; then
   exit 1
 fi
 
-printf 'PS_RUN_ID=%s\n' "${PS_ID}" >> "${GITHUB_ENV}"
-printf 'PS_RUN_TITLE=%s\n' "${PS_TITLE}" >> "${GITHUB_ENV}"
-printf 'PS_RUN_DESCRIPTION=%s\n' "${PS_DESCRIPTION}" >> "${GITHUB_ENV}"
+emit_env() {
+  local key="$1"
+  local val="$2"
+  local sanitized delimiter attempts
+  sanitized="${val//$'\r'/}"
+  delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+  attempts=0
+  while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+    attempts=$((attempts + 1))
+    if [[ "${attempts}" -gt 6 ]]; then
+      printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+      exit 1
+    fi
+    delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+  done
+  printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+}
+
+emit_env "PS_RUN_ID" "${PS_ID}"
+emit_env "PS_RUN_TITLE" "${PS_TITLE}"
+emit_env "PS_RUN_DESCRIPTION" "${PS_DESCRIPTION}"
 
 # Security logging helper: sanitize and timestamp events; write to ${log_abs} if available
 log_security_event() {
@@ -121,6 +139,32 @@ cd "${wd}"
 env_kv="${PS_ENV_KV:-}"
 if [[ -n "${env_kv}" ]]; then
   env_kv_count=$(printf '%s\n' "${env_kv}" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
+  # enforce limits in helper when invoked standalone
+  if (( env_kv_count > 100 )); then
+    printf 'ERROR: env_kv has too many entries (%s)\n' "${env_kv_count}" >&2
+    exit 1
+  fi
+  total_bytes=0
+  while IFS= read -r line; do
+    entry="${line}"
+    [[ -z "${entry}" ]] && continue
+    value="${entry#*=}"
+    value="${value//$'\r'/}"
+    if [[ "${value}" == *$'\0'* ]]; then
+      printf 'ERROR: env_kv value must not contain NUL bytes (entry: %s)\n' "${entry%%=*}" >&2
+      exit 1
+    fi
+    val_len=${#value}
+    if (( val_len > 65536 )); then
+      printf 'ERROR: env_kv value too large (entry: %s)\n' "${entry%%=*}" >&2
+      exit 1
+    fi
+    total_bytes=$((total_bytes + val_len))
+    if (( total_bytes > 262144 )); then
+      printf 'ERROR: env_kv total size too large\n' >&2
+      exit 1
+    fi
+  done <<< "${env_kv}"
 else
   env_kv_count=0
 fi

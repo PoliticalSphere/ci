@@ -353,9 +353,9 @@ export function parseWorkflow(raw) {
     const trimmed = line.trim();
     const indent = line.match(/^(\s*)/)[1].length;
 
-    updateStateOnIndent(state, indent);
-
     if (!trimmed || trimmed.startsWith('#')) continue;
+
+    updateStateOnIndent(state, indent);
 
     handleInlineOn(result, line);
     handleOnStart(state, line, indent);
@@ -408,11 +408,13 @@ export function workflowKeyFromPath(relPath) {
 }
 
 export function extractUploadPaths(step) {
-  const directPath = step.with?.path
-    ? String(step.with.path).replaceAll('"', '')
-    : '';
+  const directValue = step.with?.path ?? step.with?.artifacts_paths ?? '';
+  const directPath = String(directValue).replaceAll('"', '');
   if (directPath && directPath !== '|' && directPath !== '>') {
-    return [directPath];
+    return directPath
+      .split(/\r?\n/)
+      .map((p) => p.trim())
+      .filter(Boolean);
   }
   const paths = [];
   let inPath = false;
@@ -423,11 +425,14 @@ export function extractUploadPaths(step) {
     if (inPath && indent <= pathIndent) {
       inPath = false;
     }
-    if (/^\s{8,}path\s*:/.test(line)) {
-      const match = line.match(/^\s{8,}path\s*:\s*(.+)?$/);
+    if (/^\s{8,}(path|artifacts_paths)\s*:/.test(line)) {
+      const match = line.match(
+        /^\s{8,}(path|artifacts_paths)\s*:\s*(.+)?$/,
+      );
       pathIndent = indent;
-      if (match?.[1] && match[1] !== '|' && match[1] !== '>') {
-        paths.push(match[1].trim());
+      const value = match?.[2];
+      if (value && value !== '|' && value !== '>') {
+        paths.push(value.trim());
         inPath = false;
       } else {
         inPath = true;
@@ -445,6 +450,8 @@ export function extractUploadPaths(step) {
 export function isActionUpload(uses) {
   return (
     uses === './.github/actions/ps-upload-artifacts' ||
+    uses === './.github/actions/ps-teardown/ps-upload-artifacts' ||
+    uses === './.github/actions/ps-teardown/ps-exit' ||
     uses.startsWith('actions/upload-artifact@')
   );
 }
