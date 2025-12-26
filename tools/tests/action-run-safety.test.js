@@ -3,12 +3,12 @@
 // Scan all composite actions and ensure no run blocks interpolate inputs directly
 // (i.e., no occurrences of '${{ inputs.* }}' inside run: | blocks)
 
-import fs from 'node:fs';
 import path from 'node:path';
 import { fail, getRepoRoot, section } from './test-utils.js';
+import { listActionYmls, scanRunBlocks } from './action-safety-utils.js';
 
 const repoRoot = getRepoRoot();
-const actionsRoot = path.join(repoRoot, '.github', 'actions');
+const { actionsRoot, files } = listActionYmls(repoRoot);
 
 section(
   'safety',
@@ -16,60 +16,40 @@ section(
   `Root: ${actionsRoot}`,
 );
 
-if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) {
+if (files.length === 0) {
   // Nothing to do in bootstrap
   process.exit(0);
 }
 
-const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
-const actionDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
-
 const violations = [];
 
-for (const dir of actionDirs) {
-  const ymlPath = path.join(actionsRoot, dir, 'action.yml');
-  if (!fs.existsSync(ymlPath)) continue;
-  const content = fs.readFileSync(ymlPath, 'utf8');
-  const lines = content.split(/\r?\n/);
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    if (/^\s*run\s*:\s*\|/.test(line)) {
-      // scan subsequent lines until next step (- name: ) or EOF
-      for (let j = i + 1; j < lines.length; j++) {
-        const l = lines[j];
-        if (/^\s*-[ \t]+name\s*:\s*/.test(l)) break;
-        if (/^\S/.test(l)) break; // end of indented run block
-        // skip comments
-        if (/^\s*#/.test(l)) continue;
-
-        // detect input interpolation inside run blocks
-        if (/\{\{\s*inputs\./.test(l) || /\$\{\{\s*inputs\./.test(l)) {
-          violations.push({
-            file: ymlPath,
-            line: j + 1,
-            text: l.trim(),
-            reason: 'inputs interpolation',
-          });
-          continue;
-        }
-        // detect secrets interpolation (including github.token)
-        if (
-          /\{\{\s*secrets\./.test(l) ||
-          /\$\{\{\s*secrets\./.test(l) ||
-          /\{\{\s*github\.token\s*\}\}/.test(l) ||
-          /\$\{\{\s*github\.token\s*\}\}/.test(l)
-        ) {
-          violations.push({
-            file: ymlPath,
-            line: j + 1,
-            text: l.trim(),
-            reason: 'secrets interpolation',
-          });
-        }
-      }
+for (const file of files) {
+  scanRunBlocks(file.lines, (line, lineNumber) => {
+    // detect input interpolation inside run blocks
+    if (/\{\{\s*inputs\./.test(line) || /\$\{\{\s*inputs\./.test(line)) {
+      violations.push({
+        file: file.path,
+        line: lineNumber,
+        text: line.trim(),
+        reason: 'inputs interpolation',
+      });
+      return;
     }
-  }
+    // detect secrets interpolation (including github.token)
+    if (
+      /\{\{\s*secrets\./.test(line) ||
+      /\$\{\{\s*secrets\./.test(line) ||
+      /\{\{\s*github\.token\s*\}\}/.test(line) ||
+      /\$\{\{\s*github\.token\s*\}\}/.test(line)
+    ) {
+      violations.push({
+        file: file.path,
+        line: lineNumber,
+        text: line.trim(),
+        reason: 'secrets interpolation',
+      });
+    }
+  });
 }
 
 if (violations.length > 0) {

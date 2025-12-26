@@ -4,7 +4,13 @@ import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
-import { fail, getRepoRoot, mktemp, readYamlFile } from './test-utils.js';
+import { fail, getRepoRoot, readYamlFile } from './test-utils.js';
+import {
+  buildPsRunEnv,
+  createPsRunWorkspace,
+  createScript,
+  getLogPath,
+} from './ps-run-utils.js';
 
 const repoRoot = getRepoRoot();
 const actionYaml = path.join(
@@ -37,27 +43,14 @@ function extractRunScript(outputPath) {
 // Test: log file hardening (symlink rejection + permissions)
 // ----------------------------------------------------------------------------
 (function testLogHardening() {
-  const tmp = mktemp('psrun-');
+  const tmp = createPsRunWorkspace();
   extractRunScript(path.join(tmp, 'run.sh'));
 
-  // create workspace layout
-  fs.mkdirSync(path.join(tmp, 'logs', 'ps-task'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'reports', 'ps-task'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'scripts'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), {
-    recursive: true,
-  });
-  fs.writeFileSync(
-    path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'),
-    '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n',
-    { mode: 0o755 },
-  );
-
   const scriptRel = 'scripts/noop.sh';
-  fs.writeFileSync(
-    path.join(tmp, scriptRel),
+  createScript(
+    tmp,
+    scriptRel,
     '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n',
-    { mode: 0o755 },
   );
 
   const id = 'test-log-hardening';
@@ -65,7 +58,7 @@ function extractRunScript(outputPath) {
 
   // Create a symlink at the expected log path to simulate attack
   const target = path.join(tmp, '..', 'evil.log');
-  const logPath = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
+  const logPath = getLogPath(tmp, id);
   try {
     fs.symlinkSync(target, logPath);
   } catch {
@@ -73,9 +66,7 @@ function extractRunScript(outputPath) {
     // but proceed — test will ensure we detect unsafe path via isSymbolicLink or failure to create
   }
 
-  const env = {
-    GITHUB_WORKSPACE: tmp,
-    GITHUB_ENV: `${tmp}/gh_env`,
+  const env = buildPsRunEnv(tmp, {
     PS_TASK_ID: id,
     PS_TASK_TITLE: title,
     PS_TASK_DESC: '',
@@ -83,9 +74,7 @@ function extractRunScript(outputPath) {
     PS_TASK_WORKDIR: '.',
     PS_TASK_ENV_KV: '',
     PS_TASK_ARGS: '',
-    PATH: '',
-    HOME: process.env.HOME,
-  };
+  });
 
   let out = '';
   try {
@@ -123,38 +112,24 @@ function extractRunScript(outputPath) {
 // Test: env_kv per-value size limit enforcement
 // ----------------------------------------------------------------------------
 (function testEnvKvSizeLimit() {
-  const tmp = mktemp('psrun-');
+  const tmp = createPsRunWorkspace();
   extractRunScript(path.join(tmp, 'run.sh'));
 
-  fs.mkdirSync(path.join(tmp, 'logs', 'ps-task'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'reports', 'ps-task'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'scripts'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), {
-    recursive: true,
-  });
-  fs.writeFileSync(
-    path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'),
-    '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n',
-    { mode: 0o755 },
-  );
-
   const scriptRel = 'scripts/noop.sh';
-  fs.writeFileSync(
-    path.join(tmp, scriptRel),
+  createScript(
+    tmp,
+    scriptRel,
     '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n',
-    { mode: 0o755 },
   );
 
   const id = 'test-env-size';
   const title = 'Env Size Test';
   const huge = 'A'.repeat(70000); // > 65536
   const env_kv = `FOO=${huge}\n`;
-  const logPath = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
+  const logPath = getLogPath(tmp, id);
   const command = `exec > "${logPath}" 2>&1; ${path.join(tmp, 'run.sh')}`;
 
-  const env = {
-    GITHUB_WORKSPACE: tmp,
-    GITHUB_ENV: `${tmp}/gh_env`,
+  const env = buildPsRunEnv(tmp, {
     PS_TASK_ID: id,
     PS_TASK_TITLE: title,
     PS_TASK_DESC: '',
@@ -162,9 +137,7 @@ function extractRunScript(outputPath) {
     PS_TASK_WORKDIR: '.',
     PS_TASK_ENV_KV: env_kv,
     PS_TASK_ARGS: '',
-    PATH: '',
-    HOME: process.env.HOME,
-  };
+  });
 
   try {
     let safePath = '';

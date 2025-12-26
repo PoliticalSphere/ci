@@ -2,44 +2,35 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import path from 'node:path';
 import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
-import { fail, getRepoRoot, mktemp } from './test-utils.js';
+import { fail, getRepoRoot } from './test-utils.js';
+import {
+  buildPsRunEnv,
+  createPsRunWorkspace,
+  createScript,
+  getLogPath,
+  getPsRunHelper,
+} from './ps-run-utils.js';
 
 const repoRoot = getRepoRoot();
 
-function readLog(tmp, id) {
-  const p = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
-  if (!fs.existsSync(p)) return '';
-  return fs.readFileSync(p, 'utf8');
+function readLog(logPath) {
+  if (!fs.existsSync(logPath)) return '';
+  return fs.readFileSync(logPath, 'utf8');
 }
 
 // ----------------------------------------------------------------------------
 // Test: basic security logging
 // ----------------------------------------------------------------------------
 (function testBasicLogging() {
-  const tmp = mktemp('psrun-');
-  // Use the standalone ps-run helper script (simpler environment)
-  fs.mkdirSync(path.join(tmp, 'logs', 'ps-task'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'reports', 'ps-task'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, 'scripts'), { recursive: true });
-  // Provide a minimal print-section.sh used by ps-run
-  fs.mkdirSync(path.join(tmp, 'tools', 'scripts', 'branding'), {
-    recursive: true,
-  });
-  fs.writeFileSync(
-    path.join(tmp, 'tools', 'scripts', 'branding', 'print-section.sh'),
-    '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n',
-    { mode: 0o755 },
-  );
+  const tmp = createPsRunWorkspace();
 
   // target script placed under platform root
   const scriptRel = 'scripts/echo-args.sh';
-  const scriptAbs = path.join(tmp, scriptRel);
-  fs.writeFileSync(
-    scriptAbs,
+  createScript(
+    tmp,
+    scriptRel,
     '#!/usr/bin/env bash\nset -euo pipefail\necho "SCRIPT-RUN: $@"\n',
-    { mode: 0o755 },
   );
 
   const id = 'test-basic-logging';
@@ -47,9 +38,7 @@ function readLog(tmp, id) {
   const env_kv = 'FOO=1\nBAR=2\n';
   const args = 'alpha beta';
 
-  const env = {
-    GITHUB_WORKSPACE: tmp,
-    GITHUB_ENV: `${tmp}/gh_env`,
+  const env = buildPsRunEnv(tmp, {
     PS_ID: id,
     PS_TITLE: title,
     PS_DESCRIPTION: '',
@@ -58,21 +47,11 @@ function readLog(tmp, id) {
     PS_ARGS: args,
     PS_ENV_KV: env_kv,
     PS_ALLOW_ARGS: '1',
-    PS_PLATFORM_ROOT: tmp,
-    PATH: '',
-    HOME: process.env.HOME,
-  };
+  });
 
   // Run the helper script directly
-  const helper = path.join(
-    repoRoot,
-    'tools',
-    'scripts',
-    'actions',
-    'ps-task',
-    'ps-run.sh',
-  );
-  const logPath = path.join(tmp, 'logs', 'ps-task', `${id}.log`);
+  const helper = getPsRunHelper(repoRoot);
+  const logPath = getLogPath(tmp, id);
   const command = `exec > "${logPath}" 2>&1; ${helper}`;
   try {
     let safePath = '';
@@ -88,7 +67,7 @@ function readLog(tmp, id) {
     fail(`ps-run failed: ${out}`);
   }
 
-  const log = readLog(tmp, id);
+  const log = readLog(logPath);
 
   if (!log.includes('task_id=test-basic-logging')) fail('missing task_id log');
   if (!/env_kv_processed count=2/.test(log))
