@@ -76,6 +76,9 @@ Risky changes require an explicit, documented decision.
 
 Baseline building blocks:
 
+- `ps-bootstrap`: bootstrap helpers (e.g., `ps-init`, `ps-node`)
+- `ps-task`: task runner family (e.g., `ps-run`)
+- `ps-teardown`: teardown utilities (e.g., `ps-exit`, `ps-upload-artifacts`)
 - `ps-task/ps-run`: canonical task runner with uniform logs/reports
 - `ps-harden-runner`: wrapper for runner hardening with validated inputs
 - `ps-checkout`: canonical checkout with validated inputs and pinned action
