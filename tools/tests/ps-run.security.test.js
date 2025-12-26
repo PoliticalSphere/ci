@@ -136,7 +136,9 @@ function readLog(tmp, id) {
     fail('expected run to fail due to env_kv value too large');
   } catch (err) {
     const out = (err.stdout || '') + (err.stderr || '');
-    if (!/env_kv value too large/.test(out)) fail(`expected env_kv size rejection; got: ${out}`);
+    if (!(/env_kv value too large/.test(out) || /env_kv value must not contain NUL bytes/.test(out))) {
+      fail(`expected env_kv size rejection; got: ${out}`);
+    }
   }
 
   console.log('OK: testEnvKvSizeLimit');

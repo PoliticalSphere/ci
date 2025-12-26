@@ -175,8 +175,9 @@ runs:
         set -euo pipefail
 
         now_ms() {
-          if date +%s%3N >/dev/null 2>&1; then
-            date +%s%3N
+          # Prefer GNU date with millisecond precision; fallback to seconds*1000.
+          if out=$(date +%s%3N 2>/dev/null) && printf '%s' "$out" | grep -qE '^[0-9]+$'; then
+            printf '%s' "$out"
           else
             printf '%s000' "$(date +%s)"
           fi
@@ -312,6 +313,8 @@ runs:
 
         repo_root_input="${GITHUB_WORKSPACE:-$(pwd)}"
         repo_root="$(resolve_abs_path "${repo_root_input}" 2>/dev/null || printf '%s' "${repo_root_input}")"
+        # Ensure GITHUB_OUTPUT is defined in local/test runs to avoid unbound variable on exit
+        : "${GITHUB_OUTPUT:=${repo_root}/.github_output}"
         script_abs="${repo_root}/${script_rel}"
         working_directory_abs="${repo_root}/${working_directory}"
         check_under_root "${script_abs}"
