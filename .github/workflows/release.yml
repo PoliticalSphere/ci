@@ -259,62 +259,11 @@ jobs:
           tools_bundle: "none"
 
       - name: Compute release plan (no mutation)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.plan" "Compute release plan (no mutation)" 2>/dev/null || true
-
-          version="${PS_RELEASE_VERSION}"
-          if [[ -z "${version}" ]]; then
-            echo "ERROR: release_version is required" >&2
-            exit 1
-          fi
-          if [[ "${version}" == v* ]]; then
-            echo "ERROR: release_version must NOT include a leading 'v' (got: ${version})" >&2
-            exit 1
-          fi
-
-          tag="v${version}"
-
-          # Resolve target commit at release_ref
-          git fetch --quiet --tags --force
-          target_sha="$(git rev-parse --verify "${PS_RELEASE_REF}^{commit}")"
-          echo "PS.RELEASE_PLAN: tag=${tag}"
-          echo "PS.RELEASE_PLAN: ref=${PS_RELEASE_REF}"
-          echo "PS.RELEASE_PLAN: target_sha=${target_sha}"
-
-          if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
-            existing_sha="$(git rev-list -n 1 "${tag}")"
-            echo "PS.RELEASE_PLAN: tag_exists=true (sha=${existing_sha})"
-            if [[ "${existing_sha}" != "${target_sha}" ]]; then
-              echo "PS.RELEASE_PLAN: WARNING tag points to different commit than release_ref"
-            fi
-          else
-            echo "PS.RELEASE_PLAN: tag_exists=false"
-          fi
-
-          # Release notes plan
-          notes_mode="none"
-          if [[ -n "${PS_RELEASE_NOTES_INLINE}" ]]; then
-            notes_mode="inline"
-          elif [[ -n "${PS_RELEASE_NOTES_PATH}" ]]; then
-            notes_mode="file"
-          elif [[ "${PS_GENERATE_NOTES}" == "true" ]]; then
-            notes_mode="generate"
-          fi
-          echo "PS.RELEASE_PLAN: notes_mode=${notes_mode}"
-
-          mkdir -p reports/summary
-          cat > reports/summary/release-plan.json <<JSON
-          {
-            "dry_run": true,
-            "tag": "${tag}",
-            "release_ref": "${PS_RELEASE_REF}",
-            "target_sha": "${target_sha}",
-            "notes_mode": "${notes_mode}"
-          }
-          JSON
+        uses: ./.github/actions/ps-run
+        with:
+          id: compute-release-plan
+          title: Compute release plan (no mutation)
+          script: tools/scripts/release/compute-plan.sh
 
       - name: Upload artifacts (dry-run evidence)
         if: always()
@@ -370,53 +319,19 @@ jobs:
           tools_bundle: "none"
 
       - name: Validate release inputs (publish)
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.validate" "Validate release inputs (publish)" 2>/dev/null || true
-
-          version="${PS_RELEASE_VERSION}"
-          if [[ -z "${version}" ]]; then
-            echo "ERROR: release_version is required" >&2
-            exit 1
-          fi
-          if [[ "${version}" == v* ]]; then
-            echo "ERROR: release_version must NOT include a leading 'v' (got: ${version})" >&2
-            exit 1
-          fi
-          # Simple SemVer sanity (keeps flexibility; script may enforce stricter)
-          if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([\-+][0-9A-Za-z\.-]+)?$ ]]; then
-            echo "ERROR: release_version must look like SemVer (got: ${version})" >&2
-            exit 1
-          fi
+        uses: ./.github/actions/ps-run
+        with:
+          id: validate-release-inputs
+          title: Validate release inputs (publish)
+          script: tools/scripts/release/validate-release-inputs.sh
 
       - name: Prepare release notes mode
         id: notes
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.notes" "Prepare release notes mode" 2>/dev/null || true
-
-          mode="none"
-          if [[ -n "${PS_RELEASE_NOTES_INLINE}" ]]; then
-            mode="inline"
-          elif [[ -n "${PS_RELEASE_NOTES_PATH}" ]]; then
-            mode="file"
-          elif [[ "${PS_GENERATE_NOTES}" == "true" ]]; then
-            mode="generate"
-          fi
-
-          echo "mode=${mode}" >> "$GITHUB_OUTPUT"
-
-          # If file mode, ensure file exists at this ref
-          if [[ "${mode}" == "file" ]]; then
-            if [[ ! -f "${PS_RELEASE_NOTES_PATH}" ]]; then
-              echo "ERROR: release_notes_path not found: ${PS_RELEASE_NOTES_PATH}" >&2
-              exit 1
-            fi
-          fi
+        uses: ./.github/actions/ps-run
+        with:
+          id: prepare-release-notes
+          title: Prepare release notes mode
+          script: tools/scripts/release/prepare-release-notes.sh
 
       - name: Publish release (PS)
         uses: ./.github/actions/ps-run
@@ -430,35 +345,13 @@ jobs:
       # RELEASE VERIFICATION (DETERMINISTIC)
       # ------------------------------------------------------------------------
       - name: Verify tag + release match intended ref
-        shell: bash
+        uses: ./.github/actions/ps-run
+        with:
+          id: verify-release
+          title: Verify tag + release
+          script: tools/scripts/release/verify-release.sh
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-
-          version="${PS_RELEASE_VERSION}"
-          tag="v${version}"
-
-          # Resolve expected commit
-          git fetch --quiet --tags --force
-          expected_sha="$(git rev-parse --verify "${PS_RELEASE_REF}^{commit}")"
-
-          # Verify tag exists and points to expected commit
-          tag_sha="$(git rev-list -n 1 "${tag}")"
-          if [[ "${tag_sha}" != "${expected_sha}" ]]; then
-            echo "ERROR: tag ${tag} points to ${tag_sha}, expected ${expected_sha} (from ${PS_RELEASE_REF})" >&2
-            exit 1
-          fi
-          echo "PS.RELEASE_VERIFY: tag_ok (${tag} -> ${tag_sha})"
-
-          # Verify GitHub Release exists and targets same commit
-          # (gh returns JSON; keep it simple and deterministic)
-          rel_json="$(gh release view "${tag}" --json tagName,targetCommitish,url)"
-          echo "${rel_json}" > "reports/summary/release-verification.json"
-
-          # Best-effort check: ensure tagName matches; targetCommitish is not always a SHA
-          # so we rely primarily on tag correctness and release existence.
-          echo "PS.RELEASE_VERIFY: release_exists (${tag})"
 
       - name: Upload artifacts (release evidence)
         if: always()
@@ -473,13 +366,23 @@ jobs:
 
       - name: Release complete
         if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -f "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" ]]; then
-            bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release" "Release complete"
-          fi
-          echo "PS.RELEASE: OK"
+        uses: ./.github/actions/ps-run
+        with:
+          id: release-complete
+          title: Release complete
+          script: tools/scripts/release/release-complete.sh
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: release
+          summary_output_path: reports/summary/release.json
+          summary_results: release=${{ job.status }}
+          artifacts_name: release-artifacts
+          artifacts_paths: |
+            reports/**
+            logs/**
 
   # ============================================================================
   # AGGREGATION & REPORTING — RELEASE SUMMARY
@@ -532,3 +435,17 @@ jobs:
           path: reports/summary/release.json
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: release
+          summary_output_path: reports/summary/release.json
+          summary_results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            dry-run=${{ needs.dry-run.result }}
+            release=${{ needs.release.result }}
+          artifacts_name: release-summary
+          artifacts_paths: |
+            reports/summary/release.json

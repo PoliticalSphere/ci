@@ -202,3 +202,15 @@ jobs:
           path: reports/summary/consumer-contract.json
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: consumer-contract
+          summary_output_path: reports/summary/consumer-contract.json
+          summary_results: contract=${{ job.status }}
+          artifacts_name: consumer-contract-report
+          artifacts_paths: |
+            reports/**
+            logs/**

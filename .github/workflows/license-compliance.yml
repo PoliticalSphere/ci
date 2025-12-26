@@ -295,3 +295,15 @@ jobs:
           path: reports/summary/license-compliance.json
           if_no_files_found: "warn"
           retention_days: ${{ inputs.retention_days }}
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: license-compliance
+          summary_output_path: reports/summary/license-compliance.json
+          summary_results: license=${{ job.status }}
+          artifacts_name: license-compliance-report
+          artifacts_paths: |
+            reports/**
+            logs/**

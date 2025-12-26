@@ -327,6 +327,16 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-lint.json
+          summary_results: lint=${{ job.status }}
+          artifacts_name: pr-gates-lint
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # QUALITY GATE — TYPECHECK
@@ -376,6 +386,16 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-typecheck.json
+          summary_results: typecheck=${{ job.status }}
+          artifacts_name: pr-gates-typecheck
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # QUALITY GATE — TESTS
@@ -443,6 +463,16 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-tests.json
+          summary_results: test=${{ job.status }}
+          artifacts_name: pr-gates-tests
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # QUALITY GATE — DUPLICATION (JSCPD)
@@ -495,6 +525,16 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-jscpd.json
+          summary_results: jscpd=${{ job.status }}
+          artifacts_name: pr-gates-jscpd
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # BUILD VERIFICATION — BUILD
@@ -544,6 +584,16 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-build.json
+          summary_results: build=${{ job.status }}
+          artifacts_name: pr-gates-build
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # SECURITY GATE — FAST SECRETS SCAN
@@ -593,6 +643,16 @@ jobs:
           path: ${{ inputs.artifact_paths }}
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-secrets.json
+          summary_results: secrets=${{ job.status }}
+          artifacts_name: pr-gates-secrets
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
 
   # ============================================================================
   # SECURITY GATE — DEPENDENCY REVIEW
@@ -637,6 +697,16 @@ jobs:
         with:
           base-ref: ${{ inputs.pr_base_ref }}
           head-ref: ${{ inputs.pr_head_ref }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-dependency-review.json
+          summary_results: dependency-review=${{ job.status }}
+          artifacts_name: pr-gates-dependency-review
+          artifacts_paths: |
+            reports/**
 
   # ============================================================================
   # QUALITY SIGNAL — SONARCLOUD (BASELINE, NON-BLOCKING)
@@ -670,13 +740,11 @@ jobs:
 
       - name: Detect Sonar configuration
         id: sonar_cfg
-        run: |
-          set -euo pipefail
-          enabled="false"
-          if [[ -n "${SONAR_TOKEN:-}" && -n "${SONAR_ORGANIZATION:-}" && -n "${SONAR_PROJECT_KEY:-}" ]]; then
-            enabled="true"
-          fi
-          echo "enabled=${enabled}" >> "$GITHUB_OUTPUT"
+        uses: ./.github/actions/ps-run
+        with:
+          id: detect-sonar
+          title: Detect Sonar configuration
+          script: tools/scripts/ci/detect-sonar-config.sh
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
@@ -723,6 +791,17 @@ jobs:
           path: reports/**
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-sonar.json
+          summary_results: sonar=${{ job.status }}
+          artifacts_name: pr-gates-sonar
+          artifacts_paths: |
+            reports/**
 
   # ============================================================================
   # PR FEEDBACK — FAILURE COMMENT (OPTIONAL)
@@ -790,6 +869,17 @@ jobs:
 
             Check the workflow run for detailed logs and artifacts.
 
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-notify.json
+          summary_results: notify=${{ job.status }}
+          artifacts_name: pr-gates-notify
+          artifacts_paths: |
+            reports/**
+
   # ============================================================================
   # AGGREGATION & REPORTING — PR GATES SUMMARY
   # ----------------------------------------------------------------------------
@@ -852,3 +942,24 @@ jobs:
           path: reports/summary/pr-gates.json
           if_no_files_found: "ignore"
           retention_days: ${{ inputs.retention_days }}
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates.json
+          summary_results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            lint=${{ needs.lint.result }}
+            typecheck=${{ needs.typecheck.result }}
+            test=${{ needs.test.result }}
+            jscpd=${{ needs.jscpd.result }}
+            build=${{ needs.build.result }}
+            secrets=${{ needs.secrets-scan.result }}
+            dependency-review=${{ needs.dependency-review.result }}
+            sonar=${{ needs.sonar.result }}
+            notify=${{ needs.notify.result }}
+          artifacts_name: pr-gates-summary
+          artifacts_paths: |
+            reports/summary/pr-gates.json
