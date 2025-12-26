@@ -108,10 +108,17 @@ export function permissionLevel(value) {
 }
 
 function parseRepoEntry(line) {
-  // Match owner/repo where allowed characters include letters, digits, underscore,
-  // dot, space and hyphen. Use a simpler character class to reduce regex complexity.
-  const repoMatch = line.match(/^\s*-\s*repo:\s*([\w .-]+\/[\w .-]+)/);
-  return repoMatch ? repoMatch[1] : null;
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('- repo:')) return null;
+  const value = trimmed.slice('- repo:'.length).trim();
+  if (!value) return null;
+  const slashIndex = value.indexOf('/');
+  if (slashIndex <= 0 || slashIndex === value.length - 1) return null;
+  const owner = value.slice(0, slashIndex);
+  const repo = value.slice(slashIndex + 1);
+  const validPart = (s) => /^[A-Za-z0-9_. -]+$/.test(s);
+  if (!validPart(owner) || !validPart(repo)) return null;
+  return `${owner}/${repo}`;
 }
 
 function parseAllowed(line) {
@@ -391,9 +398,10 @@ function parsePatternId(line) {
 function parseUses(line) {
   // Allow 'owner/repo' or 'owner/repo/subpath'. Validate owner/repo parts explicitly
   // and return the original value to preserve any additional subpath.
-  const m = line.match(/^\s*uses:\s*(.+)\s*$/);
-  if (!m) return null;
-  const val = m[1].trim();
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('uses:')) return null;
+  const val = trimmed.slice('uses:'.length).trim();
+  if (!val) return null;
   const parts = val.split('/');
   if (parts.length < 2) return null;
   const owner = parts[0];
@@ -410,10 +418,15 @@ function parseEnabled(line) {
 }
 
 function parseWithEntry(line) {
-  const withMatch = line.match(
-    /^\s*([A-Za-z0-9_-]+):\s*([A-Za-z0-9_. -]+)\s*$/,
-  );
-  return withMatch ? { key: withMatch[1], value: withMatch[2] } : null;
+  const trimmed = line.trim();
+  const colon = trimmed.indexOf(':');
+  if (colon <= 0) return null;
+  const key = trimmed.slice(0, colon).trim();
+  const value = trimmed.slice(colon + 1).trim();
+  if (!key || !value) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(key)) return null;
+  if (!/^[A-Za-z0-9_. -]+$/.test(value)) return null;
+  return { key, value };
 }
 
 function cleanRegexEntry(line) {
@@ -521,8 +534,17 @@ function parseTrigger(line) {
 }
 
 function parseWorkflowPath(line) {
-  const pathMatch = line.match(/^\s*workflow_path:\s*["']?(.+?)["']?\s*$/);
-  return pathMatch ? pathMatch[1] : null;
+  const trimmed = line.trim();
+  if (!trimmed.startsWith('workflow_path:')) return null;
+  let value = trimmed.slice('workflow_path:'.length).trim();
+  if (!value) return null;
+  if (
+    (value.startsWith('"') && value.endsWith('"')) ||
+    (value.startsWith("'") && value.endsWith("'"))
+  ) {
+    value = value.slice(1, -1).trim();
+  }
+  return value || null;
 }
 
 function shouldProcessEntry(current, status) {

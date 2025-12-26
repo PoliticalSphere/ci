@@ -21,6 +21,7 @@ error() {
   else
     printf 'ERROR: %s\n' "$*" >&2
   fi
+  return 1
 }
 
 emit_tools_output() {
@@ -36,6 +37,7 @@ emit_tools_output() {
   else
     printf '%s\n' "${tools_value}"
   fi
+  return 0
 }
 
 trim_ws() {
@@ -43,6 +45,7 @@ trim_ws() {
   s="${s#"${s%%[![:space:]]*}"}"
   s="${s%"${s##*[![:space:]]}"}"
   printf '%s' "${s}"
+  return 0
 }
 
 bundle_tools() {
@@ -51,6 +54,7 @@ bundle_tools() {
     security) printf '%s' $'gitleaks' ;;
     *) printf '%s' "" ;;
   esac
+  return 0
 }
 
 # If explicit `tools` provided, normalize and pass it through

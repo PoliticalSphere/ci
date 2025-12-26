@@ -425,12 +425,11 @@ export function extractUploadPaths(step) {
     if (inPath && indent <= pathIndent) {
       inPath = false;
     }
-    if (/^\s{8,}(path|artifacts_paths)\s*:/.test(line)) {
-      const match = line.match(
-        /^\s{8,}(path|artifacts_paths)\s*:\s*(.+)?$/,
-      );
+    const trimmed = line.trimStart();
+    if (trimmed.startsWith('path:') || trimmed.startsWith('artifacts_paths:')) {
+      const colon = trimmed.indexOf(':');
+      const value = colon === -1 ? '' : trimmed.slice(colon + 1).trim();
       pathIndent = indent;
-      const value = match?.[2];
       if (value && value !== '|' && value !== '>') {
         paths.push(value.trim());
         inPath = false;

@@ -40,7 +40,10 @@ function nameFromPath(entryPath) {
     nameFromPathCache.set(entryPath, entryPath);
     return entryPath;
   }
-  const tail = parts[parts.length - 1].replace(/\/+$/, '');
+  let tail = parts[parts.length - 1];
+  while (tail.endsWith('/')) {
+    tail = tail.slice(0, -1);
+  }
   const segments = tail.split('/').filter(Boolean);
   if (segments.length === 0) {
     nameFromPathCache.set(entryPath, entryPath);
@@ -172,9 +175,12 @@ function isValidSpdxId(token) {
 
 function isValidSpdxExpressionToken(token) {
   if (!token) return false;
-  const withMatch = token.match(/^(.+)\s+WITH\s+(.+)$/i);
-  if (withMatch) {
-    return isValidSpdxId(withMatch[1]) && isValidSpdxId(withMatch[2]);
+  const upper = token.toUpperCase();
+  const withIndex = upper.indexOf(' WITH ');
+  if (withIndex !== -1) {
+    const left = token.slice(0, withIndex).trim();
+    const right = token.slice(withIndex + ' WITH '.length).trim();
+    return isValidSpdxId(left) && isValidSpdxId(right);
   }
   return isValidSpdxId(token);
 }
@@ -183,7 +189,9 @@ function evaluateSimpleLicense(policy, license) {
   // Normalize token and remove outer parentheses and whitespace in a clear way
   let tokens = String(license).trim();
   // Remove all leading '(' and all trailing ')' explicitly (avoid ambiguous alternation)
-  tokens = tokens.replace(/^\(+/, '').replace(/\)+$/, '').trim();
+  while (tokens.startsWith('(')) tokens = tokens.slice(1);
+  while (tokens.endsWith(')')) tokens = tokens.slice(0, -1);
+  tokens = tokens.trim();
   if (!tokens) return { ok: false, reason: 'missing-license', match: null };
 
   if (/^SEE LICENSE IN/i.test(tokens)) {

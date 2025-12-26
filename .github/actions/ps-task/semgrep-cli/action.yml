@@ -72,6 +72,11 @@ inputs:
     required: false
     default: ""
 
+  semgrep_allow_unverified:
+    description: "Allow Semgrep install without checksum (true|false)"
+    required: false
+    default: "false"
+
   fail_on_findings:
     description: "If true, fail when Semgrep reports findings (exit 1)"
     required: false
@@ -101,4 +106,5 @@ runs:
           SEMGREP_PATH=${{ inputs.path }}
           SEMGREP_OUTPUT=${{ inputs.output }}
           SEMGREP_SHA256=${{ inputs.semgrep_sha256 }}
+          SEMGREP_ALLOW_UNVERIFIED=${{ inputs.semgrep_allow_unverified }}
           SEMGREP_FAIL_ON_FINDINGS=${{ inputs.fail_on_findings }}

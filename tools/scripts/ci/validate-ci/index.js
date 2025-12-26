@@ -294,13 +294,51 @@ const artifactPolicy = loadArtifactPolicy(artifactPolicyPath);
 
 import { spawnSync } from 'node:child_process';
 
+const SAFE_PATH_DIRS = ['/usr/bin', '/bin', '/usr/sbin', '/sbin'];
+
+function isDirWritable(dir) {
+  try {
+    fs.accessSync(dir, fs.constants.W_OK);
+    return true;
+  } catch (err) {
+    if (err?.code === 'EACCES' || err?.code === 'EPERM') {
+      return false;
+    }
+    fatal(`PATH entry cannot be validated: ${dir}`);
+    return false;
+  }
+}
+
+function buildSafePathEnv() {
+  for (const dir of SAFE_PATH_DIRS) {
+    let stat;
+    try {
+      stat = fs.statSync(dir);
+    } catch (err) {
+      if (err?.code === 'ENOENT') {
+        fatal(`PATH entry does not exist: ${dir}`);
+      }
+      fatal(`PATH entry cannot be statted: ${dir}`);
+    }
+    if (!stat.isDirectory()) {
+      fatal(`PATH entry is not a directory: ${dir}`);
+    }
+    if (isDirWritable(dir)) {
+      fatal(`PATH entry must be non-writable: ${dir}`);
+    }
+  }
+  return SAFE_PATH_DIRS.join(':');
+}
+
+const SAFE_PATH = buildSafePathEnv();
+
 function tryGit(args) {
   const parts = String(args).split(/\s+/).filter(Boolean);
   const r = spawnSync('git', parts, {
     cwd: workspaceRoot,
     stdio: ['ignore', 'pipe', 'ignore'],
     encoding: 'utf8',
-    env: { PATH: '/usr/bin:/bin:/usr/sbin:/sbin' },
+    env: { PATH: SAFE_PATH },
   });
   if (r && r.status === 0) return String(r.stdout || '').trim();
   return '';

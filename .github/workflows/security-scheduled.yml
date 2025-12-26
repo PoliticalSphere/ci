@@ -91,10 +91,28 @@ on:
         description: "Platform repository ref"
         type: string
         required: false
-        default: "main"
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
 
       platform_require_pinned_ref:
         description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+      semgrep_version:
+        description: "Pinned Semgrep version to install"
+        type: string
+        required: false
+        default: "1.146.0"
+
+      semgrep_sha256:
+        description: "SHA-256 checksum for the Semgrep package artifact"
+        type: string
+        required: false
+        default: "a8eaae8191c3dd5b85c7b40cfaeca6db623fe387c85f8938176d112855cca829"
+
+      semgrep_allow_unverified:
+        description: "Allow Semgrep install without checksum (true|false)"
         type: string
         required: false
         default: "false"
@@ -151,7 +169,7 @@ jobs:
       node_version: ${{ inputs.node_version || '22' }}
       fetch_depth: ${{ inputs.fetch_depth || 1 }}
       cache: ${{ inputs.cache || '1' }}
-      platform_ref: ${{ inputs.platform_ref || 'main' }}
+      platform_ref: ${{ inputs.platform_ref }}
       artifact_name: security-scheduled-validate-ci
       retention_days: 7
 
@@ -171,7 +189,7 @@ jobs:
         with:
           fetch_depth: 0
           platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref || 'main' }}
+          platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
@@ -218,7 +236,7 @@ jobs:
         with:
           fetch_depth: 1
           platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref || 'main' }}
+          platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
@@ -260,7 +278,7 @@ jobs:
         with:
           fetch_depth: 1
           platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref || 'main' }}
+          platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
@@ -270,9 +288,12 @@ jobs:
       - name: Run Semgrep (SARIF)
         uses: ./.github/actions/ps-task/semgrep-cli
         with:
+          version: ${{ inputs.semgrep_version }}
           config: "p/ci"
           path: "."
           output: "semgrep.sarif"
+          semgrep_sha256: ${{ inputs.semgrep_sha256 }}
+          semgrep_allow_unverified: ${{ inputs.semgrep_allow_unverified }}
       - name: Job teardown (PS)
         if: always()
         uses: ./.github/actions/ps-teardown/ps-exit
@@ -303,7 +324,7 @@ jobs:
         with:
           fetch_depth: 1
           platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref || 'main' }}
+          platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
           platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}

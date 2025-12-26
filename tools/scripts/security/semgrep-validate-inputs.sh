@@ -73,6 +73,7 @@ fail_on_findings="${SEMGREP_FAIL_ON_FINDINGS_INPUT:-}"
 checksum="${SEMGREP_SHA256_INPUT:-}"
 config="${SEMGREP_CONFIG_INPUT:-}"
 scan_path="${SEMGREP_PATH_INPUT:-.}"
+allow_unverified="${SEMGREP_ALLOW_UNVERIFIED_INPUT:-${SEMGREP_ALLOW_UNVERIFIED:-false}}"
 
 require_nonempty "inputs.version" "${version}" || exit 1
 require_regex \
@@ -82,6 +83,15 @@ require_regex \
   "Use a pinned SemVer like 1.461.0." || exit 1
 
 require_enum "inputs.fail_on_findings" "${fail_on_findings}" true false || exit 1
+
+case "$(printf '%s' "${allow_unverified}" | tr '[:upper:]' '[:lower:]')" in
+  1|true|yes|y|on) allow_unverified="true" ;;
+  0|false|no|n|off|"") allow_unverified="false" ;;
+  *)
+    v_error "inputs.semgrep_allow_unverified must be true|false (got: ${allow_unverified})"
+    exit 1
+    ;;
+esac
 
 # Config validation: allow registry refs or safe repo-relative paths.
 require_nonempty "inputs.config" "${config}" || exit 1
@@ -115,6 +125,13 @@ if [[ -n "${checksum}" ]]; then
     "Use a 64-character SHA-256 hex string." || exit 1
 fi
 
+if [[ "${CI:-}" == "1" || "${CI:-}" == "true" ]]; then
+  if [[ -z "${checksum}" && "${allow_unverified}" != "true" ]]; then
+    v_error "inputs.semgrep_sha256 is required in CI (set semgrep_sha256 or semgrep_allow_unverified=true)"
+    exit 1
+  fi
+fi
+
 # Basic output sanity (avoid empty / weird values).
 out="${SEMGREP_OUTPUT_INPUT:-}"
 require_nonempty "inputs.output" "${out}" || exit 1
@@ -138,3 +155,4 @@ if [[ -n "${checksum}" ]]; then
   printf 'PS.SEMGREP: sha256=%q\n' "$checksum"
 fi
 printf 'PS.SEMGREP: fail_on_findings=%q\n' "$fail_on_findings"
+printf 'PS.SEMGREP: allow_unverified=%q\n' "$allow_unverified"

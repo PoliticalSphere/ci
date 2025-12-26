@@ -27,6 +27,7 @@ scan_path="${SEMGREP_PATH:-.}"
 output="${SEMGREP_OUTPUT:-reports/semgrep/semgrep.sarif}"
 checksum="${SEMGREP_SHA256:-}"
 fail_on_findings="${SEMGREP_FAIL_ON_FINDINGS:-true}"
+allow_unverified="${SEMGREP_ALLOW_UNVERIFIED:-false}"
 
 SEMGREP_VERSION_INPUT="${version}"
 SEMGREP_FAIL_ON_FINDINGS_INPUT="${fail_on_findings}"
@@ -34,6 +35,7 @@ SEMGREP_OUTPUT_INPUT="${output}"
 SEMGREP_CONFIG_INPUT="${config}"
 SEMGREP_PATH_INPUT="${scan_path}"
 SEMGREP_SHA256_INPUT="${checksum}"
+SEMGREP_ALLOW_UNVERIFIED_INPUT="${allow_unverified}"
 
 export SEMGREP_VERSION_INPUT
 export SEMGREP_FAIL_ON_FINDINGS_INPUT
@@ -41,6 +43,7 @@ export SEMGREP_OUTPUT_INPUT
 export SEMGREP_CONFIG_INPUT
 export SEMGREP_PATH_INPUT
 export SEMGREP_SHA256_INPUT
+export SEMGREP_ALLOW_UNVERIFIED_INPUT
 
 bash "${GITHUB_WORKSPACE}/tools/scripts/security/semgrep-validate-inputs.sh"
 
