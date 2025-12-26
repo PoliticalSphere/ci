@@ -115,6 +115,37 @@ function parseBraceQuantifier(str, i) {
 // Helper: detect unbounded quantifiers (+, *, or open-ended {,}) in a
 // pattern fragment. Kept at module scope so it can be tested independently
 // and to reduce nested complexity inside `compileRegex`.
+
+// Skip over a character class starting at `idx` (where `str[idx] === '['`).
+function skipCharClassIn(str, idx) {
+  const len = str.length;
+  idx++;
+  while (idx < len) {
+    if (str[idx] === '\\') {
+      idx += 2;
+      continue;
+    }
+    if (str[idx] === ']') {
+      idx++;
+      break;
+    }
+    idx++;
+  }
+  return idx;
+}
+
+// Return true if an unbounded quantifier appears at `idx` (e.g., '+', '*', or
+// an open-ended brace quantifier like '{,}' or '{n,}').
+function isUnboundedQuantifierAt(str, idx) {
+  const ch = str[idx];
+  if (ch === '+' || ch === '*') return true;
+  if (ch === '{') {
+    const q = parseBraceQuantifier(str, idx);
+    return q.isQuantifier && q.isUnbounded;
+  }
+  return false;
+}
+
 function _hasUnboundedQuantifierIn(str) {
   let i = 0;
   const len = str.length;
@@ -127,25 +158,10 @@ function _hasUnboundedQuantifierIn(str) {
     }
     // Skip character classes
     if (ch === '[') {
-      i++;
-      while (i < len) {
-        if (str[i] === '\\') {
-          i += 2;
-          continue;
-        }
-        if (str[i] === ']') {
-          i++;
-          break;
-        }
-        i++;
-      }
+      i = skipCharClassIn(str, i);
       continue;
     }
-    if (ch === '+' || ch === '*') return true;
-    if (ch === '{') {
-      const q = parseBraceQuantifier(str, i);
-      if (q.isQuantifier && q.isUnbounded) return true;
-    }
+    if (isUnboundedQuantifierAt(str, i)) return true;
     i++;
   }
   return false;
