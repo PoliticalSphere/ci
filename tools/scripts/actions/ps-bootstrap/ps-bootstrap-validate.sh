@@ -10,6 +10,8 @@ set -euo pipefail
 
 
 # Normalize and validate basic inputs
+# Boolean regex used in multiple places
+BOOL_RE='^(0|1)$' 
 if ! printf '%s' "${PS_FETCH_DEPTH_INPUT:-}" | grep -Eq '^[0-9]+$'; then
   printf 'ERROR: fetch_depth must be a non-negative integer. Got: %s\n' "${PS_FETCH_DEPTH_INPUT:-}" >&2
   exit 1
@@ -52,27 +54,27 @@ if [[ "${wd}" == *".."* ]]; then
 fi
 
 # Validate boolean flags
-if ! printf '%s' "${PS_SKIP_HARDEN_INPUT:-}" | grep -Eq '^(0|1)$'; then
+if ! printf '%s' "${PS_SKIP_HARDEN_INPUT:-}" | grep -Eq "${BOOL_RE}"; then
   printf 'ERROR: inputs.skip_harden must be 0 or 1. Got: %s\n' "${PS_SKIP_HARDEN_INPUT:-}" >&2
   exit 1
 fi
-if ! printf '%s' "${PS_SKIP_CHECKOUT_INPUT:-}" | grep -Eq '^(0|1)$'; then
+if ! printf '%s' "${PS_SKIP_CHECKOUT_INPUT:-}" | grep -Eq "${BOOL_RE}"; then
   printf 'ERROR: inputs.skip_checkout must be 0 or 1. Got: %s\n' "${PS_SKIP_CHECKOUT_INPUT:-}" >&2
   exit 1
 fi
-if ! printf '%s' "${PS_CACHE_INPUT:-}" | grep -Eq '^(0|1)$'; then
+if ! printf '%s' "${PS_CACHE_INPUT:-}" | grep -Eq "${BOOL_RE}"; then
   printf 'ERROR: inputs.cache must be 0 or 1. Got: %s\n' "${PS_CACHE_INPUT:-}" >&2
   exit 1
 fi
-if ! printf '%s' "${PS_INSTALL_DEP_INPUT:-}" | grep -Eq '^(0|1)$'; then
+if ! printf '%s' "${PS_INSTALL_DEP_INPUT:-}" | grep -Eq "${BOOL_RE}"; then
   printf 'ERROR: inputs.install_dependencies must be 0 or 1. Got: %s\n' "${PS_INSTALL_DEP_INPUT:-}" >&2
   exit 1
 fi
-if ! printf '%s' "${PS_INSTALL_TOOLS_INPUT:-}" | grep -Eq '^(0|1)$'; then
+if ! printf '%s' "${PS_INSTALL_TOOLS_INPUT:-}" | grep -Eq "${BOOL_RE}"; then
   printf 'ERROR: inputs.install_tools must be 0 or 1. Got: %s\n' "${PS_INSTALL_TOOLS_INPUT:-}" >&2
   exit 1
 fi
-if ! printf '%s' "${PS_ALLOW_UNSAFE_INPUT:-}" | grep -Eq '^(0|1)$'; then
+if ! printf '%s' "${PS_ALLOW_UNSAFE_INPUT:-}" | grep -Eq "${BOOL_RE}"; then
   printf 'ERROR: inputs.allow_unsafe must be 0 or 1. Got: %s\n' "${PS_ALLOW_UNSAFE_INPUT:-}" >&2
   exit 1
 fi
