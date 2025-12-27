@@ -105,7 +105,9 @@ inputs:
     default: ""
 
   tools:
-    description: "Optional explicit newline-separated tool list (one id per line). Takes precedence over bundle/extra_tools."
+    description: >-
+      Optional explicit newline-separated tool list (one id per line). Takes
+      precedence over bundle/extra_tools.
     required: false
     default: ""
 
@@ -185,12 +187,22 @@ runs:
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
 
         # --- basic toggle validation (GitHub-specific sanitization) ---
-        run_scans="$(norm_bool "${PS_RUN_SECURITY_SCANS_INPUT}")" || { echo "ERROR: inputs.run_security_scans must be 0/1/true/false (got: ${PS_RUN_SECURITY_SCANS_INPUT})" >&2; exit 1; }
-        cache_tools="$(norm_bool "${PS_CACHE_TOOLS_INPUT}")" || { echo "ERROR: inputs.cache_tools must be 0/1/true/false (got: ${PS_CACHE_TOOLS_INPUT})" >&2; exit 1; }
+        run_scans="$(norm_bool "${PS_RUN_SECURITY_SCANS_INPUT}")" || {
+          err_msg="ERROR: inputs.run_security_scans must be 0/1/true/false"
+          err_msg="${err_msg} (got: ${PS_RUN_SECURITY_SCANS_INPUT})"
+          echo "${err_msg}" >&2
+          exit 1
+        }
+        cache_tools="$(norm_bool "${PS_CACHE_TOOLS_INPUT}")" || {
+          echo "ERROR: inputs.cache_tools must be 0/1/true/false (got: ${PS_CACHE_TOOLS_INPUT})" >&2
+          exit 1
+        }
 
         # Delegate canonical validation + normalisation to scripts
         scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
@@ -238,7 +250,9 @@ runs:
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
 
         install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
@@ -271,10 +285,35 @@ runs:
           fi
         done <<< "${PS_RESOLVED_TOOLS}"
 
-        tools_hash="$(python3 -c "import hashlib, os; print(hashlib.sha256(os.environ.get('PS_RESOLVED_TOOLS','').encode('utf-8')).hexdigest())")"
+        py_tools_hash_cmd="import hashlib, os"
+        py_tools_hash_cmd+=$'\nprint(hashlib.sha256('
+        py_tools_hash_cmd+=$'os.environ.get("PS_RESOLVED_TOOLS","").encode("utf-8")).hexdigest())'
+        tools_hash="$(python3 -c "${py_tools_hash_cmd}")"
         export PS_SCRIPTS_ROOT="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
-        installer_hash="$(python3 -c "import hashlib, os; root=os.environ.get('PS_SCRIPTS_ROOT') or os.environ.get('GITHUB_WORKSPACE',''); path=os.path.join(root, 'tools/scripts/actions/ps-tools/ps-tools-install.sh'); print(hashlib.sha256(open(path,'rb').read()).hexdigest()) if os.path.exists(path) else print('default-version')")"
-        helper_hash="$(python3 -c $'import glob,hashlib,os\nroot=os.environ.get(\"PS_SCRIPTS_ROOT\") or os.environ.get(\"GITHUB_WORKSPACE\",\"\")\npaths=[os.path.join(root,\"tools/scripts/ci/install-tools.sh\")]\npaths+=glob.glob(os.path.join(root,\"configs/security\",\"*.env\"))\npaths=sorted(set(paths))\nh=hashlib.sha256()\nfound=False\nfor p in paths:\n    if os.path.exists(p):\n        with open(p,\"rb\") as f: h.update(f.read()); found=True\nprint(h.hexdigest() if found else \"default-version\")')"
+        py_installer_hash_cmd="import hashlib, os"
+        py_installer_hash_cmd+=$'\nroot = os.environ.get("PS_SCRIPTS_ROOT") or '
+        py_installer_hash_cmd+=$'os.environ.get("GITHUB_WORKSPACE","")'
+        py_installer_hash_cmd+=$'\npath = os.path.join(root, '
+        py_installer_hash_cmd+=$'"tools/scripts/actions/ps-tools/ps-tools-install.sh")'
+        py_installer_hash_cmd+=$'\nif os.path.exists(path):'
+        py_installer_hash_cmd+=$'\n    data = open(path, "rb").read()'
+        py_installer_hash_cmd+=$'\n    print(hashlib.sha256(data).hexdigest())'
+        py_installer_hash_cmd+=$'\nelse:'
+        py_installer_hash_cmd+=$'\n    print("default-version")'
+        installer_hash="$(python3 -c "${py_installer_hash_cmd}")"
+        py_helper_hash_cmd="import glob,hashlib,os"
+        py_helper_hash_cmd+=$'\nroot=os.environ.get("PS_SCRIPTS_ROOT") or '
+        py_helper_hash_cmd+=$'os.environ.get("GITHUB_WORKSPACE","")'
+        py_helper_hash_cmd+=$'\npaths=[os.path.join(root,"tools/scripts/ci/install-tools.sh")]'
+        py_helper_hash_cmd+=$'\npaths+=glob.glob(os.path.join(root,"configs/security","*.env"))'
+        py_helper_hash_cmd+=$'\npaths=sorted(set(paths))'
+        py_helper_hash_cmd+=$'\nh=hashlib.sha256()'
+        py_helper_hash_cmd+=$'\nfound=False'
+        py_helper_hash_cmd+=$'\nfor p in paths:'
+        py_helper_hash_cmd+=$'\n    if os.path.exists(p):'
+        py_helper_hash_cmd+=$'\n        with open(p,"rb") as f: h.update(f.read()); found=True'
+        py_helper_hash_cmd+=$'\nprint(h.hexdigest() if found else "default-version")'
+        helper_hash="$(python3 -c "${py_helper_hash_cmd}")"
         cache_key="ps-tools-${RUNNER_OS}-${installer_hash}-${helper_hash}-${tools_hash}"
         cache_path="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
 
@@ -293,7 +332,9 @@ runs:
     # 3) INSTALL (PINNED INSTALLER)
     # ==========================================================================
     - name: Install tools (PS)
-      if: ${{ env.PS_CACHE_TOOLS_VALIDATED != '1' || steps.restore_tools_cache.outputs.cache-hit != 'true' }}
+      if: >-
+        ${{ env.PS_CACHE_TOOLS_VALIDATED != '1' ||
+        steps.restore_tools_cache.outputs.cache-hit != 'true' }}
       shell: bash
       env:
         PS_SCRIPTS_ROOT: ${{ env.PS_SCRIPTS_ROOT }}
@@ -338,7 +379,8 @@ runs:
             exit 1
           fi
           if [[ -L "${tool_path}" ]]; then
-            link_target="$(python3 -c "import os,sys; print(os.path.realpath(sys.argv[1]))" "${tool_path}")"
+            py_realpath_cmd=$'import os, sys\nprint(os.path.realpath(sys.argv[1]))'
+            link_target="$(python3 -c "${py_realpath_cmd}" "${tool_path}")"
             if [[ "${link_target}" != "${install_dir_abs}/"* ]]; then
               echo "ERROR: tool symlink escapes install_dir: ${tool_trim}" >&2
               exit 1

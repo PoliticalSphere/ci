@@ -59,7 +59,7 @@ fi
 _short_path() {
   local p="$1"
   if [[ -n "${repo_root:-}" && "${p}" == "${repo_root}/"* ]]; then
-    printf '%s' "${p#${repo_root}/}"
+    printf '%s' "${p#"${repo_root}"/}"
   else
     printf '%s' "${p}"
   fi

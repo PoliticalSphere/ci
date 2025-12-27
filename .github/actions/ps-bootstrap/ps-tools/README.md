@@ -69,11 +69,18 @@ policy-aligned binaries are installed consistently across runners.
 
 ## Notes
 
-- Tool selection precedence is: `tools` > `bundle` + `extra_tools` (bundle/extras ignored when `tools` is set).
+- Tool selection precedence is:
+  - `tools` (highest precedence)
+  - `bundle` + `extra_tools` (ignored when `tools` is set)
 - `install_dir` must be repo-relative and must not contain `..` or be absolute.
-- When `cache_tools` is enabled, the cache key is derived from the resolved tool list, runner OS, installer script hash, and any `configs/security/*.env` files that define tool versions.
-- If your repo does not provide `configs/security/*.env`, caching remains functional but may not invalidate when tool versions change.
-- Tools are added to `GITHUB_PATH` for subsequent workflow steps, but not for earlier steps inside this composite action. Use the absolute path from `PS_TOOLS_BIN` if a step inside this action needs to invoke a tool.
+- When `cache_tools` is enabled, the cache key is derived from the resolved
+  tool list, runner OS, and installer script hash. It also incorporates any
+  `configs/security/*.env` files that define tool versions.
+- If your repo does not provide `configs/security/*.env`, caching remains
+  functional but may not invalidate when tool versions change.
+- Tools are added to `GITHUB_PATH` for subsequent workflow steps, but not for
+  earlier steps inside this composite action. If a step inside this action needs
+  to invoke a tool, use the absolute path from `PS_TOOLS_BIN`.
 - The action uses `python3` for hashing and symlink resolution. Ensure Python 3
   is available on self-hosted runners.
 - Enabling `run_security_scans` runs a fast secrets scan immediately after

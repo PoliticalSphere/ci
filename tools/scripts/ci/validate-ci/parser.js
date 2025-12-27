@@ -466,7 +466,7 @@ function shouldClosePathBlock(inPath, indent, pathIndent) {
 }
 
 function isPathBlockStart(trimmed) {
-  return trimmed.startsWith('path:')||trimmed.startsWith('artifacts_paths:');
+  return trimmed.startsWith('path:') || trimmed.startsWith('artifacts_paths:');
 }
 
 function extractInlinePathValue(trimmed) {

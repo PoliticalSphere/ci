@@ -112,6 +112,7 @@ LINT_IDS=()
 LINT_LABELS=()
 LINT_STATUSES=()
 LINT_LOGS=()
+LINT_PIDS=()
 
 # shellcheck disable=SC2034 # read by callers
 LINT_FAILED=0
@@ -131,7 +132,8 @@ _ps_last_command() {
 
 on_error() {
   local exit_code="$?"
-  local cmd="$(_ps_last_command)"
+  local cmd=""
+  cmd="$(_ps_last_command)"
   local where=""
   if [[ ${#BASH_LINENO[@]} -gt 0 ]]; then where="line ${BASH_LINENO[0]}"; fi
 
@@ -196,7 +198,7 @@ _short_log_ref() {
   local p="${1:-}"
   [[ -n "${p}" ]] || { printf '%s' "-"; return 0; }
   if [[ -n "${repo_root:-}" && "${p}" == "${repo_root}/"* ]]; then
-    printf '%s' "${p#${repo_root}/}"
+    printf '%s' "${p#"${repo_root}"/}"
     return 0
   fi
   basename -- "${p}"
@@ -290,6 +292,7 @@ _ps_should_print_summary_now() {
 }
 
 print_lint_summary() {
+  local force="${1:-0}"
   # Allow immediate printing in these common non-interactive scenarios:
   # - running in CI (CI=1)
   # - caller explicitly disabled inline updates (PS_LINT_INLINE=0)
@@ -297,18 +300,22 @@ print_lint_summary() {
   # If caller explicitly requested inline mode and this terminal supports
   # inline updates, avoid printing the initial waiting summary — it creates
   # noisy duplicate output with per-step lines that appear as steps finish.
-  if [[ "${PS_LINT_PRINT_MODE:-}" == "inline" && _ps_is_interactive_tty && _lint_all_waiting ]]; then
+  if [[ "${force}" -ne 1 ]] && \
+    [[ "${PS_LINT_PRINT_MODE:-}" == "inline" ]] && \
+    _ps_is_interactive_tty && \
+    _lint_all_waiting; then
     return 0
   fi
 
-  if [[ -n "${GITHUB_RUN_ID:-}" ]] || [[ "${CI:-0}" == "1" ]] || [[ "${PS_LINT_INLINE:-1}" == "0" ]]; then
+  if [[ "${force}" -ne 1 ]] && \
+    ([[ -n "${GITHUB_RUN_ID:-}" ]] || [[ "${CI:-0}" == "1" ]] || [[ "${PS_LINT_INLINE:-1}" == "0" ]]); then
     :
   else
     _ps_should_print_summary_now || return 0
   fi
 
   # Deduplicate header across processes when GITHUB_RUN_ID is set
-  if [[ -n "${GITHUB_RUN_ID:-}" ]]; then
+  if [[ "${force}" -ne 1 && -n "${GITHUB_RUN_ID:-}" ]]; then
     mkdir -p "${LINT_DIR}"
     # Remove stale per-run markers older than ~1 minute to avoid leaks across dev runs
     # Use +1 to avoid removing markers created very recently (reduces race/flakiness)
@@ -323,7 +330,8 @@ print_lint_summary() {
   fi
 
   # Only print once per process, except for inline TTY updates.
-  if [[ "${LINT_SUMMARY_EVER_PRINTED:-0}" -eq 1 ]] && ! (_ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" == "inline" || "${PS_LINT_PRINT_MODE}" == "auto" ]]); then
+  if [[ "${force}" -ne 1 && "${LINT_SUMMARY_EVER_PRINTED:-0}" -eq 1 ]] && \
+    ! (_ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]] && [[ "${PS_LINT_PRINT_MODE}" == "inline" || "${PS_LINT_PRINT_MODE}" == "auto" ]]); then
     return 0
   fi
 
@@ -375,7 +383,7 @@ print_lint_summary() {
       case "${status}" in
         PASS)     _append "${lint_indent}${padded} ${c_green}${c_bold}PASS${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
         FAIL)     _append "${lint_indent}${padded} ${c_red}${c_bold}FAIL${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
-        ERROR)    _append "${lint_indent}${padded} ${c_red}${c_bold}ERROR${c_reset}  ${c_dim}${log_ref}${c_reset}" ;;
+        ERROR)    _append "${lint_indent}${padded} ${c_yellow}${c_bold}ERROR${c_reset}  ${c_dim}${log_ref}${c_reset}" ;;
         SKIPPED)  _append "${lint_indent}${padded} ${c_yellow}${c_bold}SKIPPED${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
         Running*) _append "${lint_indent}${padded} ${c_cyan}Running...${c_reset}" ;;
         Waiting)  _append "${lint_indent}${padded} ${c_dim}Waiting...${c_reset}" ;;
@@ -395,7 +403,7 @@ print_lint_summary() {
   if [[ -n "${LINT_DIR:-}" ]]; then
     mkdir -p "${LINT_DIR}"
     if command -v python3 >/dev/null 2>&1; then
-      python3 - <<'PY' "${LINT_DIR}/summary.txt"
+      printf '%s' "${buf}" | python3 - "${LINT_DIR}/summary.txt" <<'PY'
 import re
 import sys
 
@@ -417,9 +425,15 @@ PY
 
 lint_print_final() {
   local prev="${PS_LINT_PRINT_MODE}"
+  local prev_printed="${LINT_SUMMARY_EVER_PRINTED}"
+  local prev_started="${LINT_SUMMARY_EVER_STARTED}"
   PS_LINT_PRINT_MODE="first"
-  print_lint_summary
+  LINT_SUMMARY_EVER_PRINTED=0
+  LINT_SUMMARY_EVER_STARTED=1
+  print_lint_summary 1
   PS_LINT_PRINT_MODE="${prev}"
+  LINT_SUMMARY_EVER_PRINTED="${prev_printed}"
+  LINT_SUMMARY_EVER_STARTED="${prev_started}"
   return 0
 }
 
@@ -433,6 +447,7 @@ lint_init() {
   LINT_LABELS=()
   LINT_STATUSES=()
   LINT_LOGS=()
+  LINT_PIDS=()
   LINT_FAILED=0
   LINT_SUMMARY_LINES=0
   LINT_SUMMARY_EVER_PRINTED=0
@@ -459,8 +474,101 @@ lint_init() {
     LINT_LABELS+=("${label}")
     LINT_STATUSES+=("Waiting")
     LINT_LOGS+=("")
+    LINT_PIDS+=("")
   done
 
+  return 0
+}
+
+lint_eval_status() {
+  local id="$1"
+  local rc="$2"
+  local log_file="$3"
+  local status="PASS"
+
+  if [[ ${rc} -ne 0 ]]; then
+    status="FAIL"
+
+    if grep -Eiq "config not found|cannot read config file|invalid configuration|configuration error|failed to load config|YAMLException:" "${log_file}"; then
+      status="ERROR"
+    fi
+
+    # Scoped SKIPPED heuristics (only eslint by default)
+    if [[ "${status}" == "FAIL" && "${id}" == "lint.eslint" ]] && \
+      grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
+      status="SKIPPED"
+      {
+        printf "\nNote: ESLint dependencies/registry access appear missing.\n"
+        printf "Fix: npm ci (or install missing eslint plugins) then re-run.\n"
+      } >> "${log_file}" || true
+    fi
+
+    if [[ "${status}" == "FAIL" || "${status}" == "ERROR" ]]; then
+      LINT_FAILED=1
+    fi
+  else
+    if grep -Eiq "no .*files to check|no staged|no .*files to lint" "${log_file}"; then
+      status="SKIPPED"
+    fi
+  fi
+
+  printf '%s' "${status}"
+  return 0
+}
+
+lint_emit_step_line() {
+  local title="$1"
+  local status="$2"
+  if [[ "${PS_LINT_PRINT_MODE:-}" == "final" ]]; then
+    return 0
+  fi
+  local print_step_line=1
+  if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]]; then
+    case "${PS_LINT_PRINT_MODE}" in
+      inline|auto) print_step_line=0 ;;
+      *) : ;;
+    esac
+  fi
+  if [[ "${print_step_line}" -eq 1 ]]; then
+    printf '%s %s: %s\n' "${PS_FMT_ICON:-▶}" "${title}" "${status}"
+  fi
+  return 0
+}
+
+lint_handle_log_fallback() {
+  local id="$1"
+  local rc="$2"
+  local log_file="$3"
+  shift 3
+  if [[ ${rc} -ne 0 && ! -s "${log_file}" ]]; then
+    {
+      printf "No output captured from %s (exit %d)\n" "${id}" "${rc}"
+      printf "Timestamp: %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+      if [[ $# -gt 0 ]]; then
+        printf "Command: "
+        printf '%q ' "$@"
+        printf "\n"
+      fi
+    } > "${log_file}"
+  fi
+}
+
+# Usage: lint_finalize_step_by_index <idx> <rc>
+lint_finalize_step_by_index() {
+  local idx="$1"
+  local rc="$2"
+  local id="${LINT_IDS[$idx]}"
+  local title="${LINT_LABELS[$idx]}"
+  local log_file="${LINT_LOGS[$idx]}"
+
+  lint_handle_log_fallback "${id}" "${rc}" "${log_file}"
+  local status=""
+  status="$(lint_eval_status "${id}" "${rc}" "${log_file}")"
+  LINT_STATUSES[idx]="${status}"
+  LINT_PIDS[idx]=""
+
+  lint_emit_step_line "${title}" "${status}"
+  print_lint_summary
   return 0
 }
 
@@ -511,64 +619,134 @@ run_lint_step() {
   local rc=$?
   set -e
 
-  if [[ ${rc} -ne 0 && ! -s "${log_file}" ]]; then
-    {
-      printf "No output captured from %s (exit %d)\n" "${id}" "${rc}"
-      printf "Timestamp: %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-      printf "Command: "
-      printf '%q ' "$@"
-      printf "\n"
-    } > "${log_file}"
-  fi
-
-  local status="PASS"
-
-  if [[ ${rc} -ne 0 ]]; then
-    status="FAIL"
-
-    if grep -Eiq "config not found|cannot read config file|invalid configuration|configuration error|failed to load config|yamlexception" "${log_file}"; then
-      status="ERROR"
-    fi
-
-    # Scoped SKIPPED heuristics (only eslint by default)
-    if [[ "${status}" == "FAIL" && "${id}" == "lint.eslint" ]] && grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
-      status="SKIPPED"
-      {
-        printf "\nNote: ESLint dependencies/registry access appear missing.\n"
-        printf "Fix: npm ci (or install missing eslint plugins) then re-run.\n"
-      } >> "${log_file}" || true
-    fi
-
-    if [[ "${status}" == "FAIL" || "${status}" == "ERROR" ]]; then
-      LINT_FAILED=1
-    fi
-  else
-    if grep -Eiq "no .*files to check|no staged|no .*files to lint" "${log_file}"; then
-      status="SKIPPED"
-    fi
-  fi
+  lint_handle_log_fallback "${id}" "${rc}" "${log_file}" "$@"
+  local status=""
+  status="$(lint_eval_status "${id}" "${rc}" "${log_file}")"
 
   LINT_STATUSES[idx]="${status}"
   LINT_LOGS[idx]="${log_file}"
 
-  # Emit a compact per-step status line for non-inline contexts.
-  # In interactive inline mode, this extra line breaks cursor math and causes
-  # the summary block to smear in the terminal.
-  local print_step_line=1
-  if _ps_is_interactive_tty && [[ "${PS_LINT_INLINE:-1}" == "1" ]]; then
-    case "${PS_LINT_PRINT_MODE}" in
-      inline|auto) print_step_line=0 ;;
-      *) : ;;
-    esac
-  fi
-  if [[ "${print_step_line}" -eq 1 ]]; then
-    printf '%s %s: %s\n' "${PS_FMT_ICON:-▶}" "${title}" "${LINT_STATUSES[$idx]}"
-  fi
+  lint_emit_step_line "${title}" "${status}"
 
   print_lint_summary
 
   CURRENT_STEP_ID=""
   CURRENT_STEP_TITLE=""
+  return 0
+}
+
+# Usage: run_lint_step_async <id> <title> <description> <command...>
+run_lint_step_async() {
+  local id="$1"
+  local title="$2"
+  # shellcheck disable=SC2034
+  local description="$3"
+  shift 3
+
+  if [[ ${#LINT_IDS[@]} -eq 0 ]]; then
+    lint_init
+  fi
+
+  CURRENT_STEP_ID="${id}"
+  CURRENT_STEP_TITLE="${title}"
+
+  local idx=-1 j
+  for j in "${!LINT_IDS[@]}"; do
+    if [[ "${LINT_IDS[$j]}" == "${id}" ]]; then
+      idx="${j}"
+      break
+    fi
+  done
+
+  if [[ "${idx}" -eq -1 ]]; then
+    LINT_IDS+=("${id}")
+    LINT_LABELS+=("${title}")
+    LINT_STATUSES+=("Running")
+    LINT_LOGS+=("")
+    LINT_PIDS+=("")
+    idx=$(( ${#LINT_IDS[@]} - 1 ))
+  else
+    LINT_STATUSES[idx]="Running"
+  fi
+
+  LINT_SUMMARY_EVER_STARTED=1
+  print_lint_summary
+
+  mkdir -p "${LINT_DIR}"
+  local log_file="${LINT_DIR}/${id}.log"
+
+  set +e
+  "$@" >"${log_file}" 2>&1 &
+  local pid=$!
+  set -e
+
+  LINT_PIDS[idx]="${pid}"
+  LINT_LOGS[idx]="${log_file}"
+
+  CURRENT_STEP_ID=""
+  CURRENT_STEP_TITLE=""
+  return 0
+}
+
+# Usage: wait_lint_step <id>
+wait_lint_step() {
+  local id="$1"
+  local idx=-1 j
+  for j in "${!LINT_IDS[@]}"; do
+    if [[ "${LINT_IDS[$j]}" == "${id}" ]]; then
+      idx="${j}"
+      break
+    fi
+  done
+
+  [[ "${idx}" -ge 0 ]] || return 0
+  local pid="${LINT_PIDS[$idx]}"
+  [[ -n "${pid}" ]] || return 0
+
+  local rc=0
+  if ! wait "${pid}"; then
+    rc=$?
+  fi
+
+  lint_finalize_step_by_index "${idx}" "${rc}"
+  return 0
+}
+
+lint_wait_all() {
+  local remaining=1
+  while [[ "${remaining}" -eq 1 ]]; do
+    remaining=0
+    local idx pid rc state
+    for idx in "${!LINT_PIDS[@]}"; do
+      pid="${LINT_PIDS[$idx]}"
+      [[ -n "${pid}" ]] || continue
+
+      state="$(ps -o state= -p "${pid}" 2>/dev/null || true)"
+      state="$(printf '%s' "${state}" | tr -d '[:space:]')"
+      if [[ -z "${state}" ]]; then
+        rc=0
+        if ! wait "${pid}"; then
+          rc=$?
+        fi
+        lint_finalize_step_by_index "${idx}" "${rc}"
+        continue
+      fi
+
+      if [[ "${state}" == *Z* ]]; then
+        rc=0
+        if ! wait "${pid}"; then
+          rc=$?
+        fi
+        lint_finalize_step_by_index "${idx}" "${rc}"
+        continue
+      fi
+
+      remaining=1
+    done
+    if [[ "${remaining}" -eq 1 ]]; then
+      sleep 0.2
+    fi
+  done
   return 0
 }
 

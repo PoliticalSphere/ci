@@ -60,7 +60,10 @@ runs:
       with:
         node-version: ${{ inputs.node_version }}
         cache: "npm"
-        cache-dependency-path: ${{ inputs.cache_dependency_path != '' && inputs.cache_dependency_path || format('{0}/package-lock.json', inputs.working_directory) }}
+        cache-dependency-path: >-
+          ${{ inputs.cache_dependency_path != '' &&
+          inputs.cache_dependency_path ||
+          format('{0}/package-lock.json', inputs.working_directory) }}
 
     - name: Setup Node.js
       if: ${{ inputs.cache != '1' }}

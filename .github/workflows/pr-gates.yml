@@ -232,7 +232,9 @@ permissions:
 # Ensures only one PR Gates run per PR/ref at a time.
 # ==============================================================================
 concurrency:
-  group: pr-gates-${{ github.repository }}-${{ inputs.pr_number != '' && inputs.pr_number || github.ref }}
+  group: >-
+    pr-gates-${{ github.repository }}-${{
+    inputs.pr_number != '' && inputs.pr_number || github.ref }}
   cancel-in-progress: true
 
 # ==============================================================================
@@ -296,7 +298,7 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      issues: write # Justification: post lint failure comment via ps-exit
+      issues: write  # Justification: post lint failure comment via ps-exit
     env:
       PS_FULL_SCAN: "0"
       PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
@@ -821,7 +823,8 @@ jobs:
   notify:
     name: PR failure comment
     runs-on: ${{ inputs.runner }}
-    needs: [validate-ci, lint, typecheck, test, jscpd, build, secrets-scan, dependency-review, sonar]
+    needs:
+      [validate-ci, lint, typecheck, test, jscpd, build, secrets-scan, dependency-review, sonar]
     if: >-
       ${{ failure() &&
       inputs.pr_number != '' &&
@@ -830,7 +833,7 @@ jobs:
     timeout-minutes: 10
     permissions:
       contents: read
-      pull-requests: write # Justification: post PR failure summary comment
+      pull-requests: write  # Justification: post PR failure summary comment
     steps:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap/ps-init
@@ -896,7 +899,17 @@ jobs:
   summary:
     name: PR gates summary
     runs-on: ${{ inputs.runner }}
-    needs: [validate-ci, lint, typecheck, test, jscpd, build, secrets-scan, dependency-review, sonar, notify]
+    needs:
+      - validate-ci
+      - lint
+      - typecheck
+      - test
+      - jscpd
+      - build
+      - secrets-scan
+      - dependency-review
+      - sonar
+      - notify
     if: ${{ always() }}
     timeout-minutes: 10
     permissions:

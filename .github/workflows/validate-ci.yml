@@ -297,6 +297,6 @@ jobs:
             logs/**
           artifacts_if_no_files_found: "warn"
           artifacts_retention_days: ${{ inputs.retention_days }}
-        # Note: GITHUB_TOKEN is optional; PR comment only when provided and pr_number set.
-        # secrets:
-        #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Note: GITHUB_TOKEN is optional; PR comment only when provided and pr_number set.
+          # secrets:
+          #  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

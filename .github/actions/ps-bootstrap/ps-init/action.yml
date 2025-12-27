@@ -60,7 +60,9 @@
 #
 # ==============================================================================
 name: "PS Init"
-description: "Canonical CI bootstrap switchboard: harden -> checkout -> HOME isolation -> platform -> tools"
+description: >-
+  Canonical CI bootstrap switchboard: harden -> checkout -> HOME isolation ->
+  platform -> tools
 
 inputs:
   # ---------------------------------------------------------------------------
@@ -141,12 +143,15 @@ inputs:
     default: "false"
 
   platform_require_pinned_ref:
-    description: "Require platform_ref to be a full 40-char commit SHA (0/1/true/false)"
+    description: >-
+      Require platform_ref to be a full 40-char commit SHA (0/1/true/false)
     required: false
     default: "false"
 
   platform_allowed_repositories:
-    description: "Optional newline-separated allowlist for platform_repo (OWNER/REPO). If set, platform_repo must be listed."
+    description: >-
+      Optional newline-separated allowlist for platform_repo (OWNER/REPO). If
+      set, platform_repo must be listed.
     required: false
     default: ""
 
@@ -242,7 +247,12 @@ runs:
         format_sh="${format_root}/tools/scripts/branding/format.sh"
         expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
         if [[ -f "${format_sh}" ]]; then
-          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          py_hash_cmd="import hashlib, os"
+          py_hash_cmd+=$'\npath = os.environ.get("FORMAT_SH")'
+          py_hash_cmd+=$'\nprint(hashlib.sha256(open(path, "rb").read()).hexdigest())'
+          actual_format_hash="$(
+            FORMAT_SH="${format_sh}" python3 -c "${py_hash_cmd}"
+          )"
           if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
             # shellcheck source=/dev/null
             . "${format_sh}"
@@ -276,11 +286,25 @@ runs:
             printf 'ERROR: path must not be empty\n' >&2
             exit 1
           fi
-          if [[ "${input_path}" == "~"* || "${input_path}" == "." || "${input_path}" == "./" || "${input_path}" == ./* || "${input_path}" == */./* || "${input_path}" == */. || "${input_path}" == */ || "${input_path}" == *"$"* || "${input_path}" == *"`"* ]]; then
+          if [[ "${input_path}" == "~"* || \
+            "${input_path}" == "." || \
+            "${input_path}" == "./" || \
+            "${input_path}" == ./* || \
+            "${input_path}" == */./* || \
+            "${input_path}" == */. || \
+            "${input_path}" == */ || \
+            "${input_path}" == *"$"* || \
+            "${input_path}" == *"\`"* ]]; then
             printf 'ERROR: path must be a repo-relative safe path (got %q)\n' "${input_path}" >&2
             exit 1
           fi
-          resolved="$(python3 -c "import os; print(os.path.abspath(os.path.join('${GITHUB_WORKSPACE}', '${input_path}')))")"
+          py_resolve_cmd="import os"
+          py_resolve_cmd+=$'\nws = os.environ["GITHUB_WORKSPACE"]'
+          py_resolve_cmd+=$'\ninput_path = os.environ["INPUT_PATH"]'
+          py_resolve_cmd+=$'\nprint(os.path.abspath(os.path.join(ws, input_path)))'
+          resolved="$(
+            INPUT_PATH="${input_path}" python3 -c "${py_resolve_cmd}"
+          )"
           if [[ "${resolved}" != "${GITHUB_WORKSPACE}"* ]]; then
             printf 'ERROR: path escapes workspace (got %q)\n' "${input_path}" >&2
             exit 1
@@ -293,12 +317,36 @@ runs:
           esac
         }
 
-        require_full="$(norm_bool "${PS_REQUIRE_FULL_HISTORY_INPUT}")" || { printf 'ERROR: require_full_history must be 0/1/true/false (got %q)\n' "${PS_REQUIRE_FULL_HISTORY_INPUT}" >&2; exit 1; }
-        skip_platform="$(norm_bool "${PS_SKIP_PLATFORM_INPUT}")" || { printf 'ERROR: skip_platform_checkout must be 0/1/true/false (got %q)\n' "${PS_SKIP_PLATFORM_INPUT}" >&2; exit 1; }
-        clean_platform="$(norm_bool "${PS_PLATFORM_CLEAN_PATH_INPUT}")" || { printf 'ERROR: platform_clean_path must be 0/1/true/false (got %q)\n' "${PS_PLATFORM_CLEAN_PATH_INPUT}" >&2; exit 1; }
-        require_pinned_ref="$(norm_bool "${PS_PLATFORM_REQUIRE_PINNED_REF_INPUT}")" || { printf 'ERROR: platform_require_pinned_ref must be 0/1/true/false (got %q)\n' "${PS_PLATFORM_REQUIRE_PINNED_REF_INPUT}" >&2; exit 1; }
-        install_tools="$(norm_bool "${PS_INSTALL_TOOLS_INPUT}")" || { printf 'ERROR: install_tools must be 0/1/true/false (got %q)\n' "${PS_INSTALL_TOOLS_INPUT}" >&2; exit 1; }
-        isolate_home="$(norm_bool "${PS_HOME_ISOLATION_INPUT}")" || { printf 'ERROR: home_isolation must be 0/1/true/false (got %q)\n' "${PS_HOME_ISOLATION_INPUT}" >&2; exit 1; }
+        require_full="$(norm_bool "${PS_REQUIRE_FULL_HISTORY_INPUT}")" || {
+          printf 'ERROR: require_full_history must be 0/1/true/false (got %q)\n' \
+            "${PS_REQUIRE_FULL_HISTORY_INPUT}" >&2
+          exit 1
+        }
+        skip_platform="$(norm_bool "${PS_SKIP_PLATFORM_INPUT}")" || {
+          printf 'ERROR: skip_platform_checkout must be 0/1/true/false (got %q)\n' \
+            "${PS_SKIP_PLATFORM_INPUT}" >&2
+          exit 1
+        }
+        clean_platform="$(norm_bool "${PS_PLATFORM_CLEAN_PATH_INPUT}")" || {
+          printf 'ERROR: platform_clean_path must be 0/1/true/false (got %q)\n' \
+            "${PS_PLATFORM_CLEAN_PATH_INPUT}" >&2
+          exit 1
+        }
+        require_pinned_ref="$(norm_bool "${PS_PLATFORM_REQUIRE_PINNED_REF_INPUT}")" || {
+          printf 'ERROR: platform_require_pinned_ref must be 0/1/true/false (got %q)\n' \
+            "${PS_PLATFORM_REQUIRE_PINNED_REF_INPUT}" >&2
+          exit 1
+        }
+        install_tools="$(norm_bool "${PS_INSTALL_TOOLS_INPUT}")" || {
+          printf 'ERROR: install_tools must be 0/1/true/false (got %q)\n' \
+            "${PS_INSTALL_TOOLS_INPUT}" >&2
+          exit 1
+        }
+        isolate_home="$(norm_bool "${PS_HOME_ISOLATION_INPUT}")" || {
+          printf 'ERROR: home_isolation must be 0/1/true/false (got %q)\n' \
+            "${PS_HOME_ISOLATION_INPUT}" >&2
+          exit 1
+        }
 
         depth="${PS_FETCH_DEPTH_INPUT:-1}"
         if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
@@ -306,7 +354,8 @@ runs:
           exit 1
         fi
         if [[ "${require_full}" == "1" && "${depth}" != "0" ]]; then
-          printf 'ERROR: require_full_history enabled but fetch_depth=%s (expected 0)\n' "${depth}" >&2
+          printf 'ERROR: require_full_history enabled but fetch_depth=%s (expected 0)\n' \
+            "${depth}" >&2
           exit 1
         fi
 
@@ -315,7 +364,8 @@ runs:
 
         pdepth="${PS_PLATFORM_FETCH_DEPTH_INPUT:-1}"
         if ! [[ "${pdepth}" =~ ^[0-9]+$ ]]; then
-          printf 'ERROR: platform_fetch_depth must be a non-negative integer (got %q)\n' "${pdepth}" >&2
+          printf 'ERROR: platform_fetch_depth must be a non-negative integer (got %q)\n' \
+            "${pdepth}" >&2
           exit 1
         fi
 
@@ -363,7 +413,9 @@ runs:
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
 
         # Persist validated values
@@ -407,7 +459,12 @@ runs:
         format_sh="${format_root}/tools/scripts/branding/format.sh"
         expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
         if [[ -f "${format_sh}" ]]; then
-          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          py_hash_cmd="import hashlib, os"
+          py_hash_cmd+=$'\npath = os.environ.get("FORMAT_SH")'
+          py_hash_cmd+=$'\nprint(hashlib.sha256(open(path, "rb").read()).hexdigest())'
+          actual_format_hash="$(
+            FORMAT_SH="${format_sh}" python3 -c "${py_hash_cmd}"
+          )"
           if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
             # shellcheck source=/dev/null
             . "${format_sh}"
@@ -433,7 +490,10 @@ runs:
       shell: bash
       env:
         PS_PLATFORM_SNAPSHOT_PATH: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
-      run: bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-detect-platform-snapshot.sh"
+      run: |
+        snapshot_script="${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap"
+        snapshot_script="${snapshot_script}/ps-bootstrap-detect-platform-snapshot.sh"
+        bash "${snapshot_script}"
 
     # -----------------------------------------------------------------------------
     # PHASE 4: HOME ISOLATION
@@ -453,7 +513,12 @@ runs:
         format_sh="${format_root}/tools/scripts/branding/format.sh"
         expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
         if [[ -f "${format_sh}" ]]; then
-          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          py_hash_cmd="import hashlib, os"
+          py_hash_cmd+=$'\npath = os.environ.get("FORMAT_SH")'
+          py_hash_cmd+=$'\nprint(hashlib.sha256(open(path, "rb").read()).hexdigest())'
+          actual_format_hash="$(
+            FORMAT_SH="${format_sh}" python3 -c "${py_hash_cmd}"
+          )"
           if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
             # shellcheck source=/dev/null
             . "${format_sh}"
@@ -479,7 +544,9 @@ runs:
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
         home_abs="${GITHUB_WORKSPACE}/${PS_HOME_DIR_VALIDATED}"
         mkdir -p "${home_abs}"
@@ -514,7 +581,12 @@ runs:
         format_sh="${format_root}/tools/scripts/branding/format.sh"
         expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
         if [[ -f "${format_sh}" ]]; then
-          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          py_hash_cmd="import hashlib, os"
+          py_hash_cmd+=$'\npath = os.environ.get("FORMAT_SH")'
+          py_hash_cmd+=$'\nprint(hashlib.sha256(open(path, "rb").read()).hexdigest())'
+          actual_format_hash="$(
+            FORMAT_SH="${format_sh}" python3 -c "${py_hash_cmd}"
+          )"
           if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
             # shellcheck source=/dev/null
             . "${format_sh}"
@@ -534,8 +606,10 @@ runs:
         ref: ${{ env.PS_PLATFORM_REF_VALIDATED }}
         path: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
         fetch_depth: ${{ env.PS_PLATFORM_FETCH_DEPTH_VALIDATED }}
-        clean_path: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == '1' && 'true' || 'false' }}
-        require_pinned_ref: ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED == '1' && 'true' || 'false' }}
+        clean_path: >-
+          ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == '1' && 'true' || 'false' }}
+        require_pinned_ref: >-
+          ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED == '1' && 'true' || 'false' }}
         allowed_repositories: ${{ env.PS_PLATFORM_ALLOWLIST_VALIDATED }}
         require_full_history: "false"
         persist_credentials: "false"
@@ -565,7 +639,9 @@ runs:
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
         platform_abs="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
         emit_env "PS_PLATFORM_ROOT" "${platform_abs}"
@@ -575,7 +651,8 @@ runs:
     # 6) INSTALL TOOLS (OPTIONAL)
     # =========================================================================
     - name: "Section: Install tools (PS)"
-      if: ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
+      if: >-
+        ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
       shell: bash
       run: |
         # [PS.INIT.INSTALL] --------------------------------------------------------
@@ -587,7 +664,12 @@ runs:
         format_sh="${format_root}/tools/scripts/branding/format.sh"
         expected_format_hash="accf30e19ae937f2fcb5af98ab65b19e47c551717f79e5f4027d936311355ea8"
         if [[ -f "${format_sh}" ]]; then
-          actual_format_hash="$(FORMAT_SH="${format_sh}" python3 -c 'import hashlib, os; path=os.environ.get("FORMAT_SH"); print(hashlib.sha256(open(path,"rb").read()).hexdigest())')"
+          py_hash_cmd="import hashlib, os"
+          py_hash_cmd+=$'\npath = os.environ.get("FORMAT_SH")'
+          py_hash_cmd+=$'\nprint(hashlib.sha256(open(path, "rb").read()).hexdigest())'
+          actual_format_hash="$(
+            FORMAT_SH="${format_sh}" python3 -c "${py_hash_cmd}"
+          )"
           if [[ "${actual_format_hash}" == "${expected_format_hash}" ]]; then
             # shellcheck source=/dev/null
             . "${format_sh}"
@@ -600,7 +682,8 @@ runs:
         fi
 
     - name: Install canonical tools (PS)
-      if: ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
+      if: >-
+        ${{ env.PS_INSTALL_TOOLS_VALIDATED == '1' && env.PS_TOOLS_BUNDLE_VALIDATED != 'none' }}
       uses: ./.github/actions/ps-bootstrap/ps-tools
       with:
         bundle: ${{ env.PS_TOOLS_BUNDLE_VALIDATED }}
@@ -641,7 +724,16 @@ runs:
           echo "home_isolation_enabled=${home_isolation_enabled}"
           echo "platform_root=${platform_root}"
           echo "platform_enabled=${platform_enabled}"
-          echo "init_metadata={\"repo_root\":\"${repo_root}\",\"home_dir\":\"${home_dir}\",\"is_isolated\":${home_isolation_enabled},\"platform_enabled\":${platform_enabled},\"timestamp\":\"$(date -u +'%Y-%m-%dT%H:%M:%SZ')\"}"
+          timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+          format='{"repo_root":"%s","home_dir":"%s","is_isolated":%s,'
+          format+='"platform_enabled":%s,"timestamp":"%s"}'
+          init_metadata="$(printf "${format}" \
+            "${repo_root}" \
+            "${home_dir}" \
+            "${home_isolation_enabled}" \
+            "${platform_enabled}" \
+            "${timestamp}")"
+          echo "init_metadata=${init_metadata}"
         } >> "${GITHUB_OUTPUT}"
 
         printf 'PS.INIT: repo_root=%s\n' "${repo_root}"

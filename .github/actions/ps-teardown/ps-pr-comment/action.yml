@@ -72,7 +72,11 @@ runs:
   steps:
     - name: Resolve scripts root
       shell: bash
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown/ps-pr-comment/ps-pr-comment-resolve-root.sh"
+      run: |
+        resolve_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
+        resolve_root="${resolve_root}/ps-pr-comment"
+        resolve_script="${resolve_root}/ps-pr-comment-resolve-root.sh"
+        bash "${resolve_script}"
 
     - name: Validate inputs
       shell: bash
@@ -82,7 +86,11 @@ runs:
         PS_TOKEN: ${{ inputs.github_token }}
         PS_EXPECTED_BASE: ${{ inputs.expected_base_sha }}
         PS_EXPECTED_HEAD: ${{ inputs.expected_head_sha }}
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown/ps-pr-comment/ps-pr-comment-validate-inputs.sh"
+      run: |
+        validate_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
+        validate_root="${validate_root}/ps-pr-comment"
+        validate_script="${validate_root}/ps-pr-comment-validate-inputs.sh"
+        bash "${validate_script}"
 
     - name: Validate PR refs
       if: ${{ inputs.expected_base_sha != '' || inputs.expected_head_sha != '' }}
@@ -92,7 +100,10 @@ runs:
         PS_PR_NUMBER: ${{ inputs.pr_number }}
         PS_EXPECTED_BASE_SHA: ${{ inputs.expected_base_sha }}
         PS_EXPECTED_HEAD_SHA: ${{ inputs.expected_head_sha }}
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/ci/validate-pr-refs.sh"
+      run: |
+        validate_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/ci"
+        validate_script="${validate_root}/validate-pr-refs.sh"
+        bash "${validate_script}"
 
     - name: Post PR comment
       shell: bash
@@ -100,4 +111,8 @@ runs:
         GH_TOKEN: ${{ inputs.github_token }}
         PS_PR_NUMBER: ${{ inputs.pr_number }}
         PS_BODY: ${{ inputs.body }}
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown/ps-pr-comment/ps-pr-comment-post.sh"
+      run: |
+        post_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
+        post_root="${post_root}/ps-pr-comment"
+        post_script="${post_root}/ps-pr-comment-post.sh"
+        bash "${post_script}"

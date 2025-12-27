@@ -282,7 +282,8 @@ jobs:
           platform_allowed_repositories: ${{ inputs.platform_repository }}
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
           skip_platform_checkout: "0"
-          egress_policy: audit        # Allow outbound network as needed for builds (telemetry, registries)
+          # Allow outbound network as needed for builds (telemetry, registries)
+          egress_policy: audit
           install_tools: "0"
 
       - name: Node setup (PS)

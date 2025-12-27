@@ -22,6 +22,12 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 GATE_NAME="Lint"
 export GATE_NAME
 
+# Prefer a single final summary for parallel runs unless overridden.
+if [[ "${PS_LINT_PRINT_MODE:-auto}" == "auto" ]]; then
+  PS_LINT_PRINT_MODE="final"
+fi
+export PS_LINT_PRINT_MODE
+
 # Ensure full-scan behaviour
 export PS_FULL_SCAN=1
 
@@ -31,57 +37,50 @@ if [[ "${1:-}" == "--fix" ]]; then
   FIX=1
 fi
 
-# Helper to run a linter command with optional fix arg
-run_cmd_with_optional_fix() {
-  local cmd=()
-  cmd+=("$@")
-  if [[ "${FIX}" -eq 1 ]]; then
-    case "${cmd[0]}" in
-      *biome.sh) cmd+=("--write") ;;
-      *eslint.sh) cmd+=("--fix") ;;
-      *markdownlint.sh) cmd+=("--fix") ;;
-      *) : ;;
-    esac
-  fi
-  "${cmd[@]}"
-  return 0
-}
+declare -a biome_fix_arg=()
+declare -a eslint_fix_arg=()
+declare -a markdown_fix_arg=()
+if [[ "${FIX}" -eq 1 ]]; then
+  biome_fix_arg=(--write)
+  eslint_fix_arg=(--fix)
+  markdown_fix_arg=(--fix)
+fi
 
 # Banner
 bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
 
 # Run the same steps as pre-commit but in full-scan mode
-run_lint_step "lint.biome" "BIOME" "Formatting and correctness checks" \
-  bash "${PS_LINT_SCRIPTS}/biome.sh" $( [[ "${FIX}" -eq 1 ]] && printf '%s' "--write")
+run_lint_step_async "lint.biome" "BIOME" "Formatting and correctness checks" \
+  bash "${PS_LINT_SCRIPTS}/biome.sh" "${biome_fix_arg[@]:-}"
 
-run_lint_step "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" \
-  bash "${PS_LINT_SCRIPTS}/eslint.sh" $( [[ "${FIX}" -eq 1 ]] && printf '%s' "--fix")
+run_lint_step_async "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" \
+  bash "${PS_LINT_SCRIPTS}/eslint.sh" "${eslint_fix_arg[@]:-}"
 
-run_lint_step "lint.yamllint" "YAMLLINT" "YAML validity and formatting" \
+run_lint_step_async "lint.yamllint" "YAMLLINT" "YAML validity and formatting" \
   bash "${PS_LINT_SCRIPTS}/yamllint.sh"
 
-run_lint_step "lint.actionlint" "ACTIONLINT" "GitHub Actions workflow validation" \
+run_lint_step_async "lint.actionlint" "ACTIONLINT" "GitHub Actions workflow validation" \
   bash "${PS_LINT_SCRIPTS}/actionlint.sh"
 
-run_lint_step "lint.hadolint" "HADOLINT" "Dockerfile security and quality" \
+run_lint_step_async "lint.hadolint" "HADOLINT" "Dockerfile security and quality" \
   bash "${PS_LINT_SCRIPTS}/hadolint.sh"
 
-run_lint_step "lint.shellcheck" "SHELLCHECK" "Shell script safety checks" \
+run_lint_step_async "lint.shellcheck" "SHELLCHECK" "Shell script safety checks" \
   bash "${PS_LINT_SCRIPTS}/shellcheck.sh"
 
-run_lint_step "lint.markdown" "MARKDOWN" "Markdown quality checks" \
-  bash "${PS_LINT_SCRIPTS}/markdownlint.sh" $( [[ "${FIX}" -eq 1 ]] && printf '%s' "--fix")
+run_lint_step_async "lint.markdown" "MARKDOWN" "Markdown quality checks" \
+  bash "${PS_LINT_SCRIPTS}/markdownlint.sh" "${markdown_fix_arg[@]:-}"
 
-run_lint_step "lint.cspell" "CSPELL" "Spelling checks" \
+run_lint_step_async "lint.cspell" "CSPELL" "Spelling checks" \
   bash "${PS_LINT_SCRIPTS}/cspell.sh"
 
-run_lint_step "lint.knip" "KNIP" "Dependency audit (knip)" \
+run_lint_step_async "lint.knip" "KNIP" "Dependency audit (knip)" \
   bash "${PS_LINT_SCRIPTS}/knip.sh"
 
+lint_wait_all
+
 # If configured to print only at the end, do it here (and only here).
-if [[ "${PS_LINT_PRINT_MODE}" == "final" ]]; then
-  lint_print_final || true
-fi
+lint_print_final || true
 
 # If any lint/typecheck failed, print failed section and exit non-zero
 if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then

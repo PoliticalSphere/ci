@@ -10,18 +10,31 @@ Detailed versioning rules live in `docs/versioning.md`.
 ### Added
 
 - Initial repository bootstrap and governance scaffolding.
-- Add `ps-task` composite action to centralize preflight + ps-run execution with optional path checks.
-- Add `tools/scripts/actions` for composite-action helper scripts (validation + orchestration).
-- Add `ps-harden-runner` and `ps-checkout` composite actions to standardize runner hardening and repository checkout.
+- Add `ps-task` composite action to centralize preflight and ps-run
+  execution, with optional path checks.
+- Add `tools/scripts/actions` for composite-action helper scripts
+  (validation + orchestration).
+- Add `ps-harden-runner` and `ps-checkout` composite actions to
+  standardize runner hardening and repository checkout.
 - Add `ps-bootstrap` capability map README with traceability IDs.
 
 ### Changed
 
-- Consolidate tool installers: introduce `ps-tools` as the canonical tool installer (inputs: `bundle` = lint|security|none, `extra_tools` multiline, or an explicit `tools` list). Remove now-redundant wrappers `ps-lint-tools` and `ps-security-tools` and update callers to use `ps-tools` (bundle=lint|security). `tools/scripts/ci/install-tools.sh` remains the low-level installer for pinned installs.
-- Update lint/test/typecheck/jscpd/build/consumer-contract/license-check actions to use `ps-task` and reduce duplicated validation/run steps.
-- Move composite action logic into scripts under `tools/scripts/actions` and `tools/scripts/security`, keeping action YAML minimal and reusable.
-- Update `ps-tools` to install via `tools/scripts/ci/install-tools.sh` instead of a dedicated composite action.
-- Update `ps-bootstrap` to honor `skip_checkout`, add explicit opt-out gating for `skip_harden`, and emit skip-state logs for observability.
+- Consolidate tool installers: introduce `ps-tools` as the canonical tool installer.
+  Inputs include `bundle` = lint|security|none, `extra_tools` (multiline), or an
+  explicit `tools` list.
+- Remove now-redundant wrappers `ps-lint-tools` and `ps-security-tools` and
+  update callers to use `ps-tools` (bundle=lint|security).
+- `tools/scripts/ci/install-tools.sh` remains the low-level installer for
+  pinned installs.
+- Update lint/test/typecheck/jscpd/build/consumer-contract/license-check
+  actions to use `ps-task` and reduce duplicated validation/run steps.
+- Move composite action logic into scripts under `tools/scripts/actions` and
+  `tools/scripts/security`, keeping action YAML minimal and reusable.
+- Update `ps-tools` to install via `tools/scripts/ci/install-tools.sh` instead of
+  a dedicated composite action.
+- Update `ps-bootstrap` to honor `skip_checkout`, add explicit opt-out gating for
+  `skip_harden`, and emit skip-state logs for observability.
 
 ### Deprecated
 

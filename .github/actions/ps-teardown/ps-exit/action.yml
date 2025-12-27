@@ -132,7 +132,9 @@ runs:
             fi
             delimiter="__PS_OUT_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_OUTPUT}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_OUTPUT}"
         }
 
         summary_workflow="$(trim "${PS_SUMMARY_WORKFLOW}")"
@@ -148,9 +150,15 @@ runs:
         pr_body_suffix="${PS_PR_BODY_SUFFIX:-}"
 
         run_summary="0"
-        if [[ -n "${summary_workflow}" || -n "${summary_output_path}" || -n "${summary_results}" ]]; then
-          if [[ -z "${summary_workflow}" || -z "${summary_output_path}" || -z "${summary_results}" ]]; then
-            echo "ERROR: summary_workflow, summary_output_path, and summary_results must be provided together." >&2
+        if [[ -n "${summary_workflow}" || \
+          -n "${summary_output_path}" || \
+          -n "${summary_results}" ]]; then
+          if [[ -z "${summary_workflow}" || \
+            -z "${summary_output_path}" || \
+            -z "${summary_results}" ]]; then
+            err_msg="ERROR: summary_workflow, summary_output_path, and summary_results"
+            err_msg="${err_msg} must be provided together."
+            echo "${err_msg}" >&2
             exit 1
           fi
           run_summary="1"

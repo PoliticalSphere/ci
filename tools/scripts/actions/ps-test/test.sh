@@ -74,7 +74,9 @@ elif [[ "${PS_TEST_JUNIT:-0}" == "1" ]]; then
 fi
 
 on_error() {
-  local rc="${1:-$?}"
+  local last_rc
+  last_rc=$?
+  local rc="${1:-${last_rc}}"
   write_junit
   if [[ -n "${current_test_file}" ]]; then
     error "Test failed: $(basename "${current_test_file}") (exit ${rc})"
@@ -83,7 +85,6 @@ on_error() {
     error "Tests failed (exit ${rc})"
   fi
   exit "${rc}"
-  return 0
 }
 trap 'on_error $?' ERR
 

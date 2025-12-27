@@ -257,6 +257,16 @@ fi
 # ------------------------------------------------------------------------------
 # Evidence: minimal run metadata (machine-readable)
 # ------------------------------------------------------------------------------
+EXIT_CODE="${exit_code}" \
+START_TS="${start_ts}" \
+END_TS="${end_ts}" \
+DURATION_S="${duration_s}" \
+POLICY_REL="${policy_rel}" \
+LOCK_REL="${lock_rel}" \
+REPORT_REL="${report_rel}" \
+SUMMARY_REL="${summary_rel}" \
+LOG_REL="${log_dir_rel}/license-check.log" \
+RUN_META_PATH="${run_meta_path}" \
 python3 - <<PY
 import json, os
 payload = {
@@ -278,16 +288,6 @@ with open(out, "w", encoding="utf-8") as f:
   json.dump(payload, f, indent=2, sort_keys=True)
   f.write("\\n")
 PY
-EXIT_CODE="${exit_code}" \
-START_TS="${start_ts}" \
-END_TS="${end_ts}" \
-DURATION_S="${duration_s}" \
-POLICY_REL="${policy_rel}" \
-LOCK_REL="${lock_rel}" \
-REPORT_REL="${report_rel}" \
-SUMMARY_REL="${summary_rel}" \
-LOG_REL="${log_dir_rel}/license-check.log" \
-RUN_META_PATH="${run_meta_path}"
 
 # ------------------------------------------------------------------------------
 # Outcome

@@ -20,48 +20,59 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 GATE_NAME="Lint (affected)"
 export GATE_NAME
 
+# Prefer a single final summary for parallel runs unless overridden.
+if [[ "${PS_LINT_PRINT_MODE:-auto}" == "auto" ]]; then
+  PS_LINT_PRINT_MODE="final"
+fi
+export PS_LINT_PRINT_MODE
+
 FIX=0
 if [[ "${1:-}" == "--fix" ]]; then
   FIX=1
+fi
+
+fix_arg=()
+if [[ "${FIX}" -eq 1 ]]; then
+  fix_arg=(--fix)
 fi
 
 # Banner
 bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
 
 # Use the affected script per-linter so target selection is handled there
-run_lint_step "lint.biome" "BIOME" "Formatting and correctness checks" \
-  bash "${PS_LINT_SCRIPTS}/affected.sh" biome $( [[ "${FIX}" -eq 1 ]] && printf '%s' "--fix")
+run_lint_step_async "lint.biome" "BIOME" "Formatting and correctness checks" \
+  bash "${PS_LINT_SCRIPTS}/affected.sh" biome "${fix_arg[@]}"
 
-run_lint_step "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" \
-  bash "${PS_LINT_SCRIPTS}/affected.sh" eslint $( [[ "${FIX}" -eq 1 ]] && printf '%s' "--fix")
+run_lint_step_async "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" \
+  bash "${PS_LINT_SCRIPTS}/affected.sh" eslint "${fix_arg[@]}"
 
-run_lint_step "lint.yamllint" "YAMLLINT" "YAML validity and formatting" \
+run_lint_step_async "lint.yamllint" "YAMLLINT" "YAML validity and formatting" \
   bash "${PS_LINT_SCRIPTS}/affected.sh" yaml
 
-run_lint_step "lint.actionlint" "ACTIONLINT" "GitHub Actions workflow validation" \
+run_lint_step_async "lint.actionlint" "ACTIONLINT" "GitHub Actions workflow validation" \
   bash "${PS_LINT_SCRIPTS}/affected.sh" actionlint
 
-run_lint_step "lint.hadolint" "HADOLINT" "Dockerfile security and quality" \
+run_lint_step_async "lint.hadolint" "HADOLINT" "Dockerfile security and quality" \
   bash "${PS_LINT_SCRIPTS}/affected.sh" hadolint
 
-run_lint_step "lint.shellcheck" "SHELLCHECK" "Shell script safety checks" \
+run_lint_step_async "lint.shellcheck" "SHELLCHECK" "Shell script safety checks" \
   bash "${PS_LINT_SCRIPTS}/affected.sh" shellcheck
 
-run_lint_step "lint.markdown" "MARKDOWN" "Markdown quality checks" \
-  bash "${PS_LINT_SCRIPTS}/affected.sh" markdown $( [[ "${FIX}" -eq 1 ]] && printf '%s' "--fix")
+run_lint_step_async "lint.markdown" "MARKDOWN" "Markdown quality checks" \
+  bash "${PS_LINT_SCRIPTS}/affected.sh" markdown "${fix_arg[@]}"
 
-run_lint_step "lint.cspell" "CSPELL" "Spelling checks" \
+run_lint_step_async "lint.cspell" "CSPELL" "Spelling checks" \
   bash "${PS_LINT_SCRIPTS}/affected.sh" cspell
 
-run_lint_step "lint.knip" "KNIP" "Dependency audit (knip)" \
+run_lint_step_async "lint.knip" "KNIP" "Dependency audit (knip)" \
   bash "${PS_LINT_SCRIPTS}/affected.sh" knip
+
+lint_wait_all
 
 # Typecheck: we don't run typecheck against affected files by default here — keep
 # output consistent with pre-commit gate but it may be skipped in some workflows.
 
-if [[ "${PS_LINT_PRINT_MODE}" == "final" ]]; then
-  lint_print_final || true
-fi
+lint_print_final || true
 
 if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
   bash "${PS_BRANDING_SCRIPTS}/print-section.sh" \

@@ -9,7 +9,7 @@ set -euo pipefail
 # ==============================================================================
 
 
-fail() { echo "ERROR: $*" >&2; exit 1; return 1; }
+fail() { echo "ERROR: $*" >&2; exit 1; }
 
 # Basic non-empty validation
 [[ -n "${WD:-}" ]] || fail "working-directory must not be empty"

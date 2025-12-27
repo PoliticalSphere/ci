@@ -502,6 +502,7 @@ gantt
 ## Key Architectural Patterns
 
 ### 1. **Canonical Bootstrap Pattern**
+
 ```mermaid
 graph TD
     WORKFLOW[Any Workflow Job]
@@ -515,6 +516,7 @@ graph TD
 ```
 
 ### 2. **Policy Gate Pattern**
+
 ```mermaid
 graph TD
     TRIGGER[Workflow Trigger]
@@ -528,6 +530,7 @@ graph TD
 ```
 
 ### 3. **Evidence-First Pattern**
+
 ```mermaid
 graph TD
     SUCCESS[Success Path]
@@ -575,4 +578,7 @@ graph TB
     CONTROLLED --> RETENTION
 ```
 
-This visual documentation provides a comprehensive understanding of the Political Sphere CI/CD platform architecture, workflow dependencies, execution patterns, and security model. The diagrams illustrate the sophisticated design patterns and best practices implemented throughout the platform.
+This visual documentation provides a comprehensive understanding of the Political
+Sphere CI/CD platform architecture, workflow dependencies, execution patterns,
+and security model. The diagrams illustrate the design patterns and best
+practices implemented throughout the platform.

@@ -128,10 +128,10 @@ function scanRelativeImports(filePath, extensions) {
   ];
 
   for (const regex of regexes) {
-    while (true) {
-      const match = regex.exec(raw);
-      if (!match) break;
+    let match = regex.exec(raw);
+    while (match !== null) {
       imports.push(match[1]);
+      match = regex.exec(raw);
     }
   }
 
@@ -655,111 +655,139 @@ function buildComparableReport(report) {
   });
 }
 
-async function main() {
-  const args = parseArgs(process.argv.slice(2));
-  const repoRoot = process.env.PS_CONTRACT_REPO_ROOT || getRepoRoot();
+function isPolicyEnabled(value) {
+  return value !== false && String(value || '').toLowerCase() !== 'false';
+}
 
-  const policyPath = resolvePath(
-    repoRoot,
-    args.policy ||
-      process.env.PS_CONTRACT_POLICY ||
-      'configs/consumer/contract.json',
-  );
-  const exceptionsPath = resolvePath(
-    repoRoot,
-    args.exceptions ||
-      process.env.PS_CONTRACT_EXCEPTIONS ||
-      'configs/consumer/exceptions.json',
-  );
-  const reportPath = resolvePath(
-    repoRoot,
-    args.report ||
-      process.env.PS_CONTRACT_REPORT ||
-      path.join(repoRoot, 'reports', 'contracts', 'contract.json'),
-  );
-  const summaryPath = resolvePath(
-    repoRoot,
-    args.summary ||
-      process.env.PS_CONTRACT_SUMMARY ||
-      path.join(repoRoot, 'reports', 'contracts', 'contract.txt'),
-  );
-  const baselinePath = resolvePath(
-    repoRoot,
-    args.baseline || process.env.PS_CONTRACT_BASELINE || '',
-  );
+function resolveContractPaths(repoRoot, args) {
+  return {
+    policyPath: resolvePath(
+      repoRoot,
+      args.policy ||
+        process.env.PS_CONTRACT_POLICY ||
+        'configs/consumer/contract.json',
+    ),
+    exceptionsPath: resolvePath(
+      repoRoot,
+      args.exceptions ||
+        process.env.PS_CONTRACT_EXCEPTIONS ||
+        'configs/consumer/exceptions.json',
+    ),
+    reportPath: resolvePath(
+      repoRoot,
+      args.report ||
+        process.env.PS_CONTRACT_REPORT ||
+        path.join(repoRoot, 'reports', 'contracts', 'contract.json'),
+    ),
+    summaryPath: resolvePath(
+      repoRoot,
+      args.summary ||
+        process.env.PS_CONTRACT_SUMMARY ||
+        path.join(repoRoot, 'reports', 'contracts', 'contract.txt'),
+    ),
+    baselinePath: resolvePath(
+      repoRoot,
+      args.baseline || process.env.PS_CONTRACT_BASELINE || '',
+    ),
+  };
+}
 
+async function loadContractPolicy(policyPath) {
   const policyDoc = await parseConfig(policyPath, 'contract policy');
   if (!policyDoc || typeof policyDoc !== 'object' || !policyDoc.policy) {
     fatal('contract policy missing required policy object');
   }
   const policy = policyDoc.policy || {};
   const mode = policy.mode === 'advisory' ? 'advisory' : 'enforce';
-  const failOnMissing =
-    policy.fail_on_missing !== false &&
-    String(policy.fail_on_missing || '').toLowerCase() !== 'false';
-  const failOnUnknown =
-    policy.fail_on_unknown !== false &&
-    String(policy.fail_on_unknown || '').toLowerCase() !== 'false';
+  return {
+    policy,
+    mode,
+    failOnMissing: isPolicyEnabled(policy.fail_on_missing),
+    failOnUnknown: isPolicyEnabled(policy.fail_on_unknown),
+  };
+}
 
-  section('contract', 'Consumer contract check', `Repo: ${repoRoot}`);
-  detail(`Policy: ${path.relative(repoRoot, policyPath)}`);
-  detail(`Mode: ${mode}`);
-
-  let exceptionsDoc = { exceptions: {} };
-  if (fs.existsSync(exceptionsPath)) {
-    exceptionsDoc = await parseConfig(exceptionsPath, 'exceptions policy');
-    if (!exceptionsDoc || typeof exceptionsDoc !== 'object') {
-      fatal('exceptions policy is not a valid object');
-    }
+async function loadExceptionsDoc(exceptionsPath) {
+  if (!fs.existsSync(exceptionsPath)) return { exceptions: {} };
+  const exceptionsDoc = await parseConfig(exceptionsPath, 'exceptions policy');
+  if (!exceptionsDoc || typeof exceptionsDoc !== 'object') {
+    fatal('exceptions policy is not a valid object');
   }
+  return exceptionsDoc;
+}
 
-  const exceptions = exceptionsDoc.exceptions || {};
-  const fileMissingAllow = loadExceptionSet(
-    exceptions.files?.allow_missing,
-    'files.allow_missing',
-  );
-  const filePresentAllow = loadExceptionSet(
-    exceptions.files?.allow_present,
-    'files.allow_present',
-  );
-  const scriptMissingAllow = loadExceptionSet(
-    exceptions.scripts?.allow_missing,
-    'scripts.allow_missing',
-  );
-  const toolMissingAllow = loadExceptionSet(
-    exceptions.tools?.allow_missing,
-    'tools.allow_missing',
-  );
-  const toolPresentAllow = loadExceptionSet(
-    exceptions.tools?.allow_present,
-    'tools.allow_present',
-  );
-  const workflowMissingAllow = loadExceptionSet(
-    exceptions.workflows?.allow_missing_uses,
-    'workflows.allow_missing_uses',
-  );
-  const workflowTopLevelAllow = loadExceptionSet(
-    exceptions.workflows?.allow_top_level,
-    'workflows.allow_top_level',
-  );
-  const importAllow = loadExceptionSet(
-    exceptions.imports?.allow_unresolved,
-    'imports.allow_unresolved',
-  );
+function buildExceptionSets(exceptions) {
+  return {
+    fileMissingAllow: loadExceptionSet(
+      exceptions.files?.allow_missing,
+      'files.allow_missing',
+    ),
+    filePresentAllow: loadExceptionSet(
+      exceptions.files?.allow_present,
+      'files.allow_present',
+    ),
+    scriptMissingAllow: loadExceptionSet(
+      exceptions.scripts?.allow_missing,
+      'scripts.allow_missing',
+    ),
+    toolMissingAllow: loadExceptionSet(
+      exceptions.tools?.allow_missing,
+      'tools.allow_missing',
+    ),
+    toolPresentAllow: loadExceptionSet(
+      exceptions.tools?.allow_present,
+      'tools.allow_present',
+    ),
+    workflowMissingAllow: loadExceptionSet(
+      exceptions.workflows?.allow_missing_uses,
+      'workflows.allow_missing_uses',
+    ),
+    workflowTopLevelAllow: loadExceptionSet(
+      exceptions.workflows?.allow_top_level,
+      'workflows.allow_top_level',
+    ),
+    importAllow: loadExceptionSet(
+      exceptions.imports?.allow_unresolved,
+      'imports.allow_unresolved',
+    ),
+  };
+}
 
-  const violations = [];
+function collectPolicyInputs(policy) {
+  return {
+    requiredFiles: Array.isArray(policy.required_files)
+      ? policy.required_files
+      : [],
+    forbiddenFiles: Array.isArray(policy.forbidden_files)
+      ? policy.forbidden_files
+      : [],
+    packageManager:
+      policy.package_manager && typeof policy.package_manager === 'object'
+        ? policy.package_manager
+        : {},
+  };
+}
 
-  const requiredFiles = Array.isArray(policy.required_files)
-    ? policy.required_files
-    : [];
-  const forbiddenFiles = Array.isArray(policy.forbidden_files)
-    ? policy.forbidden_files
-    : [];
-  const packageManager =
-    policy.package_manager && typeof policy.package_manager === 'object'
-      ? policy.package_manager
-      : {};
-
+async function runContractChecks({
+  policy,
+  repoRoot,
+  packageManager,
+  requiredFiles,
+  forbiddenFiles,
+  packageJson,
+  deps,
+  failOnMissing,
+  failOnUnknown,
+  fileMissingAllow,
+  filePresentAllow,
+  scriptMissingAllow,
+  toolMissingAllow,
+  toolPresentAllow,
+  workflowMissingAllow,
+  workflowTopLevelAllow,
+  importAllow,
+  violations,
+}) {
   await checkRequiredFiles({
     repoRoot,
     requiredFiles,
@@ -774,18 +802,6 @@ async function main() {
     filePresentAllow,
     violations,
   });
-
-  const packageJson = readPackageJson(repoRoot);
-
-  const requiredScripts = checkRequiredScripts({
-    policy,
-    packageJson,
-    failOnMissing,
-    scriptMissingAllow,
-    violations,
-  });
-
-  const deps = gatherDeps(packageJson);
 
   checkTools({
     policy,
@@ -835,16 +851,20 @@ async function main() {
     failOnMissing,
     violations,
   });
+}
 
-  const summary = {
+function createSummary(mode, violations) {
+  return {
     mode,
     violations: violations.length,
   };
+}
 
+function buildSummaryLines(summary, violations) {
   const summaryLines = [
     'Consumer contract summary',
-    `Mode: ${mode}`,
-    `Violations: ${violations.length}`,
+    `Mode: ${summary.mode}`,
+    `Violations: ${summary.violations}`,
   ];
 
   if (violations.length > 0) {
@@ -854,43 +874,137 @@ async function main() {
     }
   }
 
+  return summaryLines;
+}
+
+function computeDrift({
+  baselinePath,
+  repoRoot,
+  summary,
+  mode,
+  requiredFiles,
+  requiredScripts,
+  violations,
+}) {
   const drift = { enabled: false, changed: false };
-  if (baselinePath && fs.existsSync(baselinePath)) {
-    drift.enabled = true;
-    drift.baseline_path = path.relative(repoRoot, baselinePath);
-    try {
-      const baselineReport = JSON.parse(readText(baselinePath));
-      const baselineComparable = buildComparableReport(baselineReport);
-      const currentComparable = buildComparableReport({
-        summary,
-        policy: {
-          mode,
-          required_files: requiredFiles,
-          required_scripts: requiredScripts,
-        },
-        violations,
-      });
-      drift.changed =
-        JSON.stringify(baselineComparable) !==
-        JSON.stringify(currentComparable);
-    } catch (err) {
-      drift.error = `baseline unreadable: ${err.message}`;
-    }
+  if (!baselinePath || !fs.existsSync(baselinePath)) {
+    return drift;
   }
 
-  if (drift.enabled) {
-    let status = 'no changes';
-    if (drift.error) {
-      status = `error (${drift.error})`;
-    } else if (drift.changed) {
-      status = 'changed';
-    }
-    summaryLines.push(`Drift: ${status}`);
+  drift.enabled = true;
+  drift.baseline_path = path.relative(repoRoot, baselinePath);
+  try {
+    const baselineReport = JSON.parse(readText(baselinePath));
+    const baselineComparable = buildComparableReport(baselineReport);
+    const currentComparable = buildComparableReport({
+      summary,
+      policy: {
+        mode,
+        required_files: requiredFiles,
+        required_scripts: requiredScripts,
+      },
+      violations,
+    });
+    drift.changed =
+      JSON.stringify(baselineComparable) !== JSON.stringify(currentComparable);
+  } catch (err) {
+    drift.error = `baseline unreadable: ${err.message}`;
   }
+
+  return drift;
+}
+
+function appendDriftSummary(summaryLines, drift) {
+  if (!drift.enabled) return;
+  let status = 'no changes';
+  if (drift.error) {
+    status = `error (${drift.error})`;
+  } else if (drift.changed) {
+    status = 'changed';
+  }
+  summaryLines.push(`Drift: ${status}`);
+}
+
+function printViolationsResult(title, violations) {
+  section('result', title, `${violations.length} issue(s)`);
+  for (const v of violations) {
+    bullet(`${v.path}: ${v.message}`, { stream: 'stderr' });
+  }
+}
+
+function handleResult(violations, mode) {
+  if (violations.length === 0) {
+    section('result', 'Consumer contract passed', 'Policy checks satisfied');
+    return;
+  }
+
+  if (mode === 'enforce') {
+    printViolationsResult('Consumer contract failed', violations);
+    process.exit(1);
+  }
+
+  printViolationsResult('Consumer contract advisory', violations);
+  process.exit(0);
+}
+
+async function main() {
+  const args = parseArgs(process.argv.slice(2));
+  const repoRoot = process.env.PS_CONTRACT_REPO_ROOT || getRepoRoot();
+  const paths = resolveContractPaths(repoRoot, args);
+
+  const { policy, mode, failOnMissing, failOnUnknown } =
+    await loadContractPolicy(paths.policyPath);
+
+  section('contract', 'Consumer contract check', `Repo: ${repoRoot}`);
+  detail(`Policy: ${path.relative(repoRoot, paths.policyPath)}`);
+  detail(`Mode: ${mode}`);
+
+  const exceptionsDoc = await loadExceptionsDoc(paths.exceptionsPath);
+  const exceptionSets = buildExceptionSets(exceptionsDoc.exceptions || {});
+  const violations = [];
+
+  const { requiredFiles, forbiddenFiles, packageManager } =
+    collectPolicyInputs(policy);
+  const packageJson = readPackageJson(repoRoot);
+  const requiredScripts = checkRequiredScripts({
+    policy,
+    packageJson,
+    failOnMissing,
+    scriptMissingAllow: exceptionSets.scriptMissingAllow,
+    violations,
+  });
+  const deps = gatherDeps(packageJson);
+
+  await runContractChecks({
+    policy,
+    repoRoot,
+    packageManager,
+    requiredFiles,
+    forbiddenFiles,
+    packageJson,
+    deps,
+    failOnMissing,
+    failOnUnknown,
+    ...exceptionSets,
+    violations,
+  });
+
+  const summary = createSummary(mode, violations);
+  const summaryLines = buildSummaryLines(summary, violations);
+  const drift = computeDrift({
+    baselinePath: paths.baselinePath,
+    repoRoot,
+    summary,
+    mode,
+    requiredFiles,
+    requiredScripts,
+    violations,
+  });
+  appendDriftSummary(summaryLines, drift);
 
   writeOutputs({
-    reportPath,
-    summaryPath,
+    reportPath: paths.reportPath,
+    summaryPath: paths.summaryPath,
     reportData: {
       format: 'ps.contract',
       schema_version: '1.0.0',
@@ -907,31 +1021,7 @@ async function main() {
     summaryLines,
   });
 
-  if (violations.length > 0 && mode === 'enforce') {
-    section(
-      'result',
-      'Consumer contract failed',
-      `${violations.length} issue(s)`,
-    );
-    for (const v of violations) {
-      bullet(`${v.path}: ${v.message}`, { stream: 'stderr' });
-    }
-    process.exit(1);
-  }
-
-  if (violations.length > 0) {
-    section(
-      'result',
-      'Consumer contract advisory',
-      `${violations.length} issue(s)`,
-    );
-    for (const v of violations) {
-      bullet(`${v.path}: ${v.message}`, { stream: 'stderr' });
-    }
-    process.exit(0);
-  }
-
-  section('result', 'Consumer contract passed', 'Policy checks satisfied');
+  handleResult(violations, mode);
 }
 
 // prefer top-level await

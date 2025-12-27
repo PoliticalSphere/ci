@@ -90,9 +90,13 @@ runs:
         PS_NOFILES: ${{ inputs.if_no_files_found }}
         PS_PATHS: ${{ inputs.path }}
         PS_COMPRESSION_LEVEL: ${{ inputs.compression_level }}
-      run: bash "${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown/ps-upload-artifacts/ps-upload-artifacts-validate.sh"
+      run: |
+        validate_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
+        validate_root="${validate_root}/ps-upload-artifacts"
+        validate_script="${validate_root}/ps-upload-artifacts-validate.sh"
+        bash "${validate_script}"
     - name: Upload artifacts
-      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
       with:
         name: ${{ inputs.name }}
         path: ${{ inputs.path }}

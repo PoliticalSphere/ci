@@ -21,7 +21,7 @@ runs:
   using: "composite"
   steps:
     - name: Dependency review
-      uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261 # v4.8.2
+      uses: actions/dependency-review-action@3c4e3dcb1aa7874d2c16be7d79418e9b7efd6261  # v4.8.2
       with:
         base-ref: ${{ inputs.base_ref }}
         head-ref: ${{ inputs.head_ref }}

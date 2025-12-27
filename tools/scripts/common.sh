@@ -21,7 +21,9 @@ set -euo pipefail
 # ==============================================================================
 
 REPO_ROOT=""
+# shellcheck disable=SC2034
 repo_root=""
+# shellcheck disable=SC2034
 has_git=0
 format_loaded=0
 
@@ -42,12 +44,14 @@ set_repo_root() {
   if command -v git >/dev/null 2>&1 && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
     root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
     if [[ -n "${root}" ]]; then
+      # shellcheck disable=SC2034
       has_git=1
     fi
   fi
 
   [[ -n "${root}" ]] || root="$(pwd)"
   REPO_ROOT="$(_ps_realpath_dir "${root}")"
+  # shellcheck disable=SC2034
   repo_root="$REPO_ROOT"  # legacy name kept for compatibility (NOT exported)
   export REPO_ROOT
   return 0

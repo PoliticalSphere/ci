@@ -294,7 +294,7 @@ jobs:
     needs: [validate-ci]
     if: ${{ inputs.dry_run == false }}
     permissions:
-      contents: write # justification: tag + release creation requires contents write
+      contents: write  # justification: tag + release creation requires contents write
     timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}

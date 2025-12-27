@@ -107,7 +107,10 @@ runs:
         set -euo pipefail
         for d in "${PS_REPORT_DIR_INPUT}" "${PS_LOG_DIR_INPUT}"; do
           [[ -n "${d}" ]] || { echo "ERROR: output dir empty" >&2; exit 1; }
-          [[ "${d}" == /* || "${d}" == *".."* ]] && { echo "ERROR: unsafe dir path: ${d}" >&2; exit 1; }
+          if [[ "${d}" == /* || "${d}" == *".."* ]]; then
+            echo "ERROR: unsafe dir path: ${d}" >&2
+            exit 1
+          fi
           mkdir -p "${GITHUB_WORKSPACE}/${d}"
         done
 

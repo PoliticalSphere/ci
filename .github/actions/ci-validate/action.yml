@@ -83,7 +83,8 @@ runs:
 
         if [[ -z "${platform_root}" ]]; then
           printf 'ERROR: CI Validate requires platform root.\n' >&2
-          printf 'Set inputs.platform_root or env.PS_PLATFORM_ROOT (e.g. %s/.ps-platform).\n' "${GITHUB_WORKSPACE}" >&2
+          printf 'Set inputs.platform_root or env.PS_PLATFORM_ROOT (e.g. %s/.ps-platform).\n' \
+            "${GITHUB_WORKSPACE}" >&2
           exit 1
         fi
 
@@ -126,12 +127,15 @@ runs:
           while [[ "${sanitized}" == *"${delimiter}"* ]]; do
             attempts=$((attempts + 1))
             if [[ "${attempts}" -gt 6 ]]; then
-              printf 'ERROR: output value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              printf 'ERROR: output value for %s contains an unsafe heredoc delimiter\n' \
+                "${key}" >&2
               exit 1
             fi
             delimiter="__PS_OUT_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_OUTPUT}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_OUTPUT}"
         }
 
         emit_output "platform_root" "${platform_root}"

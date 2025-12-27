@@ -105,17 +105,21 @@ runs:
           while [[ "${sanitized}" == *"${delimiter}"* ]]; do
             attempts=$((attempts + 1))
             if [[ "${attempts}" -gt 6 ]]; then
-              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' \
+                "${key}" >&2
               exit 1
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
 
         depth="${PS_FETCH_DEPTH_INPUT:-1}"
         if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
-          printf 'ERROR: inputs.fetch_depth must be a non-negative integer (got %q)\n' "${depth}" >&2
+          printf 'ERROR: inputs.fetch_depth must be a non-negative integer (got %q)\n' \
+            "${depth}" >&2
           exit 1
         fi
 

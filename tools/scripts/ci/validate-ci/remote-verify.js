@@ -44,6 +44,56 @@ export function mapStatusToInfo(status) {
   }
 }
 
+function buildCommitHeaders(verifyRemoteShas, isCIImpl, tokenProvider) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'political-sphere-validate-ci',
+  };
+  const token = verifyRemoteShas && isCIImpl() ? tokenProvider() || '' : '';
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function isRateLimitExhausted(status, remaining) {
+  if (remaining === null) return false;
+  if (status !== 403 && status !== 429) return false;
+  return Number(remaining) === 0;
+}
+
+function formatRateLimitReset(resetHeader) {
+  if (!resetHeader) return '';
+  const resetEpoch = Number(resetHeader) * 1000;
+  if (!Number.isFinite(resetEpoch)) return '';
+  return new Date(resetEpoch).toISOString();
+}
+
+function evaluateCommitResponse(response, repo, ref, detailImpl) {
+  const status = response.status;
+  if (status === 200) return { ok: true, error: null };
+  if (status === 404) return { ok: false, error: 'ref_not_found' };
+  return handleCommitStatus(response, repo, ref, detailImpl);
+}
+
+function handleCommitStatus(response, repo, ref, detailImpl) {
+  const status = response.status;
+  const remaining = response.headers.get('x-ratelimit-remaining');
+  const reset = response.headers.get('x-ratelimit-reset');
+  if (isRateLimitExhausted(status, remaining)) {
+    const resetIso = formatRateLimitReset(reset);
+    detailImpl(
+      `REMOTE_VERIFY: rate limit hit; verification skipped for ${repo}@${ref.slice(0, 8)}… reset=${resetIso || 'unknown'}`,
+    );
+    return { ok: true, error: 'rate_limited_soft' };
+  }
+  const info = mapStatusToInfo(status);
+  detailImpl(
+    `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
+  );
+  return { ok: false, error: info.error };
+}
+
 export function createRemoteVerifier({
   verifyRemoteShas = false,
   detailImpl = detail,
@@ -110,15 +160,11 @@ export function createRemoteVerifier({
       return cache.get(key);
     }
 
-    const headers = {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'political-sphere-validate-ci',
-    };
-    const token = verifyRemoteShas && isCIImpl() ? tokenProvider() || '' : '';
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
+    const headers = buildCommitHeaders(
+      verifyRemoteShas,
+      isCIImpl,
+      tokenProvider,
+    );
     const url = `https://api.github.com/repos/${repo}/commits/${ref}`;
     let result;
     try {
@@ -126,34 +172,7 @@ export function createRemoteVerifier({
         method: 'GET',
         headers,
       });
-
-      const status = response.status;
-      if (status === 200) {
-        result = { ok: true, error: null };
-      } else if (status === 404) {
-        result = { ok: false, error: 'ref_not_found' };
-      } else {
-        const remaining = response.headers.get('x-ratelimit-remaining');
-        const reset = response.headers.get('x-ratelimit-reset');
-        if (
-          (status === 403 || status === 429) &&
-          remaining !== null &&
-          Number(remaining) === 0
-        ) {
-          const resetEpoch = reset ? Number(reset) * 1000 : null;
-          const resetIso = resetEpoch ? new Date(resetEpoch).toISOString() : '';
-          detailImpl(
-            `REMOTE_VERIFY: rate limit hit; verification skipped for ${repo}@${ref.slice(0, 8)}… reset=${resetIso || 'unknown'}`,
-          );
-          result = { ok: true, error: 'rate_limited_soft' };
-        } else {
-          const info = mapStatusToInfo(status);
-          detailImpl(
-            `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
-          );
-          result = { ok: false, error: info.error };
-        }
-      }
+      result = evaluateCommitResponse(response, repo, ref, detailImpl);
     } catch {
       logApiUnreachable(repo, ref);
       result = { ok: !isCIImpl(), error: 'api_unreachable' };

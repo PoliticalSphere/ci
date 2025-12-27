@@ -57,5 +57,6 @@ pulled into the runner without leaving persistent credentials in the workspace.
 - Validated parameters are emitted to `GITHUB_ENV` as:
   `PS_FETCH_DEPTH_VALIDATED`, `PS_PERSIST_CREDENTIALS_VALIDATED`,
   `PS_SUBMODULES_VALIDATED`, `PS_REQUIRE_FULL_HISTORY_VALIDATED`.
- - Note: `actions/checkout` defaults to `persist-credentials: true`; this action
-   enforces `false` to prevent token persistence in `.git/config`.
+
+Note: `actions/checkout` defaults to `persist-credentials: true`; this action
+enforces `false` to prevent token persistence in `.git/config`.

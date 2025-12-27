@@ -13,7 +13,6 @@ set -euo pipefail
 #   - Stable output for CI/log parsing
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 # Optional formatting (best effort; do not hard-fail if absent)

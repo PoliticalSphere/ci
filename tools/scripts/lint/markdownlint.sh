@@ -57,6 +57,20 @@ if [[ "$#" -gt 0 ]]; then
   MDL_ARGS=("$@")
 fi
 
+timeout_s="${PS_MARKDOWNLINT_TIMEOUT:-}"
+if [[ -z "${timeout_s}" && "${CI:-0}" == "1" ]]; then
+  timeout_s="300"
+fi
+
+timeout_cmd=""
+if [[ -n "${timeout_s}" ]]; then
+  if command -v timeout >/dev/null 2>&1; then
+    timeout_cmd="timeout"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    timeout_cmd="gtimeout"
+  fi
+fi
+
 # Build targets
 targets=()
 if [[ "${full_scan}" == "1" ]]; then
@@ -72,13 +86,13 @@ fi
 
 # markdownlint-cli2 works best from repo root with relative paths
 declare -a relative_targets=()
-for target in "${targets[@]}"; do
-  if [[ "${target}" == "${repo_root}/"* ]]; then
-    relative_targets+=("${target#${repo_root}/}")
-  else
-    relative_targets+=("${target}")
-  fi
-done
+  for target in "${targets[@]}"; do
+    if [[ "${target}" == "${repo_root}/"* ]]; then
+      relative_targets+=("${target#"${repo_root}"/}")
+    else
+      relative_targets+=("${target}")
+    fi
+  done
 
 # Run and capture output + exit code reliably
 output=""
@@ -87,11 +101,13 @@ set +e
 if [[ "${#MDL_ARGS[@]}" -gt 0 ]]; then
   output="$(
     cd "${repo_root}" && \
+    ${timeout_cmd:+${timeout_cmd} "${timeout_s}"} \
     "${MDL_BIN}" --config "${config_path}" "${MDL_ARGS[@]}" "${relative_targets[@]}" 2>&1
   )"
 else
   output="$(
     cd "${repo_root}" && \
+    ${timeout_cmd:+${timeout_cmd} "${timeout_s}"} \
     "${MDL_BIN}" --config "${config_path}" "${relative_targets[@]}" 2>&1
   )"
 fi
@@ -107,6 +123,10 @@ if [[ -n "${output}" ]]; then
     # If it failed but we filtered everything, show the original output.
     printf '%s\n' "${output}"
   fi
+fi
+
+if [[ -n "${timeout_cmd}" && "${status}" -eq 124 ]]; then
+  ps_error "Markdownlint timed out after ${timeout_s}s."
 fi
 
 exit "${status}"

@@ -422,38 +422,50 @@ function evaluateLicense(policy, license) {
 
 function collectPackages(lockData) {
   const packages = [];
-  if (lockData && typeof lockData === 'object') {
-    if (lockData.packages && typeof lockData.packages === 'object') {
-      for (const [entryPath, meta] of Object.entries(lockData.packages)) {
-        if (entryPath === '') continue;
-        const name = meta?.name || nameFromPath(entryPath);
-        packages.push({
-          name,
-          version: meta?.version || '',
-          license: normalizeLicense(meta?.license || meta?.licenses),
-        });
-      }
-      return packages;
-    }
-    if (lockData.dependencies && typeof lockData.dependencies === 'object') {
-      const stack = Object.entries(lockData.dependencies).map(
-        ([name, meta]) => ({ name, meta }),
-      );
-      while (stack.length > 0) {
-        const { name, meta } = stack.pop();
-        packages.push({
-          name,
-          version: meta?.version || '',
-          license: normalizeLicense(meta?.license || meta?.licenses),
-        });
-        const deps = meta?.dependencies || {};
-        for (const [depName, depMeta] of Object.entries(deps)) {
-          stack.push({ name: depName, meta: depMeta });
-        }
-      }
-    }
+  if (!isRecord(lockData)) return packages;
+  if (isRecord(lockData.packages)) {
+    collectPackagesFromEntries(lockData.packages, packages);
+    return packages;
+  }
+  if (isRecord(lockData.dependencies)) {
+    collectPackagesFromDependencies(lockData.dependencies, packages);
   }
   return packages;
+}
+
+function isRecord(value) {
+  return value && typeof value === 'object';
+}
+
+function pushPackage(packages, name, meta) {
+  packages.push({
+    name,
+    version: meta?.version || '',
+    license: normalizeLicense(meta?.license || meta?.licenses),
+  });
+}
+
+function collectPackagesFromEntries(entries, packages) {
+  for (const [entryPath, meta] of Object.entries(entries)) {
+    if (entryPath === '') continue;
+    const name = meta?.name || nameFromPath(entryPath);
+    pushPackage(packages, name, meta);
+  }
+}
+
+function collectPackagesFromDependencies(dependencies, packages) {
+  const stack = Object.entries(dependencies).map(([name, meta]) => ({
+    name,
+    meta,
+  }));
+  while (stack.length > 0) {
+    const { name, meta } = stack.pop();
+    pushPackage(packages, name, meta);
+    const deps = meta?.dependencies || {};
+    for (const [depName, depMeta] of Object.entries(deps)) {
+      stack.push({ name: depName, meta: depMeta });
+    }
+  }
 }
 
 const args = parseArgs(process.argv.slice(2));

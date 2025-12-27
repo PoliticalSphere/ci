@@ -37,7 +37,8 @@ fi
 
 printf 'PS.BUILD: id=%s\n' "${PS_ID}"
 printf 'PS.BUILD: title=%s\n' "${PS_TITLE}"
-printf 'PS.BUILD: working-directory=%s\n' "${PS_WD}"
+working_dir="${PS_WD:-${PS_WORKING_DIR:-}}"
+printf 'PS.BUILD: working-directory=%s\n' "${working_dir}"
 printf 'PS.BUILD: script=%s\n' "${PS_SCRIPT}"
 if [[ -n "${PS_ARGS:-}" ]]; then
   printf 'PS.BUILD: args=%s\n' "${PS_ARGS}"

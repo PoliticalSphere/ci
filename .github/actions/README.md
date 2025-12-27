@@ -83,9 +83,11 @@ Baseline building blocks:
 
 ## Node toolchain
 
-
-- `ps-bootstrap/ps-init`: canonical job entrypoint that hardens the runner, checks out the repository and optional platform, prepares HOME isolation, sets `PS_PLATFORM_ROOT`, and optionally installs tools.
-- `ps-bootstrap/ps-node`: Node.js setup and optional dependency install switchboard.
+- `ps-bootstrap/ps-init`: canonical job entrypoint that hardens the runner,
+  checks out the repository and optional platform, prepares HOME isolation,
+  sets `PS_PLATFORM_ROOT`, and optionally installs tools.
+- `ps-bootstrap/ps-node`: Node.js setup and optional dependency install
+  switchboard.
 
 Example: use `ps-bootstrap` to run lint with installs/tools:
 
@@ -113,7 +115,6 @@ Security-only bootstrap example:
     install_tools: "0"          # No extra binaries
     egress_policy: block         # Still perform hardening
 ```
-
 
 Lint + quality:
 

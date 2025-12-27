@@ -19,7 +19,6 @@ set -euo pipefail
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   exit 1
-  return 0
 }
 
 version="${SEMGREP_VERSION:-}"

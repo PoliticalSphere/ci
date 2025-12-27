@@ -80,13 +80,13 @@ fi
 
 # Relative paths (cspell output is nicer and config often assumes repo-root)
 declare -a relative_targets=()
-for target in "${targets[@]}"; do
-  if [[ "${target}" == "${repo_root}/"* ]]; then
-    relative_targets+=("${target#${repo_root}/}")
-  else
-    relative_targets+=("${target}")
-  fi
-done
+  for target in "${targets[@]}"; do
+    if [[ "${target}" == "${repo_root}/"* ]]; then
+      relative_targets+=("${target#"${repo_root}"/}")
+    else
+      relative_targets+=("${target}")
+    fi
+  done
 
 # Run and capture output + exit code reliably
 output=""

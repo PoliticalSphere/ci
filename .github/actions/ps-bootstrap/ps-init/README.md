@@ -91,28 +91,35 @@ Switchboard order (execution flow):
 ## Inputs
 
 Security hardening:
+
 - `egress_policy`: Egress policy for harden-runner (`audit`|`block`). Default: `audit`.
 
 Repository checkout:
+
 - `fetch_depth`: Git fetch depth (0 = full history). Default: `1`.
 - `checkout_ref`: Optional git ref (branch/tag/SHA). Default: empty.
 - `require_full_history`: Require `fetch_depth=0` (`0/1/true/false`). Default: `false`.
 
 HOME isolation:
+
 - `home_dir`: Repo-relative HOME directory to create/use. Default: `.home`.
 - `home_isolation`: Enable HOME/XDG isolation for the job (`0/1/true/false`). Default: `true`.
 
 Platform checkout (optional):
+
 - `platform_repo`: Platform repository (`OWNER/REPO`). Default: `PoliticalSphere/ci`.
 - `platform_ref`: Platform ref. Default: `main`.
 - `platform_path`: Repo-relative platform checkout path. Default: `.ps-platform`.
 - `skip_platform_checkout`: Skip platform checkout (`0/1/true/false`). Default: `false`.
 - `platform_fetch_depth`: Platform fetch depth (0 = full history). Default: `1`.
 - `platform_clean_path`: Delete platform_path before checkout (`0/1/true/false`). Default: `false`.
-- `platform_require_pinned_ref`: Require platform_ref to be a full 40-char commit SHA (`0/1/true/false`). Default: `false`.
-- `platform_allowed_repositories`: Optional newline-separated allowlist for `platform_repo`. Default: empty.
+- `platform_require_pinned_ref`: Require `platform_ref` to be a full 40-char
+  commit SHA (`0/1/true/false`). Default: `false`.
+- `platform_allowed_repositories`: Optional newline-separated allowlist for
+  `platform_repo`. Default: empty.
 
 Tools (optional):
+
 - `install_tools`: Install tool bundles (`0/1/true/false`). Default: `0`.
 - `tools_bundle`: Tools bundle (`lint`|`security`|`none`). Default: `none`.
 

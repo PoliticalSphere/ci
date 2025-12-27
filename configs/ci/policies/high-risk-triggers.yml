@@ -53,36 +53,18 @@ high_risk_triggers:
   - workflow_run
   - repository_dispatch
 
-allowlist:
-  # Empty by default. Add entries only with explicit approval.
-  #
-  # Example:
-  # - id: TR-001
-  #   status: active
-  #   trigger: pull_request_target
-  #   selector:
-  #     workflow_path: ".github/workflows/safe-labeler.yml"
-  #
-  #   rationale: >
-  #     Requires write access to apply labels. Must never check out PR code.
-  #
-  #   safeguards:
-  #     # validate-ci should fail if any checkout step exists (actions/checkout or
-  #     # local checkout wrappers).
-  #     forbid_checkout: true
-  #
-  #     # validate-ci should fail if run steps execute PR-provided code paths.
-  #     forbid_running_untrusted_code: true
-  #
-  #     # validate-ci should confirm declared permissions are <= these values.
-  #     require_permissions:
-  #       contents: read
-  #       pull-requests: write
-  #
-  #     # Optional additional hardening expectations
-  #     require_concurrency: true
-  #     require_timeout_minutes_max: 10
-  #
-  #   risk_decision_id: RD-00X
-  #   approved_by: security
-  #   review_by: 2026-03-19
+# Empty by default. Add entries only with explicit approval.
+#
+# Example: An allowlist entry (approved via risk decision) specifies a
+# trigger (e.g. pull_request_target), selector (workflow_path), a brief
+# rationale, and the required safeguards (forbid_checkout,
+# forbid_running_untrusted_code, require_permissions).
+#
+#     # Optional additional hardening expectations
+#     require_concurrency: true
+#     require_timeout_minutes_max: 10
+#
+#   risk_decision_id: RD-00X
+#   approved_by: security
+#   review_by: 2026-03-19
+allowlist: []

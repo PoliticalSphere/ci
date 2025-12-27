@@ -106,14 +106,17 @@ runs:
             fi
             delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
           done
-          printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
         }
 
         policy="${PS_EGRESS_POLICY_INPUT:-audit}"
         case "${policy}" in
           audit|block) ;;
           *)
-            printf 'ERROR: inputs.egress_policy must be "audit" or "block" (got %q)\n' "${policy}" >&2
+            printf 'ERROR: inputs.egress_policy must be "audit" or "block" (got %q)\n' \
+              "${policy}" >&2
             exit 1
             ;;
         esac

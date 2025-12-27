@@ -35,7 +35,7 @@ runs:
   using: "composite"
   steps:
     - name: SonarCloud scan
-      uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8 # v5.0.0
+      uses: sonarsource/sonarcloud-github-action@ffc3010689be73b8e5ae0c57ce35968afd7909e8  # v5.0.0
       with:
         args: >-
           -Dsonar.sources=${{ inputs.sources }}
