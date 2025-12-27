@@ -421,6 +421,16 @@ runs:
         ref: ${{ inputs.checkout_ref }}
 
     # -----------------------------------------------------------------------------
+    # Optional: Detect pre-downloaded platform snapshot when checkout is skipped.
+    # -----------------------------------------------------------------------------
+    - name: Detect platform snapshot (PS)
+      if: ${{ env.PS_SKIP_PLATFORM_VALIDATED == '1' }}
+      shell: bash
+      env:
+        PS_PLATFORM_SNAPSHOT_PATH: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
+      run: bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-detect-platform-snapshot.sh"
+
+    # -----------------------------------------------------------------------------
     # PHASE 4: HOME ISOLATION
     # Logic: Create and switch to isolated HOME to contain job artifacts.
     # -----------------------------------------------------------------------------

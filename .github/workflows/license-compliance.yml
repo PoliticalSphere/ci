@@ -106,6 +106,12 @@ on:
         required: false
         default: "1"
 
+      license_timeout_minutes:
+        description: "Timeout for license compliance job in minutes"
+        type: number
+        required: false
+        default: 15
+
     # ==========================================================================
     # PLATFORM & SHARED TOOLING
     # --------------------------------------------------------------------------
@@ -240,7 +246,7 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.license_timeout_minutes }}
     steps:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap/ps-init

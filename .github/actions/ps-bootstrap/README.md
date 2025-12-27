@@ -32,7 +32,6 @@ blocks.
 - `ps-checkout-platform`: Checkout a platform repository into a controlled path.
 - `ps-node`: Setup Node.js and optionally install dependencies.
 - `ps-tools`: Install pinned CLI tooling bundles and optional fast scans.
-- `ci-validate`: Run Validate-CI gate against a checked-out platform repo.
 
 ## Typical usage
 

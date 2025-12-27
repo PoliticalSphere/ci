@@ -39,7 +39,7 @@
 #   - Constraints: no deployments; no token writes
 #
 # Operational Notes:
-#   - Timeouts: defined per job in this workflow
+#   - Timeouts: configurable via inputs (per job)
 #   - Artifacts: reports/** and logs/** uploaded per policy
 #   - CI vs local: contract checks are file-based and network-free
 #   - Node runtime: setup-node only; npm ci is intentionally skipped
@@ -79,6 +79,12 @@ on:
         type: string
         required: false
         default: "0"
+
+      contract_timeout_minutes:
+        description: "Timeout for contract job in minutes"
+        type: number
+        required: false
+        default: 15
 
       policy_path:
         description: "Contract policy path (repo-relative)"
@@ -148,7 +154,7 @@ jobs:
     needs: [validate-ci]
     permissions:
       contents: read
-    timeout-minutes: 15
+    timeout-minutes: ${{ inputs.contract_timeout_minutes }}
     steps:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap/ps-init

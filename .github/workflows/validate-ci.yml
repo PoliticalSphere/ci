@@ -99,6 +99,12 @@ on:
         required: false
         default: "1"
 
+      validate_timeout_minutes:
+        description: "Timeout for Validate-CI job in minutes"
+        type: number
+        required: false
+        default: 10
+
       # ==========================================================================
       # CHECKOUT TARGET
       # ==========================================================================
@@ -224,7 +230,7 @@ jobs:
   validate-ci:
     name: Validate CI policy
     runs-on: ${{ inputs.runner }}
-    timeout-minutes: 10
+    timeout-minutes: ${{ inputs.validate_timeout_minutes }}
     permissions:
       contents: read
     env:
@@ -276,7 +282,7 @@ jobs:
           script: tools/scripts/ci/install-platform-deps.sh
 
       - name: Validate CI (policy)
-        uses: ./.github/actions/ps-bootstrap/ci-validate
+        uses: ./.github/actions/ci-validate
 
       - name: Job teardown (PS)
         if: always()

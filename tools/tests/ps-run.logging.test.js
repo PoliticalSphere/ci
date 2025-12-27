@@ -3,7 +3,6 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
-import { fail, getRepoRoot } from './test-utils.js';
 import {
   buildPsRunEnv,
   createPsRunWorkspace,
@@ -11,6 +10,7 @@ import {
   getLogPath,
   getPsRunHelper,
 } from './ps-run-utils.js';
+import { fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 

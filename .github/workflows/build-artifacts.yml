@@ -43,6 +43,40 @@
 # - Single canonical bootstrap path for build (ps-init)
 # - Evidence-first: artifacts + summary best-effort even on failure
 #
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/validate-ci.yml
+# - ./.github/actions/ps-bootstrap/ps-init
+# - ./.github/actions/ps-bootstrap/ps-node
+# - ./.github/actions/ps-task/build
+# - ./.github/actions/ps-teardown/ps-exit
+# - tools/scripts/actions/ps-build/build.sh (default)
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Triggered via workflow_call (consumer-facing)
+# - Runs Validate-CI gate, then build, then summary
+# - Jobs are isolated; bootstrap runs per job as needed
+# - Summary job always runs and aggregates validate-ci + build results
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
+# - Default permissions are read-only (contents: read)
+# - Egress policy: audit for build, block for summary
+# - Platform ref is pinned by default and validated when required
+#
+#
+# OPERATIONAL NOTES
+# ------------------------------------------------------------------------------
+# - Artifacts are uploaded best-effort (if: always()); build artifacts are strict
+# - Summary output is always produced
+# - Platform snapshot artifacts are captured for branding evidence (warn if missing)
+# - Summary job does not download snapshots; it only detects a preexisting one
+#
 # ==============================================================================
 
 name: Build Artifacts
@@ -56,7 +90,7 @@ on:
   workflow_call:
 
     # ==========================================================================
-    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # RUNTIME & TOOLING CONFIGURATION
     # ==========================================================================
     inputs:
       runner:
@@ -71,20 +105,20 @@ on:
         required: false
         default: "22"
 
-      fetch_depth:
-        description: "Git fetch depth (1 = shallow, 0 = full history)"
-        type: number
-        required: false
-        default: 1
-
       cache:
         description: "Enable dependency caching (1 = on, 0 = off)"
         type: string
         required: false
         default: "1"
 
+      fetch_depth:
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
+        required: false
+        default: 1
+
       # ==========================================================================
-      # PLATFORM & SHARED TOOLING
+      # PLATFORM TRUST & SECURITY
       # ==========================================================================
       platform_repository:
         description: "Platform repository for shared configs"
@@ -129,7 +163,7 @@ on:
       # ARTIFACT COLLECTION & RETENTION
       # ==========================================================================
       artifact_paths:
-        description: "Artifact paths to upload"
+        description: "Artifact paths to upload (newline-separated, repo-relative)"
         type: string
         required: false
         default: |
@@ -139,19 +173,19 @@ on:
           logs/**
 
       retention_days:
-        description: "Artifact retention in days"
+        description: "Standard artifact retention in days"
         type: number
         required: false
         default: 7
 
       compression_level:
-        description: "Zlib compression level (0-9)"
+        description: "Zlib compression level (0-9) for artifact uploads"
         type: number
         required: false
         default: 6
 
       validate_retention_days:
-        description: "Validate-CI artifact retention in days"
+        description: "Policy gate (Validate-CI) specific retention in days"
         type: number
         required: false
         default: 7
@@ -187,7 +221,7 @@ defaults:
     shell: bash
 
 # ==============================================================================
-# GLOBAL ENVIRONMENT
+# GLOBAL PLATFORM ENVIRONMENT
 # ==============================================================================
 env:
   CI: "1"
@@ -202,6 +236,9 @@ env:
 jobs:
   # ============================================================================
   # POLICY GATE — VALIDATE CI
+  # ----------------------------------------------------------------------------
+  # Runs the reusable Validate-CI workflow with platform dependency installs
+  # disabled for least privilege. This job does not use NODE_AUTH_TOKEN.
   # ============================================================================
   validate-ci:
     name: Validate CI (policy gate)
@@ -213,14 +250,16 @@ jobs:
       node_version: ${{ inputs.node_version }}
       fetch_depth: ${{ inputs.fetch_depth }}
       cache: ${{ inputs.cache }}
+      install_platform_dependencies: "0"
       artifact_name: build-artifacts-validate-ci
       retention_days: ${{ inputs.validate_retention_days }}
       platform_ref: ${{ inputs.platform_ref }}
-    secrets:
-      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   # ============================================================================
   # BUILD VERIFICATION — BUILD & ARTIFACTS
+  # ----------------------------------------------------------------------------
+  # Builds in a hardened environment after the policy gate succeeds, then
+  # uploads declared artifacts (strict: error if missing).
   # ============================================================================
   build:
     name: Build and upload artifacts
@@ -236,7 +275,8 @@ jobs:
         uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          checkout_ref: ""
+          # Prefer the exact PR head SHA when available to avoid ref spoofing.
+          checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
           platform_repo: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
           platform_path: ".ps-platform"
@@ -283,7 +323,7 @@ jobs:
           artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
-          artifacts_if_no_files_found: "warn"
+          artifacts_if_no_files_found: "error"
           artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
@@ -291,7 +331,7 @@ jobs:
   # ----------------------------------------------------------------------------
   # Note:
   #   Summary does not require Node/toolchain bootstrap. We keep it minimal:
-  #   hardened runner + checkouts + summary writer + upload.
+  #   hardened runner + repo checkout + summary writer + upload.
   # ============================================================================
   summary:
     name: Build artifacts summary
@@ -303,14 +343,12 @@ jobs:
     timeout-minutes: 10
 
     # Note: we intentionally checkout the consumer repository here so that
-    # local composite actions under `./.github/actions` (e.g., `ps-write-summary`)
-    # are available. `ps-write-summary` still creates the output directory
-    # (e.g. `reports/summary/`) and writes the summary file.
+    # platform exit actions are available to aggregate the multi-job results.
     steps:
       - name: Job setup (Security Only)
-        # ps-init will download a platform snapshot when invoked with
-        # skip_platform_checkout: "true". This centralizes snapshot handling
-        # and sets PS_PLATFORM_ROOT when the snapshot is present.
+        # If a platform snapshot is pre-downloaded into .ps-platform, ps-init
+        # will detect it and set PS_PLATFORM_ROOT. This job does not download
+        # the snapshot itself.
         uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
