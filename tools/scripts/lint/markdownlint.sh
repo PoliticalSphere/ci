@@ -52,7 +52,10 @@ else
   exit 1
 fi
 
-MDL_ARGS=("$@")
+MDL_ARGS=()
+if [[ "$#" -gt 0 ]]; then
+  MDL_ARGS=("$@")
+fi
 
 # Build targets
 targets=()
@@ -81,10 +84,17 @@ done
 output=""
 status=0
 set +e
-output="$(
-  cd "${repo_root}" && \
-  "${MDL_BIN}" --config "${config_path}" "${MDL_ARGS[@]}" "${relative_targets[@]}" 2>&1
-)"
+if [[ "${#MDL_ARGS[@]}" -gt 0 ]]; then
+  output="$(
+    cd "${repo_root}" && \
+    "${MDL_BIN}" --config "${config_path}" "${MDL_ARGS[@]}" "${relative_targets[@]}" 2>&1
+  )"
+else
+  output="$(
+    cd "${repo_root}" && \
+    "${MDL_BIN}" --config "${config_path}" "${relative_targets[@]}" 2>&1
+  )"
+fi
 status=$?
 set -e
 

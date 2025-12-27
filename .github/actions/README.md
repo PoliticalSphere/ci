@@ -77,6 +77,7 @@ Risky changes require an explicit, documented decision.
 Baseline building blocks:
 
 - `ps-bootstrap`
+- `ci-validate`
 - `ps-task`
 - `ps-teardown`
 

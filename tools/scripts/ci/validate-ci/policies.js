@@ -45,59 +45,66 @@ function shouldAddEntry(entry, entryHasStatus) {
 function parseSelectorEntries(text, startMarker = 'allowlist', opts = {}) {
   const { entryHasStatus = false } = opts;
   const entries = [];
-  let current = null;
-  let inSection = false;
-  let inSelector = false;
+  const state = {
+    current: null,
+    inSection: false,
+    inSelector: false,
+    entryHasStatus,
+  };
 
   for (const line of text.split(/\r?\n/)) {
     if (!isValidLine(line)) continue;
-
-    if (!inSection) {
-      if (isStartMarker(line, startMarker)) {
-        inSection = true;
-      }
-      continue;
-    }
-
-    const id = parseId(line);
-    if (id) {
-      if (current && shouldAddEntry(current, entryHasStatus)) {
-        entries.push(current);
-      }
-      current = { id, selector: {} };
-      if (entryHasStatus) current.status = '';
-      inSelector = false;
-      continue;
-    }
-
-    if (!current) continue;
-
-    if (entryHasStatus) {
-      const status = parseStatus(line);
-      if (status) {
-        current.status = status;
-        continue;
-      }
-    }
-
-    const trimmed = line.trim();
-    if (trimmed === 'selector:') {
-      inSelector = true;
-      continue;
-    }
-
-    if (inSelector) {
-      const selector = parseSelector(line);
-      if (selector) {
-        current.selector[selector.key] = selector.value;
-      }
-    }
+    processSelectorEntryLine(state, entries, line, startMarker);
   }
 
+  finalizeSelectorEntry(entries, state.current, entryHasStatus);
+  return entries;
+}
+
+function finalizeSelectorEntry(entries, current, entryHasStatus) {
   if (current && shouldAddEntry(current, entryHasStatus)) {
     entries.push(current);
   }
-  return entries;
+}
+
+function processSelectorEntryLine(state, entries, line, startMarker) {
+  if (!state.inSection) {
+    if (isStartMarker(line, startMarker)) {
+      state.inSection = true;
+    }
+    return;
+  }
+
+  const id = parseId(line);
+  if (id) {
+    finalizeSelectorEntry(entries, state.current, state.entryHasStatus);
+    state.current = { id, selector: {} };
+    if (state.entryHasStatus) state.current.status = '';
+    state.inSelector = false;
+    return;
+  }
+
+  if (!state.current) return;
+
+  if (state.entryHasStatus) {
+    const status = parseStatus(line);
+    if (status) {
+      state.current.status = status;
+      return;
+    }
+  }
+
+  if (line.trim() === 'selector:') {
+    state.inSelector = true;
+    return;
+  }
+
+  if (!state.inSelector) return;
+
+  const selector = parseSelector(line);
+  if (selector) {
+    state.current.selector[selector.key] = selector.value;
+  }
 }
 
 export function permissionLevel(value) {
@@ -132,37 +139,39 @@ export function loadAllowlist(filePath) {
     fatal(`actions allowlist not found at ${filePath}`);
   }
   const text = fs.readFileSync(filePath, 'utf8');
-  let currentRepo = '';
-  let currentAllowed = true;
-  let inEntry = false;
+  const state = { currentRepo: '', currentAllowed: true, inEntry: false };
 
   for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const repo = parseRepoEntry(line);
-    if (repo) {
-      if (inEntry && currentRepo && currentAllowed) {
-        allow.add(currentRepo);
-      }
-      currentRepo = repo;
-      currentAllowed = true;
-      inEntry = true;
-      continue;
-    }
-
-    if (inEntry) {
-      const allowed = parseAllowed(line);
-      if (allowed !== null) {
-        currentAllowed = allowed;
-      }
-    }
+    if (!isValidLine(line)) continue;
+    processAllowlistLine(state, allow, line);
   }
 
-  if (inEntry && currentRepo && currentAllowed) {
-    allow.add(currentRepo);
-  }
+  finalizeAllowlistEntry(state, allow);
   return allow;
+}
+
+function processAllowlistLine(state, allow, line) {
+  const repo = parseRepoEntry(line);
+  if (repo) {
+    finalizeAllowlistEntry(state, allow);
+    state.currentRepo = repo;
+    state.currentAllowed = true;
+    state.inEntry = true;
+    return;
+  }
+
+  if (!state.inEntry) return;
+
+  const allowed = parseAllowed(line);
+  if (allowed !== null) {
+    state.currentAllowed = allowed;
+  }
+}
+
+function finalizeAllowlistEntry(state, allow) {
+  if (state.inEntry && state.currentRepo && state.currentAllowed) {
+    allow.add(state.currentRepo);
+  }
 }
 
 export function loadInlineAllowlist(filePath) {
@@ -293,101 +302,120 @@ export function loadInlineConstraints(filePath) {
     fatal(`inline bash allowlist not found at ${filePath}`);
   }
   const text = fs.readFileSync(filePath, 'utf8');
-  const forbidRegex = [];
-  const requireContains = [];
-  let inConstraints = false;
-  let constraintsIndent = 0;
-
-  const sectionIndents = {
-    globalIndent: 0,
-    forbidIndent: 0,
-    requireIndent: 0,
-    runRegexIndent: 0,
-    requireAllIndent: 0,
-  };
-
-  let states = {
-    inGlobal: false,
-    inForbid: false,
-    inRequire: false,
-    inRunRegex: false,
-    inRequireAll: false,
-  };
+  const state = initInlineConstraintsState();
 
   for (const line of text.split(/\r?\n/)) {
     if (!isValidLine(line)) continue;
-
-    const trimmed = line.trim();
-    const lineIndent = getIndent(line);
-
-    if (lineIndent === 0 && trimmed === 'allowlist:') {
-      break;
-    }
-
-    if (lineIndent === 0 && trimmed === 'constraints:') {
-      inConstraints = true;
-      constraintsIndent = lineIndent;
-      states = resetAllSections();
-      continue;
-    }
-
-    if (!inConstraints) continue;
-
-    if (lineIndent <= constraintsIndent && trimmed !== 'constraints:') {
-      inConstraints = false;
-      states = resetAllSections();
-      continue;
-    }
-
-    states = updateSectionStates(states, lineIndent, sectionIndents, trimmed);
-
-    const sectionStart = parseSectionStart(line);
-    if (sectionStart) {
-      switch (sectionStart.type) {
-        case 'global':
-          states.inGlobal = true;
-          sectionIndents.globalIndent = sectionStart.indent;
-          break;
-        case 'forbid':
-          states.inForbid = true;
-          sectionIndents.forbidIndent = sectionStart.indent;
-          states.inRequire = false;
-          break;
-        case 'require':
-          states.inRequire = true;
-          sectionIndents.requireIndent = sectionStart.indent;
-          states.inForbid = false;
-          break;
-      }
-      continue;
-    }
-
-    const subSection = parseSubSection(line, states.inForbid, states.inRequire);
-    if (subSection) {
-      switch (subSection.type) {
-        case 'run_regex':
-          states.inRunRegex = true;
-          sectionIndents.runRegexIndent = subSection.indent;
-          break;
-        case 'run_contains_all':
-          states.inRequireAll = true;
-          sectionIndents.requireAllIndent = subSection.indent;
-          break;
-      }
-      continue;
-    }
-
-    const regexEntry = parseRegexEntry(line);
-    if (regexEntry !== null) {
-      if (states.inRunRegex) {
-        forbidRegex.push(regexEntry);
-      } else if (states.inRequireAll) {
-        requireContains.push(regexEntry);
-      }
-    }
+    if (processInlineConstraintsLine(state, line)) break;
   }
 
-  return { forbidRegex, requireContains };
+  return {
+    forbidRegex: state.forbidRegex,
+    requireContains: state.requireContains,
+  };
+}
+
+function initInlineConstraintsState() {
+  return {
+    forbidRegex: [],
+    requireContains: [],
+    inConstraints: false,
+    constraintsIndent: 0,
+    sectionIndents: {
+      globalIndent: 0,
+      forbidIndent: 0,
+      requireIndent: 0,
+      runRegexIndent: 0,
+      requireAllIndent: 0,
+    },
+    states: resetAllSections(),
+  };
+}
+
+function processInlineConstraintsLine(state, line) {
+  const trimmed = line.trim();
+  const lineIndent = getIndent(line);
+
+  if (lineIndent === 0 && trimmed === 'allowlist:') return true;
+  if (lineIndent === 0 && trimmed === 'constraints:') {
+    state.inConstraints = true;
+    state.constraintsIndent = lineIndent;
+    state.states = resetAllSections();
+    return false;
+  }
+
+  if (!state.inConstraints) return false;
+
+  if (lineIndent <= state.constraintsIndent && trimmed !== 'constraints:') {
+    state.inConstraints = false;
+    state.states = resetAllSections();
+    return false;
+  }
+
+  state.states = updateSectionStates(
+    state.states,
+    lineIndent,
+    state.sectionIndents,
+    trimmed,
+  );
+
+  if (handleSectionStart(state, line)) return false;
+  if (handleSubSectionStart(state, line)) return false;
+  appendInlineRegexEntry(state, line);
+  return false;
+}
+
+function handleSectionStart(state, line) {
+  const sectionStart = parseSectionStart(line);
+  if (!sectionStart) return false;
+  if (sectionStart.type === 'global') {
+    state.states.inGlobal = true;
+    state.sectionIndents.globalIndent = sectionStart.indent;
+    return true;
+  }
+  if (sectionStart.type === 'forbid') {
+    state.states.inForbid = true;
+    state.sectionIndents.forbidIndent = sectionStart.indent;
+    state.states.inRequire = false;
+    return true;
+  }
+  if (sectionStart.type === 'require') {
+    state.states.inRequire = true;
+    state.sectionIndents.requireIndent = sectionStart.indent;
+    state.states.inForbid = false;
+    return true;
+  }
+  return false;
+}
+
+function handleSubSectionStart(state, line) {
+  const subSection = parseSubSection(
+    line,
+    state.states.inForbid,
+    state.states.inRequire,
+  );
+  if (!subSection) return false;
+  if (subSection.type === 'run_regex') {
+    state.states.inRunRegex = true;
+    state.sectionIndents.runRegexIndent = subSection.indent;
+    return true;
+  }
+  if (subSection.type === 'run_contains_all') {
+    state.states.inRequireAll = true;
+    state.sectionIndents.requireAllIndent = subSection.indent;
+    return true;
+  }
+  return false;
+}
+
+function appendInlineRegexEntry(state, line) {
+  const regexEntry = parseRegexEntry(line);
+  if (regexEntry === null) return;
+  if (state.states.inRunRegex) {
+    state.forbidRegex.push(regexEntry);
+  } else if (state.states.inRequireAll) {
+    state.requireContains.push(regexEntry);
+  }
 }
 
 function parsePatternId(line) {
@@ -444,65 +472,96 @@ export function loadUnsafePatterns(filePath) {
     fatal(`unsafe patterns file not found at ${filePath}`);
   }
   const text = fs.readFileSync(filePath, 'utf8');
-  let current = null;
-  let inRunRegex = false;
-  let inWith = false;
-  let enabled = true;
+  const state = initUnsafePatternState();
 
   for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const id = parsePatternId(line);
-    if (id) {
-      if (current && enabled) patterns.push(current);
-      current = { id, runRegex: [], uses: '', with: {} };
-      inRunRegex = false;
-      inWith = false;
-      enabled = true;
-      continue;
-    }
-
-    if (!current) continue;
-
-    const uses = parseUses(line);
-    if (uses) {
-      current.uses = uses;
-    }
-
-    if (trimmed === 'run_regex:') {
-      inRunRegex = true;
-      inWith = false;
-      continue;
-    }
-
-    if (trimmed === 'with:') {
-      inWith = true;
-      inRunRegex = false;
-      continue;
-    }
-
-    const isEnabled = parseEnabled(line);
-    if (isEnabled !== null) {
-      enabled = isEnabled;
-      continue;
-    }
-
-    const regexEntry = cleanRegexEntry(line);
-    if (regexEntry !== null && inRunRegex) {
-      current.runRegex.push(regexEntry);
-    }
-
-    if (inWith) {
-      const withEntry = parseWithEntry(line);
-      if (withEntry) {
-        current.with[withEntry.key] = withEntry.value;
-      }
-    }
+    handleUnsafePatternLine(state, patterns, line);
   }
 
-  if (current && enabled) patterns.push(current);
+  finalizeUnsafePattern(state, patterns);
   return patterns;
+}
+
+function initUnsafePatternState() {
+  return {
+    current: null,
+    inRunRegex: false,
+    inWith: false,
+    enabled: true,
+  };
+}
+
+function finalizeUnsafePattern(state, patterns) {
+  if (state.current && state.enabled) {
+    patterns.push(state.current);
+  }
+}
+
+function handleUnsafePatternLine(state, patterns, line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+  if (startUnsafePatternEntry(state, patterns, line)) return;
+  if (!state.current) return;
+  if (handleUnsafePatternUses(state, line)) return;
+  if (handleUnsafePatternSection(state, trimmed)) return;
+  if (handleUnsafePatternEnabled(state, line)) return;
+  handleUnsafePatternRegexEntry(state, line);
+  handleUnsafePatternWithEntry(state, line);
+}
+
+function startUnsafePatternEntry(state, patterns, line) {
+  const id = parsePatternId(line);
+  if (!id) return false;
+  finalizeUnsafePattern(state, patterns);
+  state.current = { id, runRegex: [], uses: '', with: {} };
+  state.inRunRegex = false;
+  state.inWith = false;
+  state.enabled = true;
+  return true;
+}
+
+function handleUnsafePatternUses(state, line) {
+  const uses = parseUses(line);
+  if (!uses) return false;
+  state.current.uses = uses;
+  return true;
+}
+
+function handleUnsafePatternSection(state, trimmed) {
+  if (trimmed === 'run_regex:') {
+    state.inRunRegex = true;
+    state.inWith = false;
+    return true;
+  }
+  if (trimmed === 'with:') {
+    state.inWith = true;
+    state.inRunRegex = false;
+    return true;
+  }
+  return false;
+}
+
+function handleUnsafePatternEnabled(state, line) {
+  const isEnabled = parseEnabled(line);
+  if (isEnabled === null) return false;
+  state.enabled = isEnabled;
+  return true;
+}
+
+function handleUnsafePatternRegexEntry(state, line) {
+  if (!state.inRunRegex) return;
+  const regexEntry = cleanRegexEntry(line);
+  if (regexEntry !== null) {
+    state.current.runRegex.push(regexEntry);
+  }
+}
+
+function handleUnsafePatternWithEntry(state, line) {
+  if (!state.inWith) return;
+  const withEntry = parseWithEntry(line);
+  if (withEntry) {
+    state.current.with[withEntry.key] = withEntry.value;
+  }
 }
 
 export function loadUnsafeAllowlist(filePath) {
@@ -567,89 +626,124 @@ function updateSelectorState(inSelector, indent, selectorIndent, trimmed) {
 }
 
 export function loadHighRiskTriggers(filePath) {
-  const triggers = new Set();
-  const allowlist = new Map();
   if (!fs.existsSync(filePath)) {
     fatal(`high-risk triggers allowlist not found at ${filePath}`);
   }
   const text = fs.readFileSync(filePath, 'utf8');
-  let inHighRisk = false;
-  let inAllowlist = false;
-  let inSelector = false;
-  let selectorIndent = 0;
-  let current = null;
+  const state = initHighRiskState();
 
   for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    const indent = line.match(/^(\s*)/)[1].length;
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    if (trimmed === 'high_risk_triggers:') {
-      inHighRisk = true;
-      inAllowlist = false;
-      continue;
-    }
-
-    if (trimmed === 'allowlist:') {
-      inAllowlist = true;
-      inHighRisk = false;
-      inSelector = false;
-      continue;
-    }
-
-    if (inHighRisk && trimmed.startsWith('- ')) {
-      triggers.add(trimmed.replaceAll(/^- /g, ''));
-    }
-
-    if (inAllowlist) {
-      const id = parseHighRiskId(line);
-      if (id) {
-        addToAllowlist(allowlist, current, current?.status);
-        current = {
-          id,
-          workflow: '',
-          trigger: '',
-          status: 'active',
-        };
-        inSelector = false;
-        continue;
-      }
-
-      if (current) {
-        inSelector = updateSelectorState(
-          inSelector,
-          indent,
-          selectorIndent,
-          trimmed,
-        );
-
-        const status = parseHighRiskStatus(line);
-        if (status) current.status = status;
-
-        const workflow = parseWorkflow(line);
-        if (workflow) current.workflow = workflow;
-
-        const trigger = parseTrigger(line);
-        if (trigger) current.trigger = trigger;
-
-        if (trimmed === 'selector:') {
-          inSelector = true;
-          selectorIndent = indent;
-          continue;
-        }
-
-        if (inSelector) {
-          const workflowPath = parseWorkflowPath(line);
-          if (workflowPath) {
-            current.workflow = workflowPath;
-          }
-        }
-      }
-    }
+    handleHighRiskLine(state, line);
   }
 
-  addToAllowlist(allowlist, current, current?.status);
-  return { triggers, allowlist };
+  finalizeHighRiskAllowlist(state);
+  return { triggers: state.triggers, allowlist: state.allowlist };
+}
+
+function initHighRiskState() {
+  return {
+    triggers: new Set(),
+    allowlist: new Map(),
+    inHighRisk: false,
+    inAllowlist: false,
+    inSelector: false,
+    selectorIndent: 0,
+    current: null,
+  };
+}
+
+function finalizeHighRiskAllowlist(state) {
+  addToAllowlist(state.allowlist, state.current, state.current?.status);
+}
+
+function handleHighRiskLine(state, line) {
+  const trimmed = line.trim();
+  const indent = line.match(/^(\s*)/)[1].length;
+  if (!trimmed || trimmed.startsWith('#')) return;
+  if (handleHighRiskSectionStart(state, trimmed)) return;
+  if (handleHighRiskTriggersEntry(state, trimmed)) return;
+  handleHighRiskAllowlistEntry(state, line, trimmed, indent);
+}
+
+function handleHighRiskSectionStart(state, trimmed) {
+  if (trimmed === 'high_risk_triggers:') {
+    state.inHighRisk = true;
+    state.inAllowlist = false;
+    state.inSelector = false;
+    return true;
+  }
+  if (trimmed === 'allowlist:') {
+    state.inAllowlist = true;
+    state.inHighRisk = false;
+    state.inSelector = false;
+    return true;
+  }
+  return false;
+}
+
+function handleHighRiskTriggersEntry(state, trimmed) {
+  if (!state.inHighRisk) return false;
+  if (!trimmed.startsWith('- ')) return false;
+  state.triggers.add(trimmed.replaceAll(/^- /g, ''));
+  return true;
+}
+
+function handleHighRiskAllowlistEntry(state, line, trimmed, indent) {
+  if (!state.inAllowlist) return;
+  if (startHighRiskAllowlistEntry(state, line)) return;
+  if (!state.current) return;
+  updateHighRiskSelectorState(state, indent, trimmed);
+  if (handleHighRiskSelectorStart(state, trimmed, indent)) return;
+  applyHighRiskEntryFields(state, line);
+  if (state.inSelector) {
+    applyHighRiskSelectorFields(state, line);
+  }
+}
+
+function startHighRiskAllowlistEntry(state, line) {
+  const id = parseHighRiskId(line);
+  if (!id) return false;
+  addToAllowlist(state.allowlist, state.current, state.current?.status);
+  state.current = {
+    id,
+    workflow: '',
+    trigger: '',
+    status: 'active',
+  };
+  state.inSelector = false;
+  return true;
+}
+
+function updateHighRiskSelectorState(state, indent, trimmed) {
+  state.inSelector = updateSelectorState(
+    state.inSelector,
+    indent,
+    state.selectorIndent,
+    trimmed,
+  );
+}
+
+function handleHighRiskSelectorStart(state, trimmed, indent) {
+  if (trimmed !== 'selector:') return false;
+  state.inSelector = true;
+  state.selectorIndent = indent;
+  return true;
+}
+
+function applyHighRiskEntryFields(state, line) {
+  const status = parseHighRiskStatus(line);
+  if (status) state.current.status = status;
+  const workflow = parseWorkflow(line);
+  if (workflow) state.current.workflow = workflow;
+  const trigger = parseTrigger(line);
+  if (trigger) state.current.trigger = trigger;
+}
+
+function applyHighRiskSelectorFields(state, line) {
+  const workflowPath = parseWorkflowPath(line);
+  if (workflowPath) {
+    state.current.workflow = workflowPath;
+  }
 }
 
 function parseUnspecified(line) {
@@ -693,81 +787,115 @@ export function loadPermissionsBaseline(filePath) {
     fatal(`permissions baseline not found at ${filePath}`);
   }
   const text = fs.readFileSync(filePath, 'utf8');
-  let inDefaults = false;
-  let inPolicy = false;
-  let inWorkflows = false;
-  let inBaseline = false;
-  let current = '';
+  const state = initPermissionsBaselineState();
 
   for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    if (trimmed === 'defaults:') {
-      inDefaults = true;
-      inPolicy = false;
-      inWorkflows = false;
-      continue;
-    }
-
-    if (trimmed === 'policy:') {
-      inPolicy = true;
-      inDefaults = false;
-      inWorkflows = false;
-      continue;
-    }
-
-    if (trimmed === 'workflows:') {
-      inWorkflows = true;
-      inDefaults = false;
-      inPolicy = false;
-      continue;
-    }
-
-    if (inDefaults) {
-      const unspecified = parseUnspecified(line);
-      if (unspecified) {
-        baseline.defaults.unspecified = unspecified;
-      }
-    }
-
-    if (inPolicy) {
-      const unspecifiedPermission = parseUnspecifiedPermission(line);
-      if (unspecifiedPermission) {
-        baseline.defaults.unspecified = unspecifiedPermission;
-      }
-    }
-
-    if (inWorkflows) {
-      const wfName = parseWorkflowName(line);
-      if (wfName) {
-        current = wfName;
-        if (!baseline.workflows[current]) baseline.workflows[current] = {};
-        inBaseline = false;
-        continue;
-      }
-
-      if (current && isBaselineLine(line)) {
-        inBaseline = true;
-        continue;
-      }
-
-      if (current && inBaseline) {
-        const baselinePerm = parseBaselinePermission(line);
-        if (baselinePerm) {
-          baseline.workflows[current][baselinePerm.key] = baselinePerm.value;
-        }
-        continue;
-      }
-
-      const perm = parsePermission(line);
-      if (perm && current) {
-        baseline.workflows[current][perm.key] = perm.value;
-      }
-    }
+    handlePermissionsBaselineLine(state, baseline, line);
   }
 
   return baseline;
+}
+
+function initPermissionsBaselineState() {
+  return {
+    inDefaults: false,
+    inPolicy: false,
+    inWorkflows: false,
+    inBaseline: false,
+    current: '',
+  };
+}
+
+function handlePermissionsBaselineLine(state, baseline, line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+  if (handlePermissionsSectionStart(state, trimmed)) return;
+  if (state.inDefaults) {
+    applyPermissionsDefaults(baseline, line);
+  }
+  if (state.inPolicy) {
+    applyPermissionsPolicy(baseline, line);
+  }
+  if (state.inWorkflows) {
+    applyPermissionsWorkflow(state, baseline, line);
+  }
+}
+
+function handlePermissionsSectionStart(state, trimmed) {
+  if (trimmed === 'defaults:') {
+    state.inDefaults = true;
+    state.inPolicy = false;
+    state.inWorkflows = false;
+    return true;
+  }
+  if (trimmed === 'policy:') {
+    state.inPolicy = true;
+    state.inDefaults = false;
+    state.inWorkflows = false;
+    return true;
+  }
+  if (trimmed === 'workflows:') {
+    state.inWorkflows = true;
+    state.inDefaults = false;
+    state.inPolicy = false;
+    return true;
+  }
+  return false;
+}
+
+function applyPermissionsDefaults(baseline, line) {
+  const unspecified = parseUnspecified(line);
+  if (unspecified) {
+    baseline.defaults.unspecified = unspecified;
+  }
+}
+
+function applyPermissionsPolicy(baseline, line) {
+  const unspecifiedPermission = parseUnspecifiedPermission(line);
+  if (unspecifiedPermission) {
+    baseline.defaults.unspecified = unspecifiedPermission;
+  }
+}
+
+function applyPermissionsWorkflow(state, baseline, line) {
+  if (startWorkflowEntry(state, baseline, line)) return;
+  if (startWorkflowBaseline(state, line)) return;
+  if (state.current && state.inBaseline) {
+    applyWorkflowBaselinePermission(state, baseline, line);
+    return;
+  }
+  applyWorkflowPermission(state, baseline, line);
+}
+
+function startWorkflowEntry(state, baseline, line) {
+  const wfName = parseWorkflowName(line);
+  if (!wfName) return false;
+  state.current = wfName;
+  if (!baseline.workflows[state.current]) {
+    baseline.workflows[state.current] = {};
+  }
+  state.inBaseline = false;
+  return true;
+}
+
+function startWorkflowBaseline(state, line) {
+  if (!state.current || !isBaselineLine(line)) return false;
+  state.inBaseline = true;
+  return true;
+}
+
+function applyWorkflowBaselinePermission(state, baseline, line) {
+  const baselinePerm = parseBaselinePermission(line);
+  if (baselinePerm) {
+    baseline.workflows[state.current][baselinePerm.key] = baselinePerm.value;
+  }
+}
+
+function applyWorkflowPermission(state, baseline, line) {
+  const perm = parsePermission(line);
+  if (perm && state.current) {
+    baseline.workflows[state.current][perm.key] = perm.value;
+  }
 }
 
 function parseRetentionDays(trimmed) {
@@ -815,48 +943,75 @@ export function loadArtifactPolicy(filePath) {
     fatal(`artifact policy not found at ${filePath}`);
   }
   const text = fs.readFileSync(filePath, 'utf8');
-  let inRequired = false;
-  let inAllowlist = false;
-  let current = '';
+  const state = initArtifactPolicyState();
 
   for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-
-    const sectionStates = updateArtifactSectionStates(
-      inRequired,
-      inAllowlist,
-      trimmed,
-    );
-    inRequired = sectionStates.inRequired;
-    inAllowlist = sectionStates.inAllowlist;
-
-    const retentionDays = parseRetentionDays(trimmed);
-    if (retentionDays !== null) {
-      policy.defaultRetention = retentionDays;
-    }
-
-    const requiredPath = parseRequiredPath(trimmed);
-    if (requiredPath !== null && inRequired) {
-      policy.requiredPaths.push(requiredPath);
-    }
-
-    if (inAllowlist) {
-      const wfName = parseArtifactWorkflowName(line);
-      if (wfName) {
-        current = wfName;
-        if (!policy.allowlist.has(current)) {
-          policy.allowlist.set(current, new Set());
-        }
-        continue;
-      }
-
-      const artifactName = parseArtifactName(line);
-      if (artifactName && current) {
-        policy.allowlist.get(current).add(artifactName);
-      }
-    }
+    handleArtifactPolicyLine(state, policy, line);
   }
 
   return policy;
+}
+
+function initArtifactPolicyState() {
+  return {
+    inRequired: false,
+    inAllowlist: false,
+    current: '',
+  };
+}
+
+function handleArtifactPolicyLine(state, policy, line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#')) return;
+  applyArtifactSectionState(state, trimmed);
+  applyArtifactRetention(policy, trimmed);
+  applyArtifactRequiredPath(state, policy, trimmed);
+  applyArtifactAllowlistEntry(state, policy, line);
+}
+
+function applyArtifactSectionState(state, trimmed) {
+  const sectionStates = updateArtifactSectionStates(
+    state.inRequired,
+    state.inAllowlist,
+    trimmed,
+  );
+  state.inRequired = sectionStates.inRequired;
+  state.inAllowlist = sectionStates.inAllowlist;
+}
+
+function applyArtifactRetention(policy, trimmed) {
+  const retentionDays = parseRetentionDays(trimmed);
+  if (retentionDays !== null) {
+    policy.defaultRetention = retentionDays;
+  }
+}
+
+function applyArtifactRequiredPath(state, policy, trimmed) {
+  const requiredPath = parseRequiredPath(trimmed);
+  if (requiredPath !== null && state.inRequired) {
+    policy.requiredPaths.push(requiredPath);
+  }
+}
+
+function applyArtifactAllowlistEntry(state, policy, line) {
+  if (!state.inAllowlist) return;
+  if (startArtifactAllowlistWorkflow(state, policy, line)) return;
+  addArtifactAllowlistName(state, policy, line);
+}
+
+function startArtifactAllowlistWorkflow(state, policy, line) {
+  const wfName = parseArtifactWorkflowName(line);
+  if (!wfName) return false;
+  state.current = wfName;
+  if (!policy.allowlist.has(state.current)) {
+    policy.allowlist.set(state.current, new Set());
+  }
+  return true;
+}
+
+function addArtifactAllowlistName(state, policy, line) {
+  const artifactName = parseArtifactName(line);
+  if (artifactName && state.current) {
+    policy.allowlist.get(state.current).add(artifactName);
+  }
 }

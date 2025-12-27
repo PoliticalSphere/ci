@@ -151,6 +151,10 @@ outputs:
     description: "Exit code from the task script"
     value: ${{ steps.ps_task_run.outputs.exit_code }}
 
+  enabled:
+    description: "Optional boolean flag emitted by tasks indicating feature enabled (true|false)"
+    value: ${{ steps.ps_task_run.outputs.enabled }}
+
 runs:
   using: "composite"
   steps:

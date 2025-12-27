@@ -375,13 +375,14 @@ print_lint_summary() {
       case "${status}" in
         PASS)     _append "${lint_indent}${padded} ${c_green}${c_bold}PASS${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
         FAIL)     _append "${lint_indent}${padded} ${c_red}${c_bold}FAIL${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
+        ERROR)    _append "${lint_indent}${padded} ${c_red}${c_bold}ERROR${c_reset}  ${c_dim}${log_ref}${c_reset}" ;;
         SKIPPED)  _append "${lint_indent}${padded} ${c_yellow}${c_bold}SKIPPED${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
         Running*) _append "${lint_indent}${padded} ${c_cyan}Running...${c_reset}" ;;
         Waiting)  _append "${lint_indent}${padded} ${c_dim}Waiting...${c_reset}" ;;
         *)        _append "${lint_indent}${padded} ${status}" ;;
       esac
     else
-      if [[ "${status}" == "PASS" || "${status}" == "FAIL" || "${status}" == "SKIPPED" ]]; then
+      if [[ "${status}" == "PASS" || "${status}" == "FAIL" || "${status}" == "ERROR" || "${status}" == "SKIPPED" ]]; then
         _append "${lint_indent}${padded} ${status}   ${log_ref}"
       else
         _append "${lint_indent}${padded} ${status}"
@@ -525,8 +526,12 @@ run_lint_step() {
   if [[ ${rc} -ne 0 ]]; then
     status="FAIL"
 
+    if grep -Eiq "config not found|cannot read config file|invalid configuration|configuration error|failed to load config|yamlexception" "${log_file}"; then
+      status="ERROR"
+    fi
+
     # Scoped SKIPPED heuristics (only eslint by default)
-    if [[ "${id}" == "lint.eslint" ]] && grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
+    if [[ "${status}" == "FAIL" && "${id}" == "lint.eslint" ]] && grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
       status="SKIPPED"
       {
         printf "\nNote: ESLint dependencies/registry access appear missing.\n"
@@ -534,7 +539,7 @@ run_lint_step() {
       } >> "${log_file}" || true
     fi
 
-    if [[ "${status}" == "FAIL" ]]; then
+    if [[ "${status}" == "FAIL" || "${status}" == "ERROR" ]]; then
       LINT_FAILED=1
     fi
   else

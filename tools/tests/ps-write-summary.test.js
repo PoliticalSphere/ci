@@ -14,6 +14,7 @@ const actionFile = path.join(
   repoRoot,
   '.github',
   'actions',
+  'ps-teardown',
   'ps-write-summary',
   'action.yml',
 );
@@ -34,9 +35,24 @@ const shellStep = steps.find(
 if (!shellStep) fail('ps-write-summary must include a bash run step');
 
 const content = shellStep.run;
-if (!content.includes('skipped'))
+const scriptMatch = content.match(/ps-write-summary\.sh"$/m);
+if (!scriptMatch) fail('ps-write-summary must invoke ps-write-summary.sh');
+
+const scriptPath = path.join(
+  repoRoot,
+  'tools',
+  'scripts',
+  'actions',
+  'ps-teardown',
+  'ps-write-summary',
+  'ps-write-summary.sh',
+);
+if (!fs.existsSync(scriptPath)) fail('ps-write-summary.sh not found');
+
+const scriptContent = fs.readFileSync(scriptPath, 'utf8');
+if (!scriptContent.includes('skipped'))
   fail('ps-write-summary must handle skipped values');
-if (!content.includes('overall="skipped"'))
+if (!scriptContent.includes('overall="skipped"'))
   fail('ps-write-summary must set overall to "skipped" when a job is skipped');
 
 console.log('OK: ps-write-summary handles skipped results appropriately');

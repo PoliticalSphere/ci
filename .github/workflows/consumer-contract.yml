@@ -1,59 +1,86 @@
 # ==============================================================================
-# Political Sphere - Reusable Workflow: Consumer Contract
+# Political Sphere — Reusable Workflow: Consumer Contract
+# ==============================================================================
+#
+# METADATA
 # ------------------------------------------------------------------------------
-# Purpose:
-#   Validate consumer repositories against the platform contract policy.
+# id: consumer-contract
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-20
+# last_updated: 2025-12-20
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
 #
-# Scope & Responsibilities:
-#   - Does: enforce contract checks and publish reports/logs artifacts.
-#   - Does NOT: deploy, release, or modify repository state.
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Validate consumer repositories against the platform contract policy and
+# publish audit-friendly reports/logs artifacts.
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Least privilege with explicit permissions
-#   - SHA-pinned actions only
-#   - Validate-CI gate runs first
 #
-# Dependencies:
-#   - ./.github/workflows/validate-ci.yml
-#   - ./.github/actions/ps-node-setup
-#   - ./.github/actions/consumer-contract
-#   - ./.github/actions/ps-upload-artifacts
-#   - ./.github/actions/ps-write-summary
-#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Enforce CI policy compliance via Validate-CI
+#   - Run contract checks against policy + exceptions
+#   - Upload reports/logs artifacts with controlled retention
 #
-# Dependents:
-#   - Downstream PS application repositories
+# DOES NOT:
+#   - Deploy, release, or publish artifacts
+#   - Modify repository state
+#   - Run tests or quality gates (handled by PR Gates)
 #
-# Execution Model:
-#   - Trigger: workflow_call (consumer-facing)
-#   - Reusable workflow (consumer-facing)
 #
-# Security & Policy Notes:
-#   - Secrets: optional NODE_AUTH_TOKEN for private registry access
-#   - Permissions: contents: read
-#   - Constraints: no deployments; no token writes
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Least privilege with explicit permissions
+# - Validate-CI gate runs first
+# - Evidence-first: artifacts best-effort even on failure
 #
-# Operational Notes:
-#   - Timeouts: configurable via inputs (per job)
-#   - Artifacts: reports/** and logs/** uploaded per policy
-#   - CI vs local: contract checks are file-based and network-free
-#   - Node runtime: setup-node only; npm ci is intentionally skipped
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/validate-ci.yml
+# - ./.github/actions/ps-bootstrap/ps-init
+# - ./.github/actions/ps-task/consumer-contract
+# - ./.github/actions/ps-teardown/ps-exit
+# - tools/scripts/consumer/contract-check.sh
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Triggered via workflow_call (consumer-facing)
+# - Runs Validate-CI gate, then contract check
+# - Jobs are isolated; bootstrap runs per job as needed
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
+# - Default permissions are read-only (contents: read)
+# - Egress policy: audit for contract job
+# - Platform ref is pinned by default and validated when required
+#
+#
+# OPERATIONAL NOTES
+# ------------------------------------------------------------------------------
+# - Timeouts are configurable via inputs (per job)
+# - Artifacts are uploaded best-effort (if: always())
+# - Contract checks are file-based and network-free
+#
 # ==============================================================================
 
 name: Consumer Contract
 
+# ==============================================================================
+# TRIGGER & INVOCATION MODEL
+# ==============================================================================
 on:
   workflow_call:
 
     # ==========================================================================
-    # Runtime & Environment Configuration
-    # --------------------------------------------------------------------------
-    # Controls runner selection, Node version, checkout depth, and caching
+    # RUNTIME & TOOLING CONFIGURATION
     # ==========================================================================
     inputs:
       runner:
@@ -68,19 +95,43 @@ on:
         required: false
         default: "22"
 
-      fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
-        type: number
-        required: false
-        default: "1"
-
       cache:
         description: "Enable Node dependency caching (1 = on, 0 = off)"
         type: string
         required: false
         default: "0"
 
-      contract_timeout_minutes:
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        type: number
+        required: false
+        default: 1
+
+      # ==========================================================================
+      # PLATFORM TRUST & SECURITY
+      # ==========================================================================
+      platform_repository:
+        description: "Platform repository for shared configs"
+        type: string
+        required: false
+        default: "PoliticalSphere/ci"
+
+      platform_ref:
+        description: "Platform repository ref for shared scripts/configs"
+        type: string
+        required: false
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+      # ==========================================================================
+      # CONTRACT CONFIGURATION
+      # ==========================================================================
+      job_timeout_minutes:
         description: "Timeout for contract job in minutes"
         type: number
         required: false
@@ -116,25 +167,87 @@ on:
         required: false
         default: "logs/contracts"
 
+      # ==========================================================================
+      # ARTIFACT COLLECTION & RETENTION
+      # ==========================================================================
+      artifact_paths:
+        description: "Artifact paths to upload (newline-separated, repo-relative)"
+        type: string
+        required: false
+        default: |
+          dist/**
+          build/**
+          reports/**
+          logs/**
+
       retention_days:
-        description: "Artifact retention in days"
+        description: "Standard artifact retention in days"
         type: number
         required: false
         default: 7
 
+      compression_level:
+        description: "Zlib compression level (0-9) for artifact uploads"
+        type: number
+        required: false
+        default: 6
+
+      validate_retention_days:
+        description: "Policy gate (Validate-CI) specific retention in days"
+        type: number
+        required: false
+        default: 7
+
+    # ==========================================================================
+    # SECRETS (OPTIONAL, LEAST-PRIVILEGE)
+    # ==========================================================================
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
         required: false
 
-concurrency:
-  group: consumer-contract-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
 permissions:
   contents: read
 
+# ==============================================================================
+# CONCURRENCY CONTROL
+# ------------------------------------------------------------------------------
+# Ensures a single consumer-contract run per ref.
+# ==============================================================================
+
+concurrency:
+  group: consumer-contract-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
+# GLOBAL PLATFORM ENVIRONMENT
+# ==============================================================================
+env:
+  CI: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
+
+  # Standardised workflow identifiers (avoid magic strings)
+  PS_WORKFLOW_ID: "consumer-contract"
+  PS_ARTIFACT_PREFIX: "consumer-contract"
+  PS_BRAND_KEY: "consumer.contract"
+
 jobs:
+  # ============================================================================
+  # POLICY GATE — VALIDATE CI
+  # ----------------------------------------------------------------------------
+  # Runs the reusable Validate-CI workflow with platform dependency installs
+  # enabled for runtime dependencies. NODE_AUTH_TOKEN is passed if provided.
+  # ============================================================================
   validate-ci:
     name: Validate CI (policy gate)
     uses: ./.github/workflows/validate-ci.yml
@@ -143,25 +256,43 @@ jobs:
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}
+      fetch_depth: ${{ inputs.fetch_depth }}
+      cache: ${{ inputs.cache }}
+      platform_ref: ${{ inputs.platform_ref }}
+      platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
       artifact_name: consumer-contract-validate-ci
-      retention_days: ${{ inputs.retention_days }}
+      retention_days: ${{ inputs.validate_retention_days }}
     secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
+  # ============================================================================
+  # CONTRACT VALIDATION — CONSUMER CONTRACT
+  # ----------------------------------------------------------------------------
+  # Performs contract checks after the policy gate succeeds, then uploads
+  # reports/logs and a summary JSON.
+  # ============================================================================
   contract:
     name: Consumer contract
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
+    timeout-minutes: ${{ inputs.job_timeout_minutes }}
     permissions:
       contents: read
-    timeout-minutes: ${{ inputs.contract_timeout_minutes }}
+
     steps:
       - name: Job setup (PS)
         uses: ./.github/actions/ps-bootstrap/ps-init
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
+          # Prefer the exact PR head SHA when available to avoid ref spoofing.
+          checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          platform_repo: ${{ inputs.platform_repository }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: ${{ inputs.platform_repository }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
           egress_policy: audit
-          skip_platform_checkout: "true"
           install_tools: "0"
 
       - name: Contract check
@@ -182,7 +313,7 @@ jobs:
           summary_results: contract=${{ job.status }}
           artifacts_name: consumer-contract-report
           artifacts_paths: |
-            reports/**
-            logs/**
+            ${{ inputs.artifact_paths }}
           artifacts_if_no_files_found: "warn"
           artifacts_retention_days: ${{ inputs.retention_days }}
+          artifacts_compression_level: ${{ inputs.compression_level }}

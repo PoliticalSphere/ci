@@ -151,13 +151,17 @@ function extractRunScript(outputPath) {
     fail('expected run to fail due to env_kv value too large');
   } catch (err) {
     const out = (err.stdout || '') + (err.stderr || '');
+    const logOut = fs.existsSync(logPath)
+      ? fs.readFileSync(logPath, 'utf8')
+      : '';
+    const combined = out + logOut;
     if (
       !(
-        /env_kv value too large/.test(out) ||
-        /env_kv value must not contain NUL bytes/.test(out)
+        /env_kv value too large/.test(combined) ||
+        /env_kv value must not contain NUL bytes/.test(combined)
       )
     ) {
-      fail(`expected env_kv size rejection; got: ${out}`);
+      fail(`expected env_kv size rejection; got: ${combined}`);
     }
   }
 

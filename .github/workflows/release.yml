@@ -159,6 +159,7 @@ on:
       # ==========================================================================
       platform_ref:
         description: "Platform repo ref to checkout for shared scripts/configs"
+        type: string
         required: false
         default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
 
@@ -167,7 +168,6 @@ on:
         type: string
         required: false
         default: "true"
-        type: string
 
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)

@@ -313,7 +313,7 @@ jobs:
   summary:
     name: Security scheduled summary
     runs-on: ${{ inputs.runner || 'ubuntu-22.04' }}
-    needs: [secrets, codeql, semgrep]
+    needs: [validate-ci, secrets, codeql, semgrep]
     if: always()
     timeout-minutes: 10
     permissions:

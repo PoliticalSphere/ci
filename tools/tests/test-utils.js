@@ -43,6 +43,8 @@ import { execFileSync } from 'node:child_process';
 import { getRepoRoot } from '../scripts/ci/validate-ci/console.js';
 import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 
+export const SAFE_PATH = getSafePathEnv();
+
 export function runLintSummary(envOverrides = {}) {
   const repoRoot = getRepoRoot();
   let safePath = '';

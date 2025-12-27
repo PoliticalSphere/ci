@@ -53,7 +53,10 @@ else
   exit 1
 fi
 
-CSP_ARGS=("$@")
+CSP_ARGS=()
+if [[ "$#" -gt 0 ]]; then
+  CSP_ARGS=("$@")
+fi
 
 # Build targets
 targets=()
@@ -90,15 +93,29 @@ output=""
 status=0
 set +e
 if [[ "${CSP_VIA_NPX}" -eq 1 ]]; then
-  output="$(
-    cd "${repo_root}" && \
-    "${CSP_BIN}" --yes cspell --config "${config_path}" "${CSP_ARGS[@]}" "${relative_targets[@]}" 2>&1
-  )"
+  if [[ "${#CSP_ARGS[@]}" -gt 0 ]]; then
+    output="$(
+      cd "${repo_root}" && \
+      "${CSP_BIN}" --yes cspell --config "${config_path}" "${CSP_ARGS[@]}" "${relative_targets[@]}" 2>&1
+    )"
+  else
+    output="$(
+      cd "${repo_root}" && \
+      "${CSP_BIN}" --yes cspell --config "${config_path}" "${relative_targets[@]}" 2>&1
+    )"
+  fi
 else
-  output="$(
-    cd "${repo_root}" && \
-    "${CSP_BIN}" --config "${config_path}" "${CSP_ARGS[@]}" "${relative_targets[@]}" 2>&1
-  )"
+  if [[ "${#CSP_ARGS[@]}" -gt 0 ]]; then
+    output="$(
+      cd "${repo_root}" && \
+      "${CSP_BIN}" --config "${config_path}" "${CSP_ARGS[@]}" "${relative_targets[@]}" 2>&1
+    )"
+  else
+    output="$(
+      cd "${repo_root}" && \
+      "${CSP_BIN}" --config "${config_path}" "${relative_targets[@]}" 2>&1
+    )"
+  fi
 fi
 status=$?
 set -e

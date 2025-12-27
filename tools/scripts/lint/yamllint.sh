@@ -32,7 +32,10 @@ if ! command -v "${YAMLLINT_BIN}" >/dev/null 2>&1; then
   exit 1
 fi
 
-YAMLLINT_ARGS=("$@")
+YAMLLINT_ARGS=()
+if [[ "$#" -gt 0 ]]; then
+  YAMLLINT_ARGS=("$@")
+fi
 
 # Build targets
 targets=()
@@ -51,4 +54,8 @@ else
   fi
 fi
 
-"${YAMLLINT_BIN}" -c "${config_path}" "${YAMLLINT_ARGS[@]}" "${targets[@]}"
+if [[ "${#YAMLLINT_ARGS[@]}" -gt 0 ]]; then
+  "${YAMLLINT_BIN}" -c "${config_path}" "${YAMLLINT_ARGS[@]}" "${targets[@]}"
+else
+  "${YAMLLINT_BIN}" -c "${config_path}" "${targets[@]}"
+fi

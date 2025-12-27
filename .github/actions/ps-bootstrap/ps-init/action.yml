@@ -79,6 +79,11 @@ inputs:
     required: false
     default: "1"
 
+  cache:
+    description: "Enable dependency caching (1 = on, 0 = off)"
+    required: false
+    default: "1"
+
   checkout_ref:
     description: "Optional git ref to checkout"
     required: false

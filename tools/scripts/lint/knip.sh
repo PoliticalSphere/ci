@@ -53,8 +53,8 @@ fi
 
 # Knip invocation
 # - reporter compact for stable output
-# - run from repo root; pass '.' rather than absolute path (cleaner output)
-declare -a KNIP_ARGS=(--reporter compact .)
+# - run from repo root; avoid passing '.' (newer knip rejects positional args)
+declare -a KNIP_ARGS=(--reporter compact)
 
 output=""
 status=0

@@ -29,7 +29,10 @@ if ! command -v "${SHELLCHECK_BIN}" >/dev/null 2>&1; then
   exit 1
 fi
 
-SHELLCHECK_ARGS=("$@")
+SHELLCHECK_ARGS=()
+if [[ "$#" -gt 0 ]]; then
+  SHELLCHECK_ARGS=("$@")
+fi
 
 is_shell_script() {
   local p="$1"
@@ -93,4 +96,8 @@ if [[ "${#files[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-"${SHELLCHECK_BIN}" -x --rcfile "${config_path}" "${SHELLCHECK_ARGS[@]}" "${files[@]}"
+if [[ "${#SHELLCHECK_ARGS[@]}" -gt 0 ]]; then
+  "${SHELLCHECK_BIN}" -x --rcfile "${config_path}" "${SHELLCHECK_ARGS[@]}" "${files[@]}"
+else
+  "${SHELLCHECK_BIN}" -x --rcfile "${config_path}" "${files[@]}"
+fi

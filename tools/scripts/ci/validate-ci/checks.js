@@ -74,42 +74,23 @@ function runHasAll(runLines, required) {
 // Helper: parse a brace quantifier starting at index i (where str[i] === '{')
 // Returns { isQuantifier, isUnbounded, endIndex }
 function parseBraceQuantifier(str, i) {
-  const len = str.length;
-  let j = i + 1;
-  // skip whitespace
-  while (j < len && /\s/.test(str[j])) j++;
-
-  // collect digits (may be empty)
-  let _digitsBefore = '';
-  while (j < len && /\d/.test(str[j])) {
-    _digitsBefore += str[j++];
+  const slice = str.slice(i);
+  const match = slice.match(/^\{\s*(\d*)\s*(?:,\s*(\d*)\s*)?\}/);
+  if (!match) {
+    return { isQuantifier: false, isUnbounded: false, endIndex: i };
   }
 
-  // skip whitespace
-  while (j < len && /\s/.test(str[j])) j++;
+  const hasComma = match[0].includes(',');
+  const digitsBefore = match[1] || '';
+  const digitsAfter = match[2] || '';
 
-  if (j < len && str[j] === ',') {
-    j++;
-    // skip whitespace
-    while (j < len && /\s/.test(str[j])) j++;
-    // if immediate '}', unbounded
-    if (j < len && str[j] === '}')
-      return { isQuantifier: true, isUnbounded: true, endIndex: j };
-    // digits after comma (may be empty)
-    let digitsAfter = '';
-    while (j < len && /\d/.test(str[j])) {
-      digitsAfter += str[j++];
-    }
-    while (j < len && /\s/.test(str[j])) j++;
-    if (j < len && str[j] === '}') {
-      return {
-        isQuantifier: true,
-        isUnbounded: digitsAfter.length === 0,
-        endIndex: j,
-      };
-    }
+  if (!hasComma && digitsBefore.length === 0) {
+    return { isQuantifier: false, isUnbounded: false, endIndex: i };
   }
-  return { isQuantifier: false, isUnbounded: false, endIndex: i };
+
+  const endIndex = i + match[0].length - 1;
+  const isUnbounded = hasComma && digitsAfter.length === 0;
+  return { isQuantifier: true, isUnbounded, endIndex };
 }
 
 // Helper: detect unbounded quantifiers (+, *, or open-ended {,}) in a
@@ -1169,14 +1150,7 @@ export async function scanWorkflows({
     const rel = path.relative(workspaceRoot, wfPath);
     const rawWf = fs.readFileSync(wfPath, 'utf8');
     const parsed = parseWorkflow(rawWf);
-    if (parsed.parseWarnings?.length) {
-      for (const warn of parsed.parseWarnings) {
-        warnings.push({ workflow: rel, ...warn });
-        if (!quiet) {
-          detail(`WARN: ${warn.message}`);
-        }
-      }
-    }
+    collectParseWarnings(parsed, rel, warnings, quiet);
     const workflowKey = workflowKeyFromPath(rel);
 
     if (!quiet) {
@@ -1201,51 +1175,30 @@ export async function scanWorkflows({
       }),
     );
 
-    const uploadNames = [];
-    const uploadPaths = [];
+    const {
+      violations: jobViolations,
+      uploadNames,
+      uploadPaths,
+    } = await scanWorkflowJobs({
+      rel,
+      parsed,
+      baseline,
+      permissionsBaseline,
+      allowedFirstSteps,
+      hardenRunnerActionAllowlist,
+      workspaceRoot,
+      allowedActions,
+      unsafePatterns,
+      unsafeAllowlist,
+      validateRemoteAction,
+      localActions,
+      inlineAllowlist,
+      inlineConstraints,
+      inlineMaxLines,
+      requireSectionHeaders,
+    });
 
-    for (const [jobId, job] of Object.entries(parsed.jobs)) {
-      violations.push(
-        ...checkJobPermissions({
-          rel,
-          jobId,
-          job,
-          baseline,
-          permissionsBaseline,
-        }),
-      );
-      violations.push(
-        ...checkHardenRunnerFirst({
-          rel,
-          jobId,
-          job,
-          allowedFirstSteps,
-          hardenRunnerActionAllowlist,
-        }),
-      );
-
-      for (const step of job.steps) {
-        const stepViolations = await processStep({
-          rel,
-          jobId,
-          step,
-          workspaceRoot,
-          allowedActions,
-          unsafePatterns,
-          unsafeAllowlist,
-          validateRemoteAction,
-          localActions,
-          inlineAllowlist,
-          inlineConstraints,
-          inlineMaxLines,
-          requireSectionHeaders,
-          uploadNames,
-          uploadPaths,
-        });
-        violations.push(...stepViolations);
-      }
-    }
-
+    violations.push(...jobViolations);
     violations.push(
       ...checkArtifactPolicy({
         rel,
@@ -1258,6 +1211,83 @@ export async function scanWorkflows({
   }
 
   return { violations, warnings };
+}
+
+function collectParseWarnings(parsed, rel, warnings, quiet) {
+  if (!parsed.parseWarnings?.length) return;
+  for (const warn of parsed.parseWarnings) {
+    warnings.push({ workflow: rel, ...warn });
+    if (!quiet) {
+      detail(`WARN: ${warn.message}`);
+    }
+  }
+}
+
+async function scanWorkflowJobs({
+  rel,
+  parsed,
+  baseline,
+  permissionsBaseline,
+  allowedFirstSteps,
+  hardenRunnerActionAllowlist,
+  workspaceRoot,
+  allowedActions,
+  unsafePatterns,
+  unsafeAllowlist,
+  validateRemoteAction,
+  localActions,
+  inlineAllowlist,
+  inlineConstraints,
+  inlineMaxLines,
+  requireSectionHeaders,
+}) {
+  const violations = [];
+  const uploadNames = [];
+  const uploadPaths = [];
+
+  for (const [jobId, job] of Object.entries(parsed.jobs)) {
+    violations.push(
+      ...checkJobPermissions({
+        rel,
+        jobId,
+        job,
+        baseline,
+        permissionsBaseline,
+      }),
+    );
+    violations.push(
+      ...checkHardenRunnerFirst({
+        rel,
+        jobId,
+        job,
+        allowedFirstSteps,
+        hardenRunnerActionAllowlist,
+      }),
+    );
+
+    for (const step of job.steps) {
+      const stepViolations = await processStep({
+        rel,
+        jobId,
+        step,
+        workspaceRoot,
+        allowedActions,
+        unsafePatterns,
+        unsafeAllowlist,
+        validateRemoteAction,
+        localActions,
+        inlineAllowlist,
+        inlineConstraints,
+        inlineMaxLines,
+        requireSectionHeaders,
+        uploadNames,
+        uploadPaths,
+      });
+      violations.push(...stepViolations);
+    }
+  }
+
+  return { violations, uploadNames, uploadPaths };
 }
 
 export async function scanActions({
@@ -1277,30 +1307,47 @@ export async function scanActions({
       section('action', 'Scanning composite action', rel);
     }
 
-    for (let idx = 0; idx < lines.length; idx++) {
-      const line = lines[idx];
-      const lineNumber = idx + 1;
-      const trimmed = line.trim();
-      if (!trimmed || trimmed.startsWith('#')) continue;
+    const fileViolations = await scanActionLines({
+      rel,
+      lines,
+      allowedActions,
+      validateRemoteAction,
+    });
+    violations.push(...fileViolations);
+  }
+  return violations;
+}
 
-      const usesMatch = line.match(/^\s*-?\s*uses:\s*([^\s#]+)/);
-      if (!usesMatch) continue;
+async function scanActionLines({
+  rel,
+  lines,
+  allowedActions,
+  validateRemoteAction,
+}) {
+  const violations = [];
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx];
+    const lineNumber = idx + 1;
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) continue;
 
-      const uses = usesMatch[1];
-      if (isLocalAction(uses)) continue;
-      // Validate `uses:` reference for remote/docker/allowlist/pinning.
-      const col = line.indexOf('uses') + 1 || null;
-      const check = await checkUsesReference({
-        rel,
-        uses,
-        line: lineNumber,
-        col,
-        allowedActions,
-        validateRemoteAction,
-      });
-      violations.push(...check.violations);
-      if (check.handled) continue;
-    }
+    const usesMatch = line.match(/^\s*-?\s*uses:\s*([^\s#]+)/);
+    if (!usesMatch) continue;
+
+    const uses = usesMatch[1];
+    if (isLocalAction(uses)) continue;
+
+    // Validate `uses:` reference for remote/docker/allowlist/pinning.
+    const col = line.indexOf('uses') + 1 || null;
+    const check = await checkUsesReference({
+      rel,
+      uses,
+      line: lineNumber,
+      col,
+      allowedActions,
+      validateRemoteAction,
+    });
+    violations.push(...check.violations);
   }
   return violations;
 }

@@ -5,8 +5,8 @@
 //   unescaped '${' patterns (prevents interpolating inputs directly into run blocks)
 
 import path from 'node:path';
-import { fail, getRepoRoot, section } from './test-utils.js';
 import { listActionYmls, scanRunBlocks } from './action-safety-utils.js';
+import { fail, getRepoRoot, section } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 const { actionsRoot, files } = listActionYmls(repoRoot);

@@ -37,7 +37,10 @@ if [[ ! -x "${ESLINT_BIN}" ]]; then
 fi
 
 # Pass-through args safely (e.g. --fix).
-ESLINT_ARGS=("$@")
+ESLINT_ARGS=()
+if [[ "$#" -gt 0 ]]; then
+  ESLINT_ARGS=("$@")
+fi
 
 # Determine targets
 targets=()
@@ -51,17 +54,30 @@ else
   fi
 fi
 
+if [[ "${#targets[@]}" -eq 0 ]]; then
+  ps_detail "ESLint: no targets to check."
+  exit 0
+fi
+
 # Run ESLint:
 # - --max-warnings 0 means warnings fail the step (gate-quality)
 # - --no-error-on-unmatched-pattern keeps staged targeting stable
 # - stream output (no giant command substitution)
 set +e
-"${ESLINT_BIN}" \
-  --config "${config_path}" \
-  --max-warnings 0 \
-  --no-error-on-unmatched-pattern \
-  "${ESLINT_ARGS[@]}" \
-  "${targets[@]}"
+if [[ "${#ESLINT_ARGS[@]}" -gt 0 ]]; then
+  ESLINT_USE_FLAT_CONFIG=true "${ESLINT_BIN}" \
+    --config "${config_path}" \
+    --max-warnings 0 \
+    --no-error-on-unmatched-pattern \
+    "${ESLINT_ARGS[@]}" \
+    "${targets[@]}"
+else
+  ESLINT_USE_FLAT_CONFIG=true "${ESLINT_BIN}" \
+    --config "${config_path}" \
+    --max-warnings 0 \
+    --no-error-on-unmatched-pattern \
+    "${targets[@]}"
+fi
 rc=$?
 set -e
 

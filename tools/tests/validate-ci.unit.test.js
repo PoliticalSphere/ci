@@ -109,7 +109,7 @@ try {
 
   fs.writeFileSync(wfPath, wf, 'utf8');
 
-  const violations = await scanWorkflows({
+  const { violations } = await scanWorkflows({
     workflows: [wfPath],
     workspaceRoot: tmp,
 

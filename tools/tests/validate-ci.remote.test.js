@@ -66,6 +66,7 @@ function assertFail(result, expectedError, label) {
  */
 function makeFetchStub({
   statusByUrl = {},
+  headersByUrl = {},
   throwByUrl = {},
   defaultStatus = 200,
 } = {}) {
@@ -82,7 +83,15 @@ function makeFetchStub({
       ? statusByUrl[u]
       : defaultStatus;
 
-    return { status };
+    const headerMap = Object.hasOwn(headersByUrl, u) ? headersByUrl[u] : {};
+    return {
+      status,
+      headers: {
+        get(name) {
+          return headerMap[String(name).toLowerCase()] ?? null;
+        },
+      },
+    };
   };
 
   return {
@@ -325,13 +334,16 @@ async function main() {
   // 9) Status mappings: 401, 403, 429, 500 => specific errors.
   // ---------------------------------------------------------------------------
   {
-    const mk = async (status, expectedError) => {
+    const mk = async ({ status, expectedError, headers = {} }) => {
       const commitUrl =
         'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
       const fetch = makeFetchStub({
         statusByUrl: {
           'https://api.github.com/': 200,
           [commitUrl]: status,
+        },
+        headersByUrl: {
+          [commitUrl]: headers,
         },
       });
 
@@ -349,10 +361,14 @@ async function main() {
       assertFail(res, expectedError, `status mapping ${status}`);
     };
 
-    await mk(401, 'unauthorized');
-    await mk(403, 'forbidden_or_rate_limited');
-    await mk(429, 'rate_limited');
-    await mk(500, 'unexpected_status');
+    await mk({ status: 401, expectedError: 'unauthorized' });
+    await mk({ status: 403, expectedError: 'forbidden_or_rate_limited' });
+    await mk({
+      status: 429,
+      expectedError: 'rate_limited',
+      headers: { 'x-ratelimit-remaining': '1' },
+    });
+    await mk({ status: 500, expectedError: 'unexpected_status' });
 
     info('OK: status mappings (401/403/429/500)');
   }

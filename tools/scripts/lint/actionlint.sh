@@ -50,7 +50,10 @@ if ! command -v "${ACTIONLINT_BIN}" >/dev/null 2>&1; then
 fi
 
 # Pass-through args (rare, but supported)
-ACTIONLINT_ARGS=("$@")
+ACTIONLINT_ARGS=()
+if [[ "$#" -gt 0 ]]; then
+  ACTIONLINT_ARGS=("$@")
+fi
 
 # Friendly path for logs
 _short_path() {
@@ -106,4 +109,8 @@ if [[ "${#lintable[@]}" -eq 0 ]]; then
 fi
 
 # Run actionlint
-"${ACTIONLINT_BIN}" -config-file "${config_path}" "${ACTIONLINT_ARGS[@]}" "${lintable[@]}"
+if [[ "${#ACTIONLINT_ARGS[@]}" -gt 0 ]]; then
+  "${ACTIONLINT_BIN}" -config-file "${config_path}" "${ACTIONLINT_ARGS[@]}" "${lintable[@]}"
+else
+  "${ACTIONLINT_BIN}" -config-file "${config_path}" "${lintable[@]}"
+fi
