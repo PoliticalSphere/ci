@@ -9,7 +9,16 @@ set -euo pipefail
 # ==============================================================================
 
 
-fail() { echo "ERROR: $*" >&2; exit 1; }
+fail() {
+  echo "ERROR: $*" >&2
+  # If the script is being sourced, return so the caller can handle the error.
+  # If the script is being executed directly, exit to stop the process.
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 1
+  else
+    exit 1
+  fi
+}
 
 # Basic non-empty validation
 [[ -n "${WD:-}" ]] || fail "working-directory must not be empty"

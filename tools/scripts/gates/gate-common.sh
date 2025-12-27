@@ -114,6 +114,9 @@ LINT_STATUSES=()
 LINT_LOGS=()
 LINT_PIDS=()
 
+# Status constants
+LINT_STATUS_RUNNING="Running"
+
 # shellcheck disable=SC2034 # read by callers
 LINT_FAILED=0
 export LINT_FAILED
@@ -437,6 +440,46 @@ lint_print_final() {
   return 0
 }
 
+lint_print_tally() {
+  local include_logs="${1:-1}"
+  local pass=0 fail=0 skipped=0 error=0
+  local -a log_refs=()
+
+  local i status log_ref
+  for i in "${!LINT_STATUSES[@]}"; do
+    status="${LINT_STATUSES[$i]}"
+    case "${status}" in
+      PASS) pass=$((pass + 1)) ;;
+      FAIL)
+        fail=$((fail + 1))
+        if [[ "${include_logs}" -eq 1 ]]; then
+          log_ref="$(_short_log_ref "${LINT_LOGS[$i]}")"
+          [[ -n "${log_ref}" ]] && log_refs+=("${log_ref}")
+        fi
+        ;;
+      SKIPPED) skipped=$((skipped + 1)) ;;
+      ERROR)
+        error=$((error + 1))
+        if [[ "${include_logs}" -eq 1 ]]; then
+          log_ref="$(_short_log_ref "${LINT_LOGS[$i]}")"
+          [[ -n "${log_ref}" ]] && log_refs+=("${log_ref}")
+        fi
+        ;;
+      *) : ;;
+    esac
+  done
+
+  local line="Summary: ${pass} passed, ${fail} failed, ${skipped} skipped, ${error} errors"
+  if [[ "${#log_refs[@]}" -gt 0 ]]; then
+    local refs=""
+    refs="$(printf '%s, ' "${log_refs[@]}")"
+    refs="${refs%, }"
+    line+=" (see ${refs})"
+  fi
+  printf '%s\n' "${line}"
+  return 0
+}
+
 # ==============================================================================
 # Lint runner
 # ==============================================================================
@@ -486,17 +529,21 @@ lint_eval_status() {
   local log_file="$3"
   local status="PASS"
 
+  if grep -Eiq "no .*files to check|no .*files to lint|no .*files found|no staged|no dockerfiles found|no workflow files to check" "${log_file}"; then
+    printf '%s' "SKIPPED"
+    return 0
+  fi
+
   if [[ ${rc} -ne 0 ]]; then
     status="FAIL"
 
-    if grep -Eiq "config not found|cannot read config file|invalid configuration|configuration error|failed to load config|YAMLException:" "${log_file}"; then
+    if grep -Eiq "config not found|cannot read config file|invalid configuration|configuration error|failed to load config|YAMLException:|command not found|Cannot find module|Cannot find package|ERR_MODULE_NOT_FOUND|tsc not found" "${log_file}"; then
       status="ERROR"
     fi
 
-    # Scoped SKIPPED heuristics (only eslint by default)
-    if [[ "${status}" == "FAIL" && "${id}" == "lint.eslint" ]] && \
+    if [[ "${id}" == "lint.eslint" ]] && \
       grep -Eiq "failed to resolve a plugin|Cannot find package 'eslint-plugin-|npm (ERR!|error)|Access token expired|ERR_MODULE_NOT_FOUND" "${log_file}"; then
-      status="SKIPPED"
+      status="ERROR"
       {
         printf "\nNote: ESLint dependencies/registry access appear missing.\n"
         printf "Fix: npm ci (or install missing eslint plugins) then re-run.\n"
@@ -505,10 +552,6 @@ lint_eval_status() {
 
     if [[ "${status}" == "FAIL" || "${status}" == "ERROR" ]]; then
       LINT_FAILED=1
-    fi
-  else
-    if grep -Eiq "no .*files to check|no staged|no .*files to lint" "${log_file}"; then
-      status="SKIPPED"
     fi
   fi
 
@@ -551,6 +594,7 @@ lint_handle_log_fallback() {
       fi
     } > "${log_file}"
   fi
+  return 0
 }
 
 # Usage: lint_finalize_step_by_index <idx> <rc>
@@ -576,7 +620,6 @@ lint_finalize_step_by_index() {
 run_lint_step() {
   local id="$1"
   local title="$2"
-  # shellcheck disable=SC2034
   local description="$3"
   shift 3
 
@@ -599,11 +642,11 @@ run_lint_step() {
   if [[ "${idx}" -eq -1 ]]; then
     LINT_IDS+=("${id}")
     LINT_LABELS+=("${title}")
-    LINT_STATUSES+=("Running")
+    LINT_STATUSES+=("${LINT_STATUS_RUNNING}")
     LINT_LOGS+=("")
     idx=$(( ${#LINT_IDS[@]} - 1 ))
   else
-    LINT_STATUSES[idx]="Running"
+    LINT_STATUSES[idx]="${LINT_STATUS_RUNNING}"
   fi
 
   # Mark that we have genuinely started linting (enables summary printing)
@@ -639,7 +682,6 @@ run_lint_step() {
 run_lint_step_async() {
   local id="$1"
   local title="$2"
-  # shellcheck disable=SC2034
   local description="$3"
   shift 3
 
@@ -649,6 +691,7 @@ run_lint_step_async() {
 
   CURRENT_STEP_ID="${id}"
   CURRENT_STEP_TITLE="${title}"
+  bash "${branding_scripts}/print-section.sh" "${id}" "${title}" "${description}"
 
   local idx=-1 j
   for j in "${!LINT_IDS[@]}"; do
@@ -661,12 +704,12 @@ run_lint_step_async() {
   if [[ "${idx}" -eq -1 ]]; then
     LINT_IDS+=("${id}")
     LINT_LABELS+=("${title}")
-    LINT_STATUSES+=("Running")
+    LINT_STATUSES+=("${LINT_STATUS_RUNNING}")
     LINT_LOGS+=("")
     LINT_PIDS+=("")
     idx=$(( ${#LINT_IDS[@]} - 1 ))
   else
-    LINT_STATUSES[idx]="Running"
+    LINT_STATUSES[idx]="${LINT_STATUS_RUNNING}"
   fi
 
   LINT_SUMMARY_EVER_STARTED=1
@@ -710,6 +753,45 @@ wait_lint_step() {
 
   lint_finalize_step_by_index "${idx}" "${rc}"
   return 0
+}
+
+lint_active_count() {
+  local count=0
+  local pid
+  for pid in "${LINT_PIDS[@]}"; do
+    [[ -n "${pid}" ]] && count=$((count + 1))
+  done
+  printf '%s' "${count}"
+  return 0
+}
+
+lint_wait_one() {
+  local remaining=1
+  while [[ "${remaining}" -eq 1 ]]; do
+    remaining=0
+    local idx pid rc state
+    for idx in "${!LINT_PIDS[@]}"; do
+      pid="${LINT_PIDS[$idx]}"
+      [[ -n "${pid}" ]] || continue
+
+      state="$(ps -o state= -p "${pid}" 2>/dev/null || true)"
+      state="$(printf '%s' "${state}" | tr -d '[:space:]')"
+      if [[ -z "${state}" || "${state}" == *Z* ]]; then
+        rc=0
+        if ! wait "${pid}"; then
+          rc=$?
+        fi
+        lint_finalize_step_by_index "${idx}" "${rc}"
+        return 0
+      fi
+
+      remaining=1
+    done
+    if [[ "${remaining}" -eq 1 ]]; then
+      sleep 0.2
+    fi
+  done
+  return 1
 }
 
 lint_wait_all() {

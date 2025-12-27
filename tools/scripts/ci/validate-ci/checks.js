@@ -1077,9 +1077,9 @@ async function processStep({
     validateRemoteAction,
     localActions,
   });
-  violations.push(...stepViolations);
 
   violations.push(
+    ...stepViolations,
     ...checkInlineRun({
       rel,
       jobId,
@@ -1090,25 +1090,19 @@ async function processStep({
       unsafePatterns,
       unsafeAllowlist,
     }),
-  );
-
-  violations.push(
     ...checkSecretsHandling({
       rel,
       jobId,
       step,
     }),
+    ...(requireSectionHeaders
+      ? checkSectionHeaders({
+          rel,
+          jobId,
+          step,
+        })
+      : []),
   );
-
-  if (requireSectionHeaders) {
-    violations.push(
-      ...checkSectionHeaders({
-        rel,
-        jobId,
-        step,
-      }),
-    );
-  }
 
   if (step.uses && isActionUpload(step.uses)) {
     if (step.with.name) {
@@ -1166,8 +1160,6 @@ export async function scanWorkflows({
         permissionsBaseline,
         workflowKey,
       }),
-    );
-    violations.push(
       ...checkHighRiskTriggers({
         rel,
         parsed,
@@ -1198,8 +1190,8 @@ export async function scanWorkflows({
       requireSectionHeaders,
     });
 
-    violations.push(...jobViolations);
     violations.push(
+      ...jobViolations,
       ...checkArtifactPolicy({
         rel,
         workflowKey,
@@ -1254,8 +1246,6 @@ async function scanWorkflowJobs({
         baseline,
         permissionsBaseline,
       }),
-    );
-    violations.push(
       ...checkHardenRunnerFirst({
         rel,
         jobId,

@@ -205,3 +205,10 @@ if [[ -x "${branding_script}" ]]; then
 else
   printf 'Tests passed: %s test file(s) validated\n' "${#test_files[@]}"
 fi
+
+# Explicitly return success when sourced to clarify intended behavior
+if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+  return 0
+else
+  exit 0
+fi

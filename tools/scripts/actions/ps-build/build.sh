@@ -36,7 +36,16 @@ set -euo pipefail
 #
 # ==============================================================================
 
-die() { echo "ERROR: $*" >&2; exit 1; }
+die() {
+  echo "ERROR: $*" >&2
+  # If the script is being sourced, return so the caller can handle the error.
+  # If the script is being executed directly, exit to stop the process.
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 1
+  else
+    exit 1
+  fi
+}
 warn() { echo "WARN: $*" >&2; return 0; }
 
 # ----------------------------
@@ -52,7 +61,15 @@ format_sh="${repo_root}/tools/scripts/branding/format.sh"
 if [[ -f "${format_sh}" ]]; then
   # shellcheck source=tools/scripts/branding/format.sh
   . "${format_sh}"
-  die() { ps_error "$*"; exit 1; }
+  die() {
+    ps_error "$*"
+    # When sourced, return so the caller can decide how to proceed; otherwise exit.
+    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+      return 1
+    else
+      exit 1
+    fi
+  }
   warn() { ps_warn "$*"; return 0; }
 fi
 

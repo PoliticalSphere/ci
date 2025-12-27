@@ -18,7 +18,13 @@ set -euo pipefail
 
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
-  exit 1
+  # If the script is being sourced, return so the caller can handle the error.
+  # If the script is being executed directly, exit to stop the process.
+  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
+    return 1
+  else
+    exit 1
+  fi
 }
 
 version="${SEMGREP_VERSION:-}"
