@@ -12,6 +12,8 @@ reports/
 
 !.github/actions/build/
 !.github/actions/build/**
+!.github/actions/ps-task/build/
+!.github/actions/ps-task/build/**
 
 # Editor
 .DS_Store

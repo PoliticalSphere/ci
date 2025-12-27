@@ -19,7 +19,6 @@ This directory defines the branding assets and usage rules.
 ## Where It’s Used
 
 - `tools/scripts/branding/print-banner.sh`
-- `.github/actions/ps-banner`
 - `tools/scripts/branding/print-section.sh`
 - `tools/scripts/gates/gate-pre-commit.sh`
 - `tools/scripts/gates/gate-pre-push.sh`

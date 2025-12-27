@@ -8,6 +8,7 @@ Deterministic lint scripts used by local gates and CI.
 - `eslint.sh`
 - `yamllint.sh`
 - `actionlint.sh`
+- `affected.sh`
 - `hadolint.sh`
 - `shellcheck.sh`
 - `markdownlint.sh`

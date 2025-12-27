@@ -15,9 +15,8 @@ meta:
 rule:
   require_harden_runner: true
   allowed_first_steps:
-    - ./.github/actions/ps-harden-runner
-    - ./.github/actions/ps-setup
-    - ./.github/actions/ps-hardened-checkout
+    - ./.github/actions/ps-bootstrap/ps-init
+    - ./.github/actions/ps-bootstrap/ps-harden-runner
     - step-security/harden-runner@
   harden_runner_action_allowlist:
     - step-security/harden-runner

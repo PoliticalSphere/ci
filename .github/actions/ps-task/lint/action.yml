@@ -1,0 +1,64 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Lint (ps-task adapter)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run the fast lint/validation gate with platform defaults via PS Task Runner.
+#
+# Notes:
+#   - Intentionally thin: delegates execution, logging, and reporting to ps-run.
+#   - Provides safe defaults aligned with PR-gates (fast lint; no secrets scan).
+# ==============================================================================
+
+name: "Lint"
+description: "Run fast lint gate (pre-commit style) with standardized PS reporting"
+
+inputs:
+  script:
+    description: "Gate script path (repo-relative)"
+    required: false
+    default: "tools/scripts/gates/gate-pre-commit.sh"
+
+  working_directory:
+    description: "Working directory to run from (repo-relative)"
+    required: false
+    default: "."
+
+  ps_full_scan:
+    description: "Force full scan behaviour for the lint gate (0|1)"
+    required: false
+    default: "0"
+
+  skip_secrets_scan:
+    description: "Skip secrets scan within lint gate (0|1). PR gates runs secrets separately."
+    required: false
+    default: "1"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run lint gate (PS)
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "lint.gate"
+        title: "Lint gate"
+        description: "Run the pre-commit gate (fast lint + validation)"
+        script: ${{ inputs.script }}
+        working_directory: ${{ inputs.working_directory }}
+
+        # Preconditions (fail fast if the gate script isn't present)
+        require_files: |
+          ${{ inputs.script }}
+
+        # Evidence expectations (glob-aware in upgraded ps-run)
+        artifact_paths: |
+          reports/**
+          logs/**
+
+        # Stable, explicit behaviour
+        env_kv: |
+          CI=1
+          PS_FULL_SCAN=${{ inputs.ps_full_scan }}
+          PS_SKIP_SECRETS_SCAN=${{ inputs.skip_secrets_scan }}
+
+        continue_on_error: "0"
+        allow_args: "0"

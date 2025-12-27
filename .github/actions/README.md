@@ -76,22 +76,45 @@ Risky changes require an explicit, documented decision.
 
 Baseline building blocks:
 
-- `ps-banner`: print Political Sphere ASCII branding
-- `ps-run`: standard banner + section wrapper for script execution
-- `ps-checkout`: safe checkout wrapper with explicit fetch depth
-- `ps-hardened-checkout`: harden runner + checkout in one step
-- `ps-harden-runner`: step-security hardening with validated inputs
-- `ps-upload-artifacts`: artifact upload with input validation
-- `ps-pr-comment`: post PR comments with input validation
-- `ps-write-summary`: write structured JSON summary artifacts
-- `ps-preflight`: shared preflight checks for common requirements
-- `ps-install-tools`: install pinned CI tools from an explicit allowlist
+- `ps-bootstrap`
+- `ci-validate`
+- `ps-task`
+- `ps-teardown`
 
-Node toolchain:
+## Node toolchain
 
-- `ps-node-bootstrap`: setup Node and run `npm ci` deterministically
-- `ps-node-setup`: checkout + bootstrap Node toolchain
-- `ps-setup`: harden runner + node setup (single step)
+- `ps-bootstrap/ps-init`: canonical job entrypoint that hardens the runner,
+  checks out the repository and optional platform, prepares HOME isolation,
+  sets `PS_PLATFORM_ROOT`, and optionally installs tools.
+- `ps-bootstrap/ps-node`: Node.js setup and optional dependency install
+  switchboard.
+
+Example: use `ps-bootstrap` to run lint with installs/tools:
+
+```yaml
+- name: Job setup (PS)
+  uses: ./.github/actions/ps-bootstrap/ps-init
+  with:
+    fetch_depth: ${{ inputs.fetch_depth }}
+    install_tools: "1"
+    tools_bundle: "lint"
+    skip_checkout: "1"
+    skip_harden: "1"
+    allow_unsafe: "1"
+    unsafe_reason: "runner already hardened earlier in the job"
+```
+
+Security-only bootstrap example:
+
+```yaml
+- name: Job setup (Security Only)
+  uses: ./.github/actions/ps-bootstrap
+  with:
+    skip_checkout: "1"          # Don't pull the consumer repo
+    install_dependencies: "0"   # No npm ci
+    install_tools: "0"          # No extra binaries
+    egress_policy: block         # Still perform hardening
+```
 
 Lint + quality:
 
@@ -106,10 +129,8 @@ Security:
 - `ci-validate`: enforce CI policy validation
 - `consumer-contract`: validate consumer repositories against contract policy
 - `license-check`: license compliance against policy allowlists
-- `secret-scan-pr`: fast gitleaks scan for PRs
+
 - `semgrep-cli`: run Semgrep CLI and upload SARIF
-- `ps-lint-tools`: install pinned lint tools for CI
-- `ps-security-tools`: install pinned security tools for CI
 
 ---
 

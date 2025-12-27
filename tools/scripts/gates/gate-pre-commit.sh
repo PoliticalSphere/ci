@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 set -euo pipefail
-# shellcheck disable=SC2034
-# Reason: this gate defines metadata variables used indirectly (GATE_NAME).
 
 # ==============================================================================
 # Political Sphere — Pre-Commit Gate
@@ -10,31 +8,56 @@ set -euo pipefail
 #   Fast local validation prior to commit. Mirrors CI lint gates where possible.
 #
 # Design:
-#   - Deterministic, non-interactive (CI=1)
+#   - Fast: only lightweight checks
+#   - Deterministic, non-interactive by default
 #   - Structured output (banner + sections)
-#   - Fail-fast with clear step attribution
-#   - Avoid overengineering: pre-commit must stay fast
+#   - Lint steps never stop early; gate stops before naming/secrets if lint failed
 # ==============================================================================
 
-# Source shared gate helpers
+# ----------------------------
+# Re-entrancy guard
+# ----------------------------
+# Pre-commit frameworks sometimes trigger nested runs (e.g., via npm scripts).
+# This prevents duplicate output and prevents the gate from running twice.
+if [[ -n "${PS_GATE_ACTIVE_PRECOMMIT:-}" ]]; then
+  echo "▶ Pre-commit gate already running (skipping nested invocation)"
+  exit 0
+fi
+export PS_GATE_ACTIVE_PRECOMMIT="1"
+
+# ----------------------------
+# Gate identity (set BEFORE sourcing common)
+# ----------------------------
+GATE_NAME="Pre-commit"
+export GATE_NAME
+
+# ----------------------------
+# Locate + source shared gate helpers
+# ----------------------------
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/gates/gate-common.sh
 . "${script_dir}/gate-common.sh"
 
-GATE_NAME="Pre-commit"
-: "${GATE_NAME:-}"
-trap on_error ERR
+# ----------------------------
+# Behaviour defaults
+# ----------------------------
+# Pre-commit should be non-interactive, but DO NOT force CI=1 globally if you
+# rely on interactive UX; instead prefer "fast mode" flags consumed by tools.
+export PS_FAST="${PS_FAST:-1}"
+export PS_STAGED_ONLY="${PS_STAGED_ONLY:-1}"
 
+# If you never want the lint dashboard printed during the run, set:
+#   export PS_LINT_PRINT_MODE=final
+# and call lint_print_final at the end (only if any step started).
+export PS_LINT_PRINT_MODE="${PS_LINT_PRINT_MODE:-auto}"
+
+# Banner
 bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
 
 # ------------------------------------------------------------------------------
 # FAST CHECKS ONLY
-# If a step is expensive, it belongs in pre-push or CI.
-# Prefer staged/affected operation inside each tool script where possible.
 # ------------------------------------------------------------------------------
-
-# Run lint steps (aggregated summary: Waiting -> Running -> PASS/FAIL/SKIPPED)
-run_lint_step "lint.biome" "Biome" "Formatting and correctness checks" \
+run_lint_step "lint.biome" "BIOME" "Formatting and correctness checks" \
   bash "${PS_LINT_SCRIPTS}/biome.sh"
 
 run_lint_step "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" \
@@ -61,16 +84,20 @@ run_lint_step "lint.cspell" "CSPELL" "Spelling checks" \
 run_lint_step "lint.knip" "KNIP" "Dependency audit (knip)" \
   bash "${PS_LINT_SCRIPTS}/knip.sh"
 
-# Type checking is part of the lint block (runs as part of Lint & Type Check)
 run_lint_step "lint.typecheck" "TYPECHECK" "Type checking (tsc)" \
   bash "${PS_TASKS_SCRIPTS}/typecheck.sh"
+
+# If configured to print only at the end, do it here (and only here).
+if [[ "${PS_LINT_PRINT_MODE}" == "final" ]]; then
+  lint_print_final || true
+fi
 
 # If any lint/typecheck failed, abort further steps
 if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
   bash "${PS_BRANDING_SCRIPTS}/print-section.sh" \
     "gate.failed" \
     "${GATE_NAME} gate failed" \
-    "One or more lint checks failed"
+    "One or more lint/typecheck checks failed (see logs/lint/*.log)"
   exit 1
 fi
 
@@ -80,5 +107,4 @@ run_step "naming.checks" "Naming conventions" "Repository naming policy checks" 
 run_step "secrets.fast" "Secrets scan (fast)" "Lightweight secret detection" \
   bash "${PS_SECURITY_SCRIPTS}/secret-scan-pr.sh"
 
-# Success summary
 print_success

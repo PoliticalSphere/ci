@@ -2,36 +2,31 @@
 set -euo pipefail
 
 # ==============================================================================
-# Political Sphere — Markdownlint
+# Political Sphere — Markdownlint (Correct exit codes, low-noise output)
 # ------------------------------------------------------------------------------
 # Purpose:
-#   Validate Markdown files with the platform configuration.
+#   Validate Markdown files with markdownlint-cli2 using repo config.
 #
 # Modes:
-#   - Default (local): checks staged Markdown files only (fast)
+#   - Default (local): staged Markdown files only (fast)
 #   - CI / full scan: checks all Markdown when PS_FULL_SCAN=1 or CI=1
-#
-# Usage:
-#   bash tools/scripts/lint/markdownlint.sh
-#   PS_FULL_SCAN=1 bash tools/scripts/lint/markdownlint.sh
 # ==============================================================================
 
-# Source shared lint helpers
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/lint/common.sh
 . "${script_dir}/common.sh"
 
 set_repo_root_and_git
 set_full_scan_flag
 
-# Prefer '.markdownlint.json' (required by markdownlint-cli2), then JSON/JSONC configs. Fall back to YAML for
-# documentation/compatibility with older tooling.
+# Prefer '.markdownlint.json' (markdownlint-cli2), then jsonc/json/yml fallbacks.
 config_dot="${repo_root}/configs/lint/.markdownlint.json"
 config_jsonc="${repo_root}/configs/lint/markdownlint-cli2.jsonc"
 config_jsonc_alt="${repo_root}/configs/lint/markdownlint.jsonc"
 config_json="${repo_root}/configs/lint/markdownlint.json"
 config_yaml="${repo_root}/configs/lint/markdownlint.yml"
 
+config_path=""
 if [[ -f "${config_dot}" ]]; then
   config_path="${config_dot}"
 elif [[ -f "${config_jsonc}" ]]; then
@@ -43,7 +38,7 @@ elif [[ -f "${config_json}" ]]; then
 elif [[ -f "${config_yaml}" ]]; then
   config_path="${config_yaml}"
 else
-  ps_error "markdownlint config not found (expected .markdownlint.json or markdownlint-cli2.jsonc or markdownlint.json or markdownlint.yml)"
+  ps_error "markdownlint config not found (expected .markdownlint.json / markdownlint-cli2.jsonc / markdownlint.json[c] / markdownlint.yml)"
   exit 1
 fi
 
@@ -57,13 +52,27 @@ else
   exit 1
 fi
 
-# Pass-through args safely (rare, but keeps tooling consistent).
 MDL_ARGS=()
 if [[ "$#" -gt 0 ]]; then
-  MDL_ARGS+=("$@")
+  MDL_ARGS=("$@")
+fi
+
+timeout_s="${PS_MARKDOWNLINT_TIMEOUT:-}"
+if [[ -z "${timeout_s}" && "${CI:-0}" == "1" ]]; then
+  timeout_s="300"
+fi
+
+timeout_cmd=""
+if [[ -n "${timeout_s}" ]]; then
+  if command -v timeout >/dev/null 2>&1; then
+    timeout_cmd="timeout"
+  elif command -v gtimeout >/dev/null 2>&1; then
+    timeout_cmd="gtimeout"
+  fi
 fi
 
 # Build targets
+targets=()
 if [[ "${full_scan}" == "1" ]]; then
   collect_targets_find -name "*.md"
 else
@@ -75,32 +84,49 @@ if [[ "${#targets[@]}" -eq 0 ]]; then
   exit 0
 fi
 
-relative_targets=()
-for target in "${targets[@]}"; do
-  if [[ "${target}" == "${repo_root}/"* ]]; then
-    relative_targets+=("${target#"${repo_root}"/}")
-  else
-    relative_targets+=("${target}")
-  fi
-done
+# markdownlint-cli2 works best from repo root with relative paths
+declare -a relative_targets=()
+  for target in "${targets[@]}"; do
+    if [[ "${target}" == "${repo_root}/"* ]]; then
+      relative_targets+=("${target#"${repo_root}"/}")
+    else
+      relative_targets+=("${target}")
+    fi
+  done
 
-run_markdownlint() {
-  if [[ "$#" -gt 0 ]]; then
-    (cd "${repo_root}" && "${MDL_BIN}" --config "${config_path}" "$@" "${relative_targets[@]}")
-  else
-    (cd "${repo_root}" && "${MDL_BIN}" --config "${config_path}" "${relative_targets[@]}")
-  fi
-}
+# Run and capture output + exit code reliably
+output=""
+status=0
+set +e
+if [[ "${#MDL_ARGS[@]}" -gt 0 ]]; then
+  output="$(
+    cd "${repo_root}" && \
+    ${timeout_cmd:+${timeout_cmd} "${timeout_s}"} \
+    "${MDL_BIN}" --config "${config_path}" "${MDL_ARGS[@]}" "${relative_targets[@]}" 2>&1
+  )"
+else
+  output="$(
+    cd "${repo_root}" && \
+    ${timeout_cmd:+${timeout_cmd} "${timeout_s}"} \
+    "${MDL_BIN}" --config "${config_path}" "${relative_targets[@]}" 2>&1
+  )"
+fi
+status=$?
+set -e
 
 # Filter noise so output shows only actionable lint issues.
-output="$(run_markdownlint "$@" 2>&1)"
-status=$?
 if [[ -n "${output}" ]]; then
-  filtered="$(echo "${output}" | grep -Ev '^(markdownlint-cli2|Finding:|Linting:|Summary:)' || true)"
+  filtered="$(printf '%s\n' "${output}" | grep -Ev '^(markdownlint-cli2|Finding:|Linting:|Summary:)' || true)"
   if [[ -n "${filtered}" ]]; then
-    echo "${filtered}"
+    printf '%s\n' "${filtered}"
   elif [[ "${status}" -ne 0 ]]; then
-    echo "${output}"
+    # If it failed but we filtered everything, show the original output.
+    printf '%s\n' "${output}"
   fi
 fi
+
+if [[ -n "${timeout_cmd}" && "${status}" -eq 124 ]]; then
+  ps_error "Markdownlint timed out after ${timeout_s}s."
+fi
+
 exit "${status}"

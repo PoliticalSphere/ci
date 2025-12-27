@@ -63,3 +63,24 @@ Copy the block below for each decision:
   mitigation: Review and monitor packages using this license; time-bounded review scheduled
   expires: 2026-06-21
   approval: platform-governance
+
+- id: RD-2025-004
+  date: 2025-12-23
+  owner: political-sphere
+  status: approved
+  scope: configs/ci/policies/allowed-actions.yml, .github/workflows/pr-gates.yml
+  policy: configs/ci/policies/validate-ci.yml#sha_pinning
+  decision: Allow `sonarsource/sonarcloud-github-action` in the action
+    allowlist for baseline SonarCloud analysis
+  rationale: SonarCloud provides baseline analysis for code quality and security.
+    The job is non-blocking by default (continue-on-error) and runs in a hardened
+    runner with minimal permissions; its output is stored as artifacts only.
+  impact: Introduces external action dependency. Risk is mitigated by pinning the
+    action to a specific commit SHA, using a hardened runner, keeping the job
+    non-blocking, and controlling token usage via repository secrets.
+  mitigation:
+  - Pin the action to a specific SHA.
+  - Run in a hardened runner.
+  - Store findings as artifacts only (no automatic posting of blocking checks).
+  expires: 2026-06-23
+  approval: platform-governance

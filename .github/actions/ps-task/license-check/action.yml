@@ -1,0 +1,136 @@
+# ==============================================================================
+# Political Sphere — Composite Action: License Compliance
+# ==============================================================================
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: license-check
+# version: 1.1.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-task/ps-run
+# - tools/scripts/security/license-check.sh
+# - tools/scripts/security/license-check.js
+# - configs/security/license-policy.yml (default policy)
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - Workflow jobs that invoke license-check for compliance gating
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Enforce OSS license compliance using a policy file + dependency lockfile, and
+# emit evidence (reports/logs) in a deterministic, CI-safe manner.
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Validate output directories
+#   - Run the license check via ps-run
+#   - Emit deterministic reports/logs for audit
+#
+# DOES NOT:
+#   - Install dependencies or lockfiles
+#   - Modify job permissions
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Policy-driven enforcement
+# - Audit-friendly evidence outputs
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 1 — High (policy enforcement for OSS compliance)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents unapproved OSS licenses from entering the build by enforcing
+#          policy against the dependency lockfile.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Reports and logs are emitted to configured directories for compliance review.
+#
+# ==============================================================================
+name: "License Compliance"
+description: "Check dependency licenses against the platform policy"
+
+inputs:
+  policy_path:
+    description: "Path to license policy (repo-relative)"
+    required: false
+    default: "configs/security/license-policy.yml"
+
+  lock_path:
+    description: "Dependency lockfile path (repo-relative)"
+    required: false
+    default: "package-lock.json"
+
+  report_dir:
+    description: "Report output directory (repo-relative)"
+    required: false
+    default: "reports/security"
+
+  log_dir:
+    description: "Log output directory (repo-relative)"
+    required: false
+    default: "logs/security"
+
+outputs:
+  status:
+    description: "Task status (success|failure)"
+    value: ${{ steps.license.outputs.status }}
+
+  report_path:
+    description: "Task report JSON path"
+    value: ${{ steps.license.outputs.report_path }}
+
+  log_path:
+    description: "Task log path"
+    value: ${{ steps.license.outputs.log_path }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Prepare output directories (PS)
+      shell: bash
+      env:
+        PS_REPORT_DIR_INPUT: ${{ inputs.report_dir }}
+        PS_LOG_DIR_INPUT: ${{ inputs.log_dir }}
+      run: |
+        set -euo pipefail
+        for d in "${PS_REPORT_DIR_INPUT}" "${PS_LOG_DIR_INPUT}"; do
+          [[ -n "${d}" ]] || { echo "ERROR: output dir empty" >&2; exit 1; }
+          if [[ "${d}" == /* || "${d}" == *".."* ]]; then
+            echo "ERROR: unsafe dir path: ${d}" >&2
+            exit 1
+          fi
+          mkdir -p "${GITHUB_WORKSPACE}/${d}"
+        done
+
+    - name: License compliance (PS)
+      id: license
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "security.license"
+        title: "License compliance"
+        description: "Policy-driven OSS license validation"
+        script: "tools/scripts/security/license-check.sh"
+        require_files: |
+          tools/scripts/security/license-check.sh
+          ${{ inputs.policy_path }}
+          ${{ inputs.lock_path }}
+        artifact_paths: |
+          ${{ inputs.report_dir }}
+          ${{ inputs.log_dir }}
+        env_kv: |
+          PS_LICENSE_POLICY=${{ inputs.policy_path }}
+          PS_LICENSE_LOCK_PATH=${{ inputs.lock_path }}
+          PS_REPORT_DIR=${{ inputs.report_dir }}
+          PS_LOG_DIR=${{ inputs.log_dir }}

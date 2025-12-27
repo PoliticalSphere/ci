@@ -20,6 +20,80 @@ const defaultFetch =
 const defaultTokenProvider = () =>
   process.env.GH_TOKEN || process.env.GITHUB_TOKEN || '';
 
+export function normalizeActionToRepo(action) {
+  const noAt = String(action).split('@')[0];
+  const parts = noAt.split('/').filter(Boolean);
+  if (parts.length < 2) return null;
+  return `${parts[0]}/${parts[1]}`;
+}
+
+export function mapStatusToInfo(status) {
+  // Map problematic statuses to human-readable reason and internal error code.
+  switch (status) {
+    case 401:
+      return { reason: 'authentication failed', error: 'unauthorized' };
+    case 403:
+      return {
+        reason: 'permission/rate limited',
+        error: 'forbidden_or_rate_limited',
+      };
+    case 429:
+      return { reason: 'rate limited', error: 'rate_limited' };
+    default:
+      return { reason: 'unexpected status', error: 'unexpected_status' };
+  }
+}
+
+function buildCommitHeaders(verifyRemoteShas, isCIImpl, tokenProvider) {
+  const headers = {
+    Accept: 'application/vnd.github+json',
+    'User-Agent': 'political-sphere-validate-ci',
+  };
+  const token = verifyRemoteShas && isCIImpl() ? tokenProvider() || '' : '';
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+  return headers;
+}
+
+function isRateLimitExhausted(status, remaining) {
+  if (remaining === null) return false;
+  if (status !== 403 && status !== 429) return false;
+  return Number(remaining) === 0;
+}
+
+function formatRateLimitReset(resetHeader) {
+  if (!resetHeader) return '';
+  const resetEpoch = Number(resetHeader) * 1000;
+  if (!Number.isFinite(resetEpoch)) return '';
+  return new Date(resetEpoch).toISOString();
+}
+
+function evaluateCommitResponse(response, repo, ref, detailImpl) {
+  const status = response.status;
+  if (status === 200) return { ok: true, error: null };
+  if (status === 404) return { ok: false, error: 'ref_not_found' };
+  return handleCommitStatus(response, repo, ref, detailImpl);
+}
+
+function handleCommitStatus(response, repo, ref, detailImpl) {
+  const status = response.status;
+  const remaining = response.headers.get('x-ratelimit-remaining');
+  const reset = response.headers.get('x-ratelimit-reset');
+  if (isRateLimitExhausted(status, remaining)) {
+    const resetIso = formatRateLimitReset(reset);
+    detailImpl(
+      `REMOTE_VERIFY: rate limit hit; verification skipped for ${repo}@${ref.slice(0, 8)}… reset=${resetIso || 'unknown'}`,
+    );
+    return { ok: true, error: 'rate_limited_soft' };
+  }
+  const info = mapStatusToInfo(status);
+  detailImpl(
+    `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(0, 8)}… status=${status} (${info.reason})`,
+  );
+  return { ok: false, error: info.error };
+}
+
 export function createRemoteVerifier({
   verifyRemoteShas = false,
   detailImpl = detail,
@@ -80,28 +154,17 @@ export function createRemoteVerifier({
     }
   }
 
-  function normalizeActionToRepo(action) {
-    const noAt = String(action).split('@')[0];
-    const parts = noAt.split('/').filter(Boolean);
-    if (parts.length < 2) return null;
-    return `${parts[0]}/${parts[1]}`;
-  }
-
   async function fetchCommit(repo, ref) {
     const key = `${repo}@${ref}`;
     if (cache.has(key)) {
       return cache.get(key);
     }
 
-    const headers = {
-      Accept: 'application/vnd.github+json',
-      'User-Agent': 'political-sphere-validate-ci',
-    };
-    const token = verifyRemoteShas && isCIImpl() ? tokenProvider() || '' : '';
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-
+    const headers = buildCommitHeaders(
+      verifyRemoteShas,
+      isCIImpl,
+      tokenProvider,
+    );
     const url = `https://api.github.com/repos/${repo}/commits/${ref}`;
     let result;
     try {
@@ -109,35 +172,7 @@ export function createRemoteVerifier({
         method: 'GET',
         headers,
       });
-      if (response.status === 200) {
-        result = { ok: true, error: null };
-      } else if (response.status === 404) {
-        result = { ok: false, error: 'ref_not_found' };
-      } else {
-        const reason =
-          response.status === 401
-            ? 'authentication failed'
-            : response.status === 403
-              ? 'permission/rate limited'
-              : response.status === 429
-                ? 'rate limited'
-                : 'unexpected status';
-        detailImpl(
-          `REMOTE_VERIFY: repo=${repo} sha=${ref.slice(
-            0,
-            8,
-          )}… status=${response.status} (${reason})`,
-        );
-        const error =
-          response.status === 401
-            ? 'unauthorized'
-            : response.status === 403
-              ? 'forbidden_or_rate_limited'
-              : response.status === 429
-                ? 'rate_limited'
-                : 'unexpected_status';
-        result = { ok: false, error };
-      }
+      result = evaluateCommitResponse(response, repo, ref, detailImpl);
     } catch {
       logApiUnreachable(repo, ref);
       result = { ok: !isCIImpl(), error: 'api_unreachable' };
@@ -148,26 +183,17 @@ export function createRemoteVerifier({
   }
 
   return async function validateRemoteAction(action, ref) {
-    if (!verifyRemoteShas) {
-      return { ok: true, error: 'verification_disabled' };
-    }
-    if (!action || !ref) {
-      return { ok: true, error: 'missing_action_or_ref' };
-    }
-    if (action.startsWith('./')) {
-      return { ok: true, error: 'local_action' };
-    }
-    if (!/^[a-f0-9]{40}$/.test(ref)) {
-      return { ok: true, error: 'not_sha' };
-    }
+    if (!verifyRemoteShas) return { ok: true, error: 'verification_disabled' };
+    if (!action || !ref) return { ok: true, error: 'missing_action_or_ref' };
+    if (action.startsWith('./')) return { ok: true, error: 'local_action' };
+    if (!/^[a-f0-9]{40}$/.test(ref)) return { ok: true, error: 'not_sha' };
 
     const normalizedRepo = normalizeActionToRepo(action);
     if (!normalizedRepo) return { ok: false, error: 'invalid_action_ref' };
 
     if (!(await checkNetworkAvailable())) {
-      return isCIImpl()
-        ? { ok: false, error: 'api_unreachable' }
-        : { ok: true, error: 'api_unreachable_local_skip' };
+      if (isCIImpl()) return { ok: false, error: 'api_unreachable' };
+      return { ok: true, error: 'api_unreachable_local_skip' };
     }
 
     return fetchCommit(normalizedRepo, ref);

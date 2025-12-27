@@ -1,0 +1,56 @@
+# ==============================================================================
+# Political Sphere — Composite Action: Typecheck (ps-task adapter)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run strict TypeScript typechecks via PS Task Runner with standardized output.
+#
+# Notes:
+#   - Intentionally thin: delegates execution/logging/reporting to ps-run.
+#   - Exposes only the minimal knobs required to keep workflows flexible.
+# ==============================================================================
+
+name: "Typecheck"
+description: "Run strict TypeScript typechecks with standardized PS reporting"
+
+inputs:
+  script:
+    description: "Typecheck script path (repo-relative)"
+    required: false
+    default: "tools/scripts/actions/ps-typecheck/typecheck.sh"
+
+  working_directory:
+    description: "Working directory to run from (repo-relative)"
+    required: false
+    default: "."
+
+  ps_full_scan:
+    description: "Enable strict/full scan behaviour (0|1)"
+    required: false
+    default: "1"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Run typecheck (PS)
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "typecheck"
+        title: "TypeScript typecheck"
+        description: "Strict TypeScript checks"
+        script: ${{ inputs.script }}
+        working_directory: ${{ inputs.working_directory }}
+
+        require_files: |
+          ${{ inputs.script }}
+          tsconfig.json
+
+        artifact_paths: |
+          reports/**
+          logs/**
+
+        env_kv: |
+          CI=1
+          PS_FULL_SCAN=${{ inputs.ps_full_scan }}
+
+        continue_on_error: "0"
+        allow_args: "0"

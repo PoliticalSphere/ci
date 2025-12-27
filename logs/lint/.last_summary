@@ -1,0 +1,12 @@
+[32m▶[0m [1m[36mLINT & TYPE CHECK[0m
+[90m────────────────────────────────────────[0m
+  BIOME                    [90mWaiting...[0m
+  ESLINT                   [90mWaiting...[0m
+  YAMLLINT                 [90mWaiting...[0m
+  ACTIONLINT               [90mWaiting...[0m
+  HADOLINT                 [90mWaiting...[0m
+  SHELLCHECK               [90mWaiting...[0m
+  MARKDOWN                 [90mWaiting...[0m
+  CSPELL                   [90mWaiting...[0m
+  KNIP                     [90mWaiting...[0m
+  TYPECHECK                [90mWaiting...[0m

@@ -1,0 +1,35 @@
+# ==============================================================================
+# Political Sphere — Composite Action: CodeQL
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Run CodeQL init, autobuild, and analyze using pinned actions.
+# ==============================================================================
+
+name: "CodeQL Scan"
+description: "Run CodeQL analysis"
+
+inputs:
+  languages:
+    description: "CodeQL languages (comma-separated)"
+    required: true
+
+  output:
+    description: "Output directory for SARIF"
+    required: false
+    default: "codeql-results"
+
+runs:
+  using: "composite"
+  steps:
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+      with:
+        languages: ${{ inputs.languages }}
+
+    - name: Autobuild
+      uses: github/codeql-action/autobuild@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+
+    - name: Analyze
+      uses: github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
+      with:
+        output: ${{ inputs.output }}

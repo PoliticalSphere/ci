@@ -1,0 +1,152 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Harden Runner
+# ==============================================================================
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: ps-harden-runner
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-26
+# last_updated: 2025-12-26
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+#
+# DEPENDENTS
+# ------------------------------------------------------------------------------
+# - ./.github/actions/ps-bootstrap/ps-init
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Standardize runner hardening with validated inputs and consistent logging.
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Validate hardening inputs (fail-fast)
+#   - Set a safe HOME for runner tools (optional but recommended)
+#   - Harden the runner using a SHA-pinned dependency
+#
+# DOES NOT:
+#   - Checkout repositories
+#   - Install dependencies or tools
+#   - Modify job permissions
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Secure-by-default
+# - Minimal input surface, explicit opt-outs only
+# - SHA-pinned external dependencies
+#
+# SECURITY TIERING
+# ------------------------------------------------------------------------------
+# Level 0 — Critical (this action defines the hardened runner baseline for
+#                    all subsequent steps)
+#
+# THREAT MODEL
+# ------------------------------------------------------------------------------
+# Purpose: Prevents network egress bypass, reduces exposure to supply-chain
+#          attacks, and enforces a hardened runner boundary before any code runs.
+#
+# AUDIT LOG
+# ------------------------------------------------------------------------------
+# Records hardening policy (egress policy) via outputs and console logs to
+# support traceability in CI audits.
+#
+# ==============================================================================
+name: "PS Harden Runner"
+description: "Harden the runner using a pinned action with validated inputs"
+
+inputs:
+  egress_policy:
+    description: "Egress policy for step-security/harden-runner (audit|block)"
+    required: false
+    default: "audit"
+
+  home_dir:
+    description: "HOME directory to use for the harden step (recommended: runner.temp)"
+    required: false
+    default: "${{ runner.temp }}"
+
+outputs:
+  hardened:
+    description: "Whether runner hardening completed successfully (true|false)"
+    value: ${{ steps.ps_harden_outputs.outputs.hardened }}
+
+  egress_policy:
+    description: "Validated egress policy applied (audit|block)"
+    value: ${{ steps.ps_harden_outputs.outputs.egress_policy }}
+
+runs:
+  using: "composite"
+  steps:
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_EGRESS_POLICY_INPUT: ${{ inputs.egress_policy }}
+      run: |
+        set -euo pipefail
+
+        emit_env() {
+          local key="$1"
+          local val="$2"
+          local sanitized delimiter attempts
+          sanitized="${val//$'\r'/}"
+          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          attempts=0
+          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
+            attempts=$((attempts + 1))
+            if [[ "${attempts}" -gt 6 ]]; then
+              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
+              exit 1
+            fi
+            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
+          done
+          printf '%s<<%s\n%s\n%s\n' \
+            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
+            >> "${GITHUB_ENV}"
+        }
+
+        policy="${PS_EGRESS_POLICY_INPUT:-audit}"
+        case "${policy}" in
+          audit|block) ;;
+          *)
+            printf 'ERROR: inputs.egress_policy must be "audit" or "block" (got %q)\n' \
+              "${policy}" >&2
+            exit 1
+            ;;
+        esac
+
+        if type -t ps_detail >/dev/null 2>&1; then
+          ps_detail "PS.HARDEN: egress_policy=${policy}"
+        else
+          printf 'PS.HARDEN: egress_policy=%s\n' "${policy}"
+        fi
+        emit_env "PS_EGRESS_POLICY_VALIDATED" "${policy}"
+
+    - name: Harden runner (PS)
+      uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+      env:
+        HOME: ${{ inputs.home_dir }}
+      with:
+        egress-policy: ${{ env.PS_EGRESS_POLICY_VALIDATED }}
+
+    - name: Emit outputs (PS)
+      id: ps_harden_outputs
+      shell: bash
+      run: |
+        set -euo pipefail
+        {
+          echo "hardened=true"
+          echo "egress_policy=${PS_EGRESS_POLICY_VALIDATED}"
+        } >> "${GITHUB_OUTPUT}"
+
+    - name: Harden runner complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.HARDEN: OK\n'

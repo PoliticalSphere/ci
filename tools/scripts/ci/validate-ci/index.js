@@ -13,7 +13,6 @@
 //   - Exit codes are meaningful (0 pass, 1 fail)
 // ======================================================================
 
-import { execSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -34,6 +33,7 @@ import {
   loadUnsafePatterns,
 } from './policies.js';
 import { createRemoteVerifier } from './remote-verify.js';
+import { getSafePathEnv } from './safe-path.js';
 
 const workspaceRoot = getRepoRoot();
 const platformRoot = process.env.PS_PLATFORM_ROOT || workspaceRoot;
@@ -113,6 +113,8 @@ const requireSectionHeaders =
   config.rules?.outputs_and_artifacts?.require_section_headers === true;
 const allowedFirstSteps =
   config.rules?.runner_hardening?.allowed_first_steps || [];
+const hardenRunnerActionAllowlist =
+  config.rules?.runner_hardening?.harden_runner_action_allowlist || [];
 const localActions = config.rules?.local_actions || {};
 const scoreFailThreshold =
   typeof config.enforcement?.score_fail_threshold === 'number'
@@ -137,7 +139,15 @@ const quiet =
   String(process.env.PS_VALIDATE_CI_QUIET || '0') === '1' ||
   String(process.env.PS_VALIDATE_CI_QUIET || '0') === 'true';
 
-const validateRemoteAction = createRemoteVerifier({ verifyRemoteShas });
+const baseValidateRemoteAction = createRemoteVerifier({ verifyRemoteShas });
+const remoteVerifyStats = { rateLimitedSoft: 0 };
+const validateRemoteAction = async (...args) => {
+  const result = await baseValidateRemoteAction(...args);
+  if (result?.error === 'rate_limited_soft') {
+    remoteVerifyStats.rateLimitedSoft += 1;
+  }
+  return result;
+};
 
 function assertConfigFile(filePath, label, checks) {
   const text = loadText(filePath);
@@ -283,16 +293,28 @@ const highRisk = loadHighRiskTriggers(highRiskAllowlistPath);
 const permissionsBaseline = loadPermissionsBaseline(permissionsBaselinePath);
 const artifactPolicy = loadArtifactPolicy(artifactPolicyPath);
 
+import { spawnSync } from 'node:child_process';
+
+let SAFE_PATH = '';
+try {
+  SAFE_PATH = getSafePathEnv();
+} catch (err) {
+  fatal(`Safe PATH validation failed: ${err?.message || err}`);
+}
+
 function tryGit(args) {
-  try {
-    return execSync(`git ${args}`, {
-      cwd: workspaceRoot,
-      stdio: ['ignore', 'pipe', 'ignore'],
-      encoding: 'utf8',
-    }).trim();
-  } catch {
-    return '';
+  const parts = String(args).split(/\s+/).filter(Boolean);
+  if (!SAFE_PATH) {
+    fatal('Safe PATH not initialized; refusing to spawn git');
   }
+  const r = spawnSync('git', parts, {
+    cwd: workspaceRoot,
+    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: 'utf8',
+    env: { PATH: SAFE_PATH },
+  });
+  if (r && r.status === 0) return String(r.stdout || '').trim();
+  return '';
 }
 
 function ensureCommit(sha) {
@@ -360,36 +382,34 @@ if (prOnly) {
 
 const violations = [];
 
-violations.push(
-  ...(await scanWorkflows({
-    workflows,
-    workspaceRoot,
-    allowedActions,
-    unsafePatterns,
-    unsafeAllowlist,
-    inlineAllowlist,
-    inlineConstraints,
-    inlineMaxLines,
-    highRisk,
-    permissionsBaseline,
-    artifactPolicy,
-    validateRemoteAction,
-    requireSectionHeaders,
-    allowedFirstSteps,
-    localActions,
-    quiet,
-  })),
-);
-
-violations.push(
-  ...(await scanActions({
-    actions,
-    platformRoot,
-    allowedActions,
-    validateRemoteAction,
-    quiet,
-  })),
-);
+const workflowResult = await scanWorkflows({
+  workflows,
+  workspaceRoot,
+  allowedActions,
+  unsafePatterns,
+  unsafeAllowlist,
+  inlineAllowlist,
+  inlineConstraints,
+  inlineMaxLines,
+  highRisk,
+  permissionsBaseline,
+  artifactPolicy,
+  validateRemoteAction,
+  requireSectionHeaders,
+  allowedFirstSteps,
+  hardenRunnerActionAllowlist,
+  localActions,
+  quiet,
+});
+const workflowViolations = workflowResult.violations;
+const actionViolations = await scanActions({
+  actions,
+  platformRoot,
+  allowedActions,
+  validateRemoteAction,
+  quiet,
+});
+violations.push(...workflowViolations, ...actionViolations);
 
 {
   const totalWeight = violations.reduce((s, v) => s + (v.weight || 1), 0);
@@ -398,6 +418,26 @@ violations.push(
 
   const failedByScore =
     scoreFailThreshold !== null && score < scoreFailThreshold;
+
+  const warnings = [];
+  if (workflowResult.warnings?.length) {
+    warnings.push(
+      ...workflowResult.warnings.map((w) => ({
+        code: w.code || 'PARSE_WARNING',
+        message: w.message,
+        workflow: w.workflow,
+      })),
+    );
+  }
+  if (remoteVerifyStats.rateLimitedSoft > 0) {
+    const message = `Remote SHA verification skipped for ${remoteVerifyStats.rateLimitedSoft} action(s) due to GitHub API rate limits.`;
+    warnings.push({
+      code: 'RATE_LIMIT_SOFT',
+      message,
+      count: remoteVerifyStats.rateLimitedSoft,
+    });
+    detail(`WARN: ${message}`);
+  }
 
   const reportPath =
     process.env.PS_VALIDATE_CI_REPORT ||
@@ -413,6 +453,7 @@ violations.push(
           deductionPercent,
           totalWeight,
           threshold: scoreFailThreshold,
+          warnings,
           violations,
         },
         null,
@@ -448,9 +489,14 @@ violations.push(
       { stream: 'stderr' },
     );
     if (scoreFailThreshold !== null) {
+      const thresholdMessage = failedByScore
+        ? 'Below threshold -> failing.'
+        : 'Above threshold -> OK by score.';
       bullet(
-        `Configured failure threshold: ${scoreFailThreshold}%. ${failedByScore ? 'Below threshold -> failing.' : 'Above threshold -> OK by score.'}`,
-        { stream: 'stderr' },
+        `Configured failure threshold: ${scoreFailThreshold}%. ${thresholdMessage}`,
+        {
+          stream: 'stderr',
+        },
       );
     }
 

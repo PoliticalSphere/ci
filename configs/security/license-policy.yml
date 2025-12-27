@@ -23,7 +23,7 @@ policy:
   enforcement:
     fail_on_unknown: true
     fail_on_unlicensed: true
-    allow_file_reference: false # Disallow "SEE LICENSE IN ..." by default
+    allow_file_reference: false  # Disallow "SEE LICENSE IN ..." by default
 
   # SPDX identifiers we accept (policy decision).
   allowlist:
@@ -65,7 +65,7 @@ policy:
   normalisation:
     trim: true
     collapse_whitespace: true
-    uppercase_operators: true # normalise "or"/"and" to "OR"/"AND"
+    uppercase_operators: true  # normalise "or"/"and" to "OR"/"AND"
 
   # Ignore list should be rare and justified (prefer explicit exceptions).
   ignore_packages: []

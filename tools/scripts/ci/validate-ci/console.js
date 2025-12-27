@@ -5,10 +5,11 @@
 //   Provide structured, consistent output for Validate-CI.
 // ==============================================================================
 
-import { execSync } from 'node:child_process';
+import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { getSafePathEnv } from './safe-path.js';
 
 const DEFAULT_FORMAT = {
   icon: '▶',
@@ -156,10 +157,19 @@ export function fatal(message) {
 
 export function getRepoRoot() {
   try {
-    return execSync('git rev-parse --show-toplevel', {
+    let safePath = '';
+    try {
+      safePath = getSafePathEnv();
+    } catch (err) {
+      fatal(`Safe PATH validation failed: ${err?.message || err}`);
+    }
+    const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
       stdio: ['ignore', 'pipe', 'ignore'],
       encoding: 'utf8',
-    }).trim();
+      env: { PATH: safePath },
+    });
+    if (r && r.status === 0) return String(r.stdout || '').trim();
+    return process.cwd();
   } catch {
     return process.cwd();
   }

@@ -5,6 +5,7 @@ Scripts that enforce CI policy and validation.
 ## Scripts
 
 - `validate-ci/index.js`: CI workflow validation gate (entrypoint).
+- `validate-ci-action.sh`: composite action wrapper for running the validate-ci gate.
 - `validate-pr-refs.sh`: Validate PR base/head SHAs for dependency review.
 
 ## Usage
