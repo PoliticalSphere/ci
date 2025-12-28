@@ -42,10 +42,10 @@ function logTimestamp() {
 }
 
 function escapeLogValue(value) {
-  const raw = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trimEnd();
+  const raw = String(value ?? '').replaceAll(/[\r\n\t]+/g, ' ').trimEnd();
   if (raw === '') return '""';
   if (/[=\s"\\]/.test(raw)) {
-    return `"${raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+    return `"${raw.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
   }
   return raw;
 }
