@@ -30,7 +30,9 @@ print_lint_intro() {
   if [[ -n "${note}" ]]; then
     printf '%s\n' "${note}"
   fi
-}
+
+  return 0
+} 
 
 lint_pool_wait_for_slot() {
   local max_workers="${1:?max workers required}"
@@ -42,9 +44,13 @@ lint_pool_wait_for_slot() {
     fi
     lint_wait_one || return 0
   done
-}
+
+  return 0
+} 
 
 print_lint_banner() {
   bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
   print_lint_intro "Note: To debug specific issues locally, you can run linters individually using commands like npm run lint:biome."
-}
+
+  return 0
+} 
