@@ -82,6 +82,9 @@ export CI="${CI:-0}"
 export FORCE_COLOR="${FORCE_COLOR:-0}"
 export NO_COLOR="${NO_COLOR:-0}"
 
+# Timestamp format for logs and messages (RFC-like, UTC)
+PS_TIMESTAMP_FMT="${PS_TIMESTAMP_FMT:-%Y-%m-%dT%H:%M:%SZ}"
+
 PS_LINT_INLINE="${PS_LINT_INLINE:-1}"
 PS_LINT_PRINT_MODE="${PS_LINT_PRINT_MODE:-auto}"
 PS_LINT_SECTION_HEADERS="${PS_LINT_SECTION_HEADERS:-1}"
@@ -407,12 +410,11 @@ print_lint_summary() {
   local buf=""
   _append() { local line="$1"; buf+="${line}"$'\n'; return 0; }
 
-  local rule_len="${PS_LINT_SUMMARY_RULE_LEN:-78}"
   local rule_char="${PS_FMT_RULE_CHAR:-─}"
   local rule=""
-  for ((i = 0; i < rule_len; i++)); do
-    rule+="${rule_char}"
-  done
+  # Build the rule line by repeating the rule_char PS_LINT_SUMMARY_RULE_LEN times
+  printf -v rule '%*s' "${PS_LINT_SUMMARY_RULE_LEN:-78}" ''
+  rule="${rule// /${rule_char}}"
 
   _append "${rule}"
   _append " Linter Results"
@@ -652,13 +654,13 @@ lint_handle_log_fallback() {
     {
       printf "No output captured from %s (exit %d)\n" "${id}" "${rc}"
       if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
-        if date -u -r "${SOURCE_DATE_EPOCH}" +'%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
-          printf "Timestamp: %s\n" "$(date -u -r "${SOURCE_DATE_EPOCH}" +'%Y-%m-%dT%H:%M:%SZ')"
+        if date -u -r "${SOURCE_DATE_EPOCH}" +"${PS_TIMESTAMP_FMT}" >/dev/null 2>&1; then
+          printf "Timestamp: %s\n" "$(date -u -r "${SOURCE_DATE_EPOCH}" +"${PS_TIMESTAMP_FMT}")"
         else
-          printf "Timestamp: %s\n" "$(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%dT%H:%M:%SZ')"
+          printf "Timestamp: %s\n" "$(date -u -d "@${SOURCE_DATE_EPOCH}" +"${PS_TIMESTAMP_FMT}")"
         fi
       else
-        printf "Timestamp: %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+        printf "Timestamp: %s\n" "$(date -u +"${PS_TIMESTAMP_FMT}")"
       fi
       if [[ $# -gt 0 ]]; then
         printf "Command: "
