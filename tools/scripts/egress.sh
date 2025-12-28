@@ -15,6 +15,7 @@ _egress_trim() {
   value="${value#"${value%%[![:space:]]*}"}"
   value="${value%"${value##*[![:space:]]}"}"
   printf '%s' "${value}"
+  return 0
 }
 
 load_egress_allowlist() {
