@@ -197,3 +197,9 @@ runs:
 
         continue_on_error: "0"
         allow_args: "0"
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.TEST: OK\n'

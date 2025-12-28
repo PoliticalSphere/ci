@@ -8,10 +8,11 @@ set -euo pipefail
 #   Shared input validation helpers for composite actions.
 # ==============================================================================
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/actions/cross-cutting/normalize.sh
-. "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/normalize.sh"
+. "${script_dir}/normalize.sh"
 
-format_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh"
+format_sh="${script_dir}/../../branding/format.sh"
 if [[ -f "${format_sh}" ]]; then
   # shellcheck source=/dev/null
   . "${format_sh}"

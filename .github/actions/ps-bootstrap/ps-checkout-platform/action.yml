@@ -77,7 +77,7 @@
 #     tools/scripts/actions/cross-cutting/validate.sh,
 #     tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh,
 #     tools/scripts/branding/print-section.sh,
-#     tools/scripts/branding/validate-inputs.sh,
+#     tools/scripts/actions/cross-cutting/validate.sh,
 #     tools/scripts/ci/validate-ci/index.js, configs/ci/policies/validate-ci.yml]
 #   external: [bash, actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8]
 #
@@ -124,7 +124,7 @@
 #     - tools/scripts/actions/cross-cutting/env.sh
 #     - tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh
 #     - tools/scripts/branding/print-section.sh
-#     - tools/scripts/branding/validate-inputs.sh
+#     - tools/scripts/actions/cross-cutting/validate.sh
 #
 # ==============================================================================
 
@@ -384,7 +384,7 @@ runs:
         for rel in \
           "tools/scripts/branding/format.sh" \
           "tools/scripts/branding/print-section.sh" \
-          "tools/scripts/branding/validate-inputs.sh" \
+          "tools/scripts/actions/cross-cutting/validate.sh" \
           "tools/scripts/ci/validate-ci/index.js" \
           "configs/ci/policies/validate-ci.yml"; do
           if [[ ! -f "${platform_dir}/${rel}" ]]; then

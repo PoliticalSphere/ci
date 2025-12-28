@@ -140,3 +140,9 @@ runs:
         summary_root="${summary_root}/ps-write-summary"
         summary_script="${summary_root}/ps-write-summary.sh"
         bash "${summary_script}"
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TEARDOWN.SUMMARY: OK\n'

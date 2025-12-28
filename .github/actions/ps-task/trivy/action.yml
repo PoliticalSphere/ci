@@ -125,3 +125,9 @@ runs:
         title: "Trivy filesystem (PR)"
         script: "tools/scripts/security/trivy-fs.sh"
         artifact_paths: "reports/security/trivy.sarif"
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.TRIVY: OK\n'

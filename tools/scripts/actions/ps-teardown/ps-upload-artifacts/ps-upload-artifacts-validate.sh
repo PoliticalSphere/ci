@@ -9,22 +9,14 @@ set -euo pipefail
 # ==============================================================================
 
 
-: "${PS_PLATFORM_ROOT:?PS_PLATFORM_ROOT must be set by the workflow (path to checked-out platform repo)}"
-platform_root="${PS_PLATFORM_ROOT}"
-
-if [[ ! -d "${platform_root}" ]]; then
-  printf 'ERROR: PS_PLATFORM_ROOT directory not found: %s\n' "${platform_root}" >&2
+scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+if [[ ! -d "${scripts_root}" ]]; then
+  printf 'ERROR: PS_PLATFORM_ROOT directory not found: %s\n' "${scripts_root}" >&2
   exit 1
 fi
 
-validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
-if [[ ! -f "${validate_sh}" ]]; then
-  printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
-  exit 1
-fi
-
-# shellcheck source=/dev/null
-. "${validate_sh}"
+# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+. "${scripts_root}/tools/scripts/actions/cross-cutting/validate.sh"
 
 name="${PS_NAME:-}"
 retention="${PS_RETENTION:-}"

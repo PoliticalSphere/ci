@@ -301,7 +301,7 @@ jobs:
         id: build
         uses: ./.github/actions/ps-task/build
         with:
-          working-directory: ${{ inputs.working_directory }}
+          working_directory: ${{ inputs.working_directory }}
           script: ${{ inputs.build_script }}
 
       - name: Upload platform snapshot (PS)

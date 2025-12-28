@@ -189,3 +189,9 @@ runs:
       run: |
         set -euo pipefail
         bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-install-deps.sh"
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.NODE: OK\n'

@@ -64,11 +64,9 @@ set_repo_root() {
 load_format() {
   [[ "${format_loaded}" == "1" ]] && return 0
 
-  local format_sh="${REPO_ROOT}/tools/scripts/branding/format.sh"
-  if [[ -f "${format_sh}" ]]; then
-    # shellcheck source=tools/scripts/branding/format.sh
-    . "${format_sh}"
-  fi
+  # shellcheck source=tools/scripts/branding/safe-format.sh
+  . "${REPO_ROOT}/tools/scripts/branding/safe-format.sh"
+  ps_format_try_load "${REPO_ROOT}" "" "PS.COMMON" || true
 
   format_loaded=1
   return 0

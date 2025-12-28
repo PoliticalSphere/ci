@@ -24,6 +24,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/common.sh
 . "${script_dir}/../common.sh"
 init_repo_context
+# shellcheck source=tools/scripts/actions/cross-cutting/path.sh
+. "${repo_root}/tools/scripts/actions/cross-cutting/path.sh"
 
 # ------------------------------------------------------------------------------
 # Helpers
@@ -38,7 +40,7 @@ safe_relpath_or_die() {
     error "${label} must not be empty"
     exit 1
   fi
-  if [[ "${p}" == /* || "${p}" == *".."* ]]; then
+  if ! safe_relpath_no_dotdot "${p}"; then
     error "${label} must be repo-relative and traversal-free (got: ${p})"
     exit 1
   fi

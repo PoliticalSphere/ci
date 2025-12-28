@@ -73,7 +73,6 @@ and telemetry-rich JSON reporting.
 - `description`: Optional description. Default: empty.
 - `script` (required): Repo-relative script path.
 - `working_directory`: Repo-relative working directory. Default: `.`.
-- `working-directory`: Deprecated alias for `working_directory`.
 - `require_files`: Newline-separated required files (repo-relative).
 - `artifact_paths`: Newline-separated expected output paths (repo-relative).
 - `strict_artifacts`: `0` or `1`. Require each artifact glob to match. Default: `0`.

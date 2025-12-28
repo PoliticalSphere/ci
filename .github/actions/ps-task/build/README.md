@@ -17,7 +17,6 @@ Run deterministic build steps via the canonical task runner.
 - `title`: Human-readable title. Default: `Build`.
 - `description`: Short description. Default: `Deterministic build`.
 - `working_directory`: Repo-relative working directory. Default: `.`.
-- `working-directory`: Deprecated alias for `working_directory`.
 - `script`: Repo-relative build script. Default: `tools/scripts/actions/ps-build/build.sh`.
 - `args`: Optional space-separated args passed to the script.
 - `allow_args`: `0` or `1` to allow args. Default: `1`.

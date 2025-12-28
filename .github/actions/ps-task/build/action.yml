@@ -52,8 +52,8 @@
 # INTERFACES
 # ─────────────────────────────────────────────────────────────────────────────
 # interfaces:
-#   inputs: [id, title, description, working_directory, working-directory, script, args,
-#     allow_args, artifact_paths, env_kv]
+#   inputs: [id, title, description, working_directory, script, args, allow_args,
+#     artifact_paths, env_kv]
 #   outputs: [none]
 #   exit_codes: [0=success, 1=failure]
 #
@@ -138,10 +138,6 @@ inputs:
     required: false
     default: "."
 
-  working-directory:
-    description: "Deprecated: use working_directory"
-    required: false
-    default: ""
 
   script:
     description: "Build script path (repo-relative)"
@@ -179,10 +175,16 @@ runs:
         id: ${{ inputs.id }}
         title: ${{ inputs.title }}
         description: ${{ inputs.description }}
-        working_directory: ${{ inputs.working_directory != '' && inputs.working_directory || inputs['working-directory'] }}
+        working_directory: ${{ inputs.working_directory }}
         script: ${{ inputs.script }}
         require_files: ${{ inputs.script }}
         args: ${{ inputs.args }}
         allow_args: ${{ inputs.allow_args }}
         artifact_paths: ${{ inputs.artifact_paths }}
         env_kv: ${{ inputs.env_kv }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.BUILD: OK\n'

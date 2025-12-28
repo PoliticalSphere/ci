@@ -137,3 +137,9 @@ runs:
           tools/scripts/actions/ps-jscpd/jscpd.sh
         env_kv: |
           JSCPD_THRESHOLD=${{ inputs.threshold }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.JSCPD: OK\n'

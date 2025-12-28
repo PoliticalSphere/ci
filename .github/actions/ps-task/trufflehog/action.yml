@@ -129,3 +129,9 @@ runs:
       run: |
         mkdir -p reports/security
         if [[ -f trufflehog.sarif ]]; then mv trufflehog.sarif reports/security/trufflehog.sarif; fi
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.TRUFFLEHOG: OK\n'

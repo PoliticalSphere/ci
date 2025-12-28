@@ -8,21 +8,26 @@ set -euo pipefail
 #   Validate ps-tools inputs.
 # ------------------------------------------------------------------------------
 # Dependencies:
-#   - tools/scripts/branding/validate-inputs.sh
+#   - tools/scripts/actions/cross-cutting/validate.sh
+#   - tools/scripts/actions/cross-cutting/string.sh
+#   - tools/scripts/actions/cross-cutting/path.sh
 #   - PS_SCRIPTS_ROOT, PS_INSTALL_DIR_INPUT, PS_BUNDLE_INPUT, PS_EXTRA_INPUT, PS_TOOLS_INPUT
 # Dependents:
 #   - ./.github/actions/ps-bootstrap/ps-tools/action.yml
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/actions/cross-cutting/resolve-validate-inputs.sh
-. "${script_dir}/../cross-cutting/resolve-validate-inputs.sh"
-resolve_validate_inputs || exit 1
+scripts_root="${PS_SCRIPTS_ROOT:-${GITHUB_WORKSPACE}}"
+# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+. "${scripts_root}/tools/scripts/actions/cross-cutting/validate.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/string.sh
+. "${scripts_root}/tools/scripts/actions/cross-cutting/string.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/path.sh
+. "${scripts_root}/tools/scripts/actions/cross-cutting/path.sh"
 
 # install_dir validation (source of truth)
 install_dir="${PS_INSTALL_DIR_INPUT:-.tooling/bin}"
 require_nonempty "inputs.install_dir" "${install_dir}" || exit 1
-if [[ "${install_dir}" == /* || "${install_dir}" == *".."* ]]; then
+if ! safe_relpath_no_dotdot "${install_dir}"; then
   v_error "inputs.install_dir must be repo-relative and must not contain '..' or be absolute"
   exit 1
 fi
@@ -32,11 +37,10 @@ tools_raw="${PS_TOOLS_INPUT:-}"
 if [[ -n "${tools_raw}" ]]; then
   require_nonempty "inputs.tools" "${tools_raw}" || exit 1
   # Validate explicit tools input: enforce same pattern as extra_tools
-  trim_expr='s/^[[:space:]]*//; s/[[:space:]]*$//'
-  tools_trimmed="$(printf '%s' "${tools_raw}" | sed "${trim_expr}")"
+  tools_trimmed="$(trim "${tools_raw}")"
   tools_count=0
   while IFS= read -r t; do
-    t_trim="$(printf '%s' "${t}" | sed "${trim_expr}")"
+    t_trim="$(trim "${t}")"
     if [[ -z "${t_trim}" ]]; then
       continue
     fi
@@ -56,7 +60,7 @@ fi
 require_enum "inputs.bundle" "${PS_BUNDLE_INPUT}" "lint" "security" "none" || exit 1
 
 # Extra tools can be empty; when provided ensure each id is lowercase letters, digits or hyphen
-extra_trimmed="$(printf '%s' "${PS_EXTRA_INPUT}" | sed "${trim_expr}")"
+extra_trimmed="$(trim "${PS_EXTRA_INPUT}")"
 extra_count=0
 
 # Early exit: if bundle=none and no extras provided, fail fast (saves runner time)
@@ -67,7 +71,7 @@ fi
 
 if [[ -n "${extra_trimmed}" ]]; then
   while IFS= read -r ex; do
-    ex_trim="$(printf '%s' "${ex}" | sed "${trim_expr}")"
+    ex_trim="$(trim "${ex}")"
     if [[ -z "${ex_trim}" ]]; then
       continue
     fi

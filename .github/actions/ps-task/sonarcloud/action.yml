@@ -150,3 +150,9 @@ runs:
           -Dsonar.projectKey=${{ inputs.project_key }}
       env:
         SONAR_TOKEN: ${{ inputs.token }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.SONARCLOUD: OK\n'

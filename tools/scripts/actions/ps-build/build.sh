@@ -57,10 +57,9 @@ if [[ -z "${repo_root}" ]]; then
   warn "git repo root not detected; using current directory: ${repo_root}"
 fi
 
-format_sh="${repo_root}/tools/scripts/branding/format.sh"
-if [[ -f "${format_sh}" ]]; then
-  # shellcheck source=tools/scripts/branding/format.sh
-  . "${format_sh}"
+# shellcheck source=tools/scripts/branding/safe-format.sh
+. "${repo_root}/tools/scripts/branding/safe-format.sh"
+if ps_format_try_load "${repo_root}" "" "PS.BUILD"; then
   die() {
     ps_error "$*"
     # When sourced, return so the caller can decide how to proceed; otherwise exit.

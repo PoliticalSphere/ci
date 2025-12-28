@@ -10,11 +10,11 @@ set -euo pipefail
 
 
 repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
-format_sh="${repo_root}/tools/scripts/branding/format.sh"
-if [[ -f "${format_sh}" ]]; then
-  # shellcheck source=tools/scripts/branding/format.sh
-  . "${format_sh}"
-fi
+# shellcheck source=tools/scripts/branding/safe-format.sh
+. "${repo_root}/tools/scripts/branding/safe-format.sh"
+ps_format_try_load "${repo_root}" "" "PS.PREFLIGHT" || true
+# shellcheck source=tools/scripts/actions/cross-cutting/string.sh
+. "${repo_root}/tools/scripts/actions/cross-cutting/string.sh"
 
 error() {
   if type -t ps_error >/dev/null 2>&1; then
@@ -41,7 +41,7 @@ check_lines() {
 
   while IFS= read -r line; do
     local item
-    item="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')"
+    item="$(trim "${line}")"
     if [[ -z "${item}" ]]; then
       continue
     fi

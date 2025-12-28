@@ -185,3 +185,9 @@ runs:
           # Use explicit -- to avoid filename starting with '-'
           cat -- "${summary_path}" >> "${GITHUB_STEP_SUMMARY}"
         fi
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.CONSUMER_CONTRACT: OK\n'

@@ -52,9 +52,8 @@
 # INTERFACES
 # ─────────────────────────────────────────────────────────────────────────────
 # interfaces:
-#   inputs: [id, title, description, script, working_directory, working-directory,
-#     require_files, artifact_paths, continue_on_error, env_kv, args, allow_args,
-#     strict_artifacts]
+#   inputs: [id, title, description, script, working_directory, require_files,
+#     artifact_paths, continue_on_error, env_kv, args, allow_args, strict_artifacts]
 #   outputs: [status, log_path, report_path, duration_ms, exit_code, enabled]
 #   exit_codes: [0=success, 1=failure]
 #
@@ -74,7 +73,8 @@
 # dependencies:
 #   internal: [tools/scripts/ci/emit-report.py,
 #     tools/scripts/actions/cross-cutting/string.sh,
-#     tools/scripts/actions/cross-cutting/path.sh]
+#     tools/scripts/actions/cross-cutting/path.sh,
+#     tools/scripts/actions/cross-cutting/validate.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -116,6 +116,7 @@
 #     - tools/scripts/ci/emit-report.py
 #     - tools/scripts/actions/cross-cutting/string.sh
 #     - tools/scripts/actions/cross-cutting/path.sh
+#     - tools/scripts/actions/cross-cutting/validate.sh
 #
 # ==============================================================================
 
@@ -145,10 +146,6 @@ inputs:
     required: false
     default: "."
 
-  working-directory:
-    description: "Deprecated: use working_directory"
-    required: false
-    default: ""
 
   require_files:
     description: "Newline-separated list of required files (repo-relative)"
@@ -222,7 +219,6 @@ runs:
         PS_TASK_DESC: ${{ inputs.description }}
         PS_TASK_SCRIPT: ${{ inputs.script }}
         PS_TASK_WORKDIR: ${{ inputs.working_directory }}
-        PS_TASK_WORKDIR_DASH: ${{ inputs['working-directory'] }}
         PS_TASK_REQUIRE_FILES: ${{ inputs.require_files }}
         PS_TASK_ARTIFACT_PATHS: ${{ inputs.artifact_paths }}
         PS_TASK_CONTINUE_ON_ERROR: ${{ inputs.continue_on_error }}
@@ -253,39 +249,24 @@ runs:
         . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/string.sh"
         # shellcheck source=tools/scripts/actions/cross-cutting/path.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/path.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
 
         fail() {
-          printf 'ERROR: %s\n' "$*" >&2
+          if type -t v_error >/dev/null 2>&1; then
+            v_error "$*"
+          else
+            printf 'ERROR: %s\n' "$*" >&2
+          fi
           exit 1
-        }
-
-        resolve_abs_path() {
-          local target="$1"
-          if command -v python3 >/dev/null 2>&1; then
-            python3 - <<'PY' "${target}"
-        import os, sys
-        target = sys.argv[1]
-        print(os.path.realpath(target))
-        PY
-            return 0
-          fi
-          if command -v realpath >/dev/null 2>&1; then
-            realpath -m -- "${target}"
-            return 0
-          fi
-          if command -v readlink >/dev/null 2>&1; then
-            readlink -f -- "${target}" 2>/dev/null || readlink -- "${target}"
-            return 0
-          fi
-          return 1
         }
 
         check_under_root() {
           local target="$1"
           local resolved
-        resolved="$(resolve_abs_path "${target}")" || {
-          fail "path resolver missing for security check: ${target}"
-        }
+          resolved="$(resolve_abs_path "${target}")" || {
+            fail "path resolver missing for security check: ${target}"
+          }
           case "${resolved}" in
             "${repo_root}"|${repo_root}/*) return 0 ;;
             *) fail "path escape detected: ${target} resolves outside workspace" ;;
@@ -323,8 +304,7 @@ runs:
         script_rel="${PS_TASK_SCRIPT:-}"
 
         workdir_input="${PS_TASK_WORKDIR:-}"
-        workdir_dash="${PS_TASK_WORKDIR_DASH:-}"
-        working_directory="${workdir_input:-${workdir_dash:-.}}"
+        working_directory="${workdir_input:-.}"
 
         continue_on_error="${PS_TASK_CONTINUE_ON_ERROR:-0}"
         env_kv="${PS_TASK_ENV_KV:-}"
@@ -334,35 +314,22 @@ runs:
         artifact_paths="${PS_TASK_ARTIFACT_PATHS:-}"
         strict_artifacts="${PS_TASK_STRICT_ARTIFACTS:-0}"
 
-        [[ -n "${id}" ]] || fail "inputs.id must not be empty"
-        [[ -n "${title}" ]] || fail "inputs.title must not be empty"
-        [[ -n "${script_rel}" ]] || fail "inputs.script must not be empty"
+        require_nonempty "inputs.id" "${id}" || fail "inputs.id must not be empty"
+        require_nonempty "inputs.title" "${title}" || fail "inputs.title must not be empty"
+        require_nonempty "inputs.script" "${script_rel}" || fail "inputs.script must not be empty"
 
-        if [[ -n "${workdir_dash}" && -z "${workdir_input}" ]]; then
-          printf 'WARN: inputs.working-directory is deprecated; use inputs.working_directory\n'
-        fi
-
-        if ! [[ "${id}" =~ ^[A-Za-z0-9._-]+$ ]]; then
-          fail "inputs.id must match [A-Za-z0-9._-]+ (got: ${id})"
-        fi
+        require_regex \
+          "inputs.id" \
+          "${id}" \
+          '^[A-Za-z0-9._-]+$' \
+          "Expected A-Z a-z 0-9 . _ -" || fail "inputs.id has invalid format"
         if [[ "${id}" == *"/"* || "${id}" == *"\\"* ]]; then
           fail "inputs.id must not contain path separators"
         fi
 
-        case "${continue_on_error}" in
-          0|1) ;;
-          *) fail "inputs.continue_on_error must be 0 or 1 (got: ${continue_on_error})" ;;
-        esac
-
-        case "${allow_args}" in
-          0|1) ;;
-          *) fail "inputs.allow_args must be 0 or 1 (got: ${allow_args})" ;;
-        esac
-
-        case "${strict_artifacts}" in
-          0|1) ;;
-          *) fail "inputs.strict_artifacts must be 0 or 1 (got: ${strict_artifacts})" ;;
-        esac
+        continue_on_error="$(require_bool "inputs.continue_on_error" "${continue_on_error}")"
+        allow_args="$(require_bool "inputs.allow_args" "${allow_args}")"
+        strict_artifacts="$(require_bool "inputs.strict_artifacts" "${strict_artifacts}")"
 
         if [[ "${allow_args}" == "0" && -n "${args}" ]]; then
           fail "args provided but allow_args=0"
@@ -675,3 +642,9 @@ runs:
 
         # If continue_on_error=1 we still exit 0; trap will write report + outputs.
         exit 0
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.RUN: OK\n'

@@ -67,7 +67,7 @@ if [[ -z "${rel_wd}" ]]; then
 fi
 
 if [[ "${rel_wd}" = /* ]] || [[ "${rel_wd}" == *".."* ]]; then
-  printf 'ERROR: inputs.working-directory must be a relative path within the workspace (no traversal).\n' >&2
+  printf 'ERROR: inputs.working_directory must be a relative path within the workspace (no traversal).\n' >&2
   printf 'Got: %s\n' "${rel_wd}" >&2
   exit 1
 fi

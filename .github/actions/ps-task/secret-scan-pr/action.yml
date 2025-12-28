@@ -145,3 +145,9 @@ runs:
         env_kv: |
           PS_REPORT_DIR=${{ inputs.report_dir }}
           PS_LOG_DIR=${{ inputs.log_dir }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.SECRET_SCAN_PR: OK\n'

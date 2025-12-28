@@ -9,7 +9,7 @@ minimal and deterministic.
 - `ps-tools-resolve-root.sh`: Resolve `PS_SCRIPTS_ROOT` from `PS_PLATFORM_ROOT`
   or `GITHUB_WORKSPACE` and validate the expected tools structure.
 - `ps-tools-validate-inputs.sh`: Validate `ps-tools` inputs using shared
-  branding validators and emit actionable errors.
+  cross-cutting validators and emit actionable errors.
 - `ps-tools-assemble.sh`: Assemble the final tool list from bundle/extra/explicit
   inputs and emit the list via `GITHUB_OUTPUT`.
 - `ps-tools-install.sh`: Thin wrapper that calls the installer in

@@ -186,3 +186,9 @@ runs:
           SEMGREP_SHA256=${{ inputs.semgrep_sha256 }}
           SEMGREP_ALLOW_UNVERIFIED=${{ inputs.semgrep_allow_unverified }}
           SEMGREP_FAIL_ON_FINDINGS=${{ inputs.fail_on_findings }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.SEMGREP_CLI: OK\n'

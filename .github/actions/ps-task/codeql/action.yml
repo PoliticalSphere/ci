@@ -141,3 +141,9 @@ runs:
       uses: github/codeql-action/analyze@5d4e8d1aca955e8d8589aabd499c5cae939e33c7
       with:
         output: ${{ inputs.output }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.CODEQL: OK\n'

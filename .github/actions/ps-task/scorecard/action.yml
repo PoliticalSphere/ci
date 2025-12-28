@@ -130,3 +130,9 @@ runs:
       run: |
         mkdir -p reports/security
         if [[ -f scorecard.json ]]; then mv scorecard.json reports/security/scorecard.json; fi
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.SCORECARD: OK\n'

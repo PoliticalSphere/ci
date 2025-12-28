@@ -6,7 +6,8 @@
 #   Validate Semgrep inputs (version, output, policy flags, checksum).
 #
 # Dependencies:
-#   - tools/scripts/branding/validate-inputs.sh
+#   - tools/scripts/actions/cross-cutting/validate.sh
+#   - tools/scripts/actions/cross-cutting/path.sh
 #
 # Dependents:
 #   - tools/scripts/security/semgrep-cli.sh
@@ -21,36 +22,12 @@ if [[ ! -d "${platform_root}" ]]; then
   exit 1
 fi
 
-validate_sh="${platform_root}/tools/scripts/branding/validate-inputs.sh"
-if [[ ! -f "${validate_sh}" ]]; then
-  printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
-  exit 1
-fi
-# shellcheck source=/dev/null
-. "${validate_sh}"
+# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+. "${platform_root}/tools/scripts/actions/cross-cutting/validate.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/path.sh
+. "${platform_root}/tools/scripts/actions/cross-cutting/path.sh"
 
 repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
-
-resolve_abs_path() {
-  local target="$1"
-  if command -v python3 >/dev/null 2>&1; then
-    python3 - <<'PY' "${target}"
-import os, sys
-target = sys.argv[1]
-print(os.path.realpath(target))
-PY
-    return 0
-  fi
-  if command -v realpath >/dev/null 2>&1; then
-    realpath -m -- "${target}"
-    return 0
-  fi
-  if command -v readlink >/dev/null 2>&1; then
-    readlink -f -- "${target}" 2>/dev/null || readlink -- "${target}"
-    return 0
-  fi
-  return 1
-}
 
 check_under_root() {
   local target="$1"

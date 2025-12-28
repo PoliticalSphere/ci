@@ -190,3 +190,9 @@ runs:
           PS_LICENSE_LOCK_PATH=${{ inputs.lock_path }}
           PS_REPORT_DIR=${{ inputs.report_dir }}
           PS_LOG_DIR=${{ inputs.log_dir }}
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TASK.LICENSE_CHECK: OK\n'
