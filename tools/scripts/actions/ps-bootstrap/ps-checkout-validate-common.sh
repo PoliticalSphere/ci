@@ -8,11 +8,10 @@ set -euo pipefail
 #   Shared validation for checkout inputs (fetch depth, submodules, credentials).
 # ==============================================================================
 
-format_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh"
-if [[ -f "${format_sh}" ]]; then
-  # shellcheck source=/dev/null
-  . "${format_sh}"
-fi
+format_root="${GITHUB_WORKSPACE}"
+# shellcheck source=tools/scripts/branding/safe-format.sh
+. "${format_root}/tools/scripts/branding/safe-format.sh"
+ps_format_try_load "${format_root}" "" "PS.CHECKOUT" || true
 
 # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
 . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
@@ -28,6 +27,7 @@ log_info() {
   else
     printf '%s: %s\n' "${log_prefix}" "$*"
   fi
+  return 0
 }
 
 depth="$(require_int_nonneg "inputs.fetch_depth" "${PS_FETCH_DEPTH_INPUT:-1}")"
