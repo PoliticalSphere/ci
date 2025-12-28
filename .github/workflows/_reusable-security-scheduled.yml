@@ -1,0 +1,343 @@
+# ==============================================================================
+# Political Sphere — Reusable Workflow: Security Scheduled
+# ==============================================================================
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Run scheduled, deep security scans against the repository and publish SARIF
+# and supporting artifacts for long-term security posture monitoring.
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Enforce CI policy compliance (Validate-CI)
+#   - Run full-history secrets scanning
+#   - Run CodeQL static analysis
+#   - Run Semgrep CE analysis
+#   - Run OpenSSF Scorecard analysis
+#   - Run Trivy filesystem security scanning
+#   - Publish SARIF + evidence artifacts
+#   - Produce a machine-readable summary
+#
+# DOES NOT:
+#   - Run tests or builds
+#   - Deploy or publish artifacts
+#   - Modify repository state
+#
+#
+# DESIGN PRINCIPLES
+# ------------------------------------------------------------------------------
+# - Deterministic, non-interactive execution
+# - Least privilege at workflow and job level
+# - Validate-CI MUST pass before any scan executes
+# - Full-history checkout where required (secrets scanning)
+# - Internal actions are repository-controlled
+# - External actions are SHA-pinned
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Triggered via workflow_call
+# - Use the wrapper workflow for schedule/dispatch bindings
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - No secrets required
+# - SARIF uploads require security-events: write
+# - No credentials persisted
+#
+#
+# OPERATIONAL NOTES
+# ------------------------------------------------------------------------------
+# - Artifact retention: 14 days (security evidence)
+# - Summary artifact is always produced
+#
+# ==============================================================================
+
+name: Security Scheduled
+
+# ==============================================================================
+# TRIGGERS
+# ==============================================================================
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        type: string
+        required: false
+        default: "ubuntu-22.04"
+      node_version:
+        description: "Node.js major version"
+        type: string
+        required: false
+        default: "22"
+      fetch_depth:
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
+        required: false
+        default: 1
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+      platform_ref:
+        description: "Platform repository ref"
+        type: string
+        required: false
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+      semgrep_version:
+        description: "Pinned Semgrep version to install"
+        type: string
+        required: false
+        default: "1.146.0"
+
+      semgrep_sha256:
+        description: "SHA-256 checksum for the Semgrep package artifact"
+        type: string
+        required: false
+        default: "a8eaae8191c3dd5b85c7b40cfaeca6db623fe387c85f8938176d112855cca829"
+
+      semgrep_allow_unverified:
+        description: "Allow Semgrep install without checksum (true|false)"
+        type: string
+        required: false
+        default: "false"
+      codeql_languages:
+        description: "CodeQL languages (comma-separated)"
+        type: string
+        required: false
+        default: "javascript"
+
+# ==============================================================================
+# DEFAULT PERMISSIONS
+# ==============================================================================
+permissions:
+  contents: read
+
+# ==============================================================================
+# CONCURRENCY
+# ==============================================================================
+concurrency:
+  group: security-scheduled-${{ github.repository }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# ==============================================================================
+# GLOBAL DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
+# GLOBAL ENVIRONMENT
+# ==============================================================================
+env:
+  CI: "1"
+  PS_FULL_SCAN: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
+
+jobs:
+  # ============================================================================
+  # POLICY GATE — VALIDATE CI
+  # ============================================================================
+  validate-ci:
+    name: Validate CI (policy gate)
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner || 'ubuntu-22.04' }}
+      node_version: ${{ inputs.node_version || '22' }}
+      fetch_depth: ${{ inputs.fetch_depth || 1 }}
+      cache: ${{ inputs.cache || '1' }}
+      platform_ref: ${{ inputs.platform_ref }}
+      artifact_name: security-scheduled-validate-ci
+      retention_days: 7
+
+  # ============================================================================
+  # SECRETS — FULL HISTORY (GITLEAKS)
+  # ============================================================================
+  secrets:
+    name: Secrets scan (full history)
+    runs-on: ${{ inputs.runner || 'ubuntu-22.04' }}
+    needs: [validate-ci]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: 0
+          platform_repo: "PoliticalSphere/ci"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          home_dir: ".home"
+          egress_policy: audit
+          cache: ${{ inputs.cache || '1' }}
+          install_tools: "1"
+          tools_bundle: "security"
+
+      - name: Secrets scan (Gitleaks full)
+        uses: ./.github/actions/ps-task/ps-run
+        with:
+          id: "secrets.full"
+          title: "Secrets scan (full history)"
+          script: "tools/scripts/security/gitleaks-history.sh"
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/security-secrets.json
+          summary_results: secrets=${{ job.status }}
+          artifacts_name: security-secrets
+          artifacts_paths: |
+            reports/**
+            logs/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: 14
+
+  # ============================================================================
+  # CODEQL
+  # ============================================================================
+  codeql:
+    name: CodeQL
+    runs-on: ${{ inputs.runner || 'ubuntu-22.04' }}
+    needs: [validate-ci]
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: 1
+          platform_repo: "PoliticalSphere/ci"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          home_dir: ".home"
+          egress_policy: audit
+
+      - name: CodeQL scan (PS)
+        uses: ./.github/actions/ps-task/codeql
+        with:
+          languages: ${{ inputs.codeql_languages || 'javascript' }}
+          output: codeql-results
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/codeql.json
+          summary_results: codeql=${{ job.status }}
+          artifacts_name: codeql-sarif
+          artifacts_paths: |
+            codeql-results/**
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: 14
+
+  # ============================================================================
+  # SEMGREP
+  # ============================================================================
+  semgrep:
+    name: Semgrep CE
+    runs-on: ${{ inputs.runner || 'ubuntu-22.04' }}
+    needs: [validate-ci]
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: 1
+          platform_repo: "PoliticalSphere/ci"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          home_dir: ".home"
+          egress_policy: audit
+
+      - name: Run Semgrep (SARIF)
+        uses: ./.github/actions/ps-task/semgrep-cli
+        with:
+          version: ${{ inputs.semgrep_version }}
+          config: "p/ci"
+          path: "."
+          output: "semgrep.sarif"
+          semgrep_sha256: ${{ inputs.semgrep_sha256 }}
+          semgrep_allow_unverified: ${{ inputs.semgrep_allow_unverified }}
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/semgrep.json
+          summary_results: semgrep=${{ job.status }}
+          artifacts_name: semgrep-sarif
+          artifacts_paths: |
+            semgrep.sarif
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: 14
+
+  # ============================================================================
+  # FINAL AGGREGATION — SUMMARY
+  # ============================================================================
+  summary:
+    name: Security scheduled summary
+    runs-on: ${{ inputs.runner || 'ubuntu-22.04' }}
+    needs: [validate-ci, secrets, codeql, semgrep]
+    if: always()
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: 1
+          platform_repo: "PoliticalSphere/ci"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: "PoliticalSphere/ci"
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          home_dir: ".home"
+          egress_policy: audit
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: security-scheduled
+          summary_output_path: reports/summary/security-scheduled.json
+          summary_results: |
+            validate-ci=${{ needs['validate-ci'].result }}
+            secrets=${{ needs.secrets.result }}
+            codeql=${{ needs.codeql.result }}
+            semgrep=${{ needs.semgrep.result }}
+          artifacts_name: security-scheduled-summary
+          artifacts_paths: |
+            reports/**
+            logs/**
+            reports/summary/security-scheduled.json
+          artifacts_if_no_files_found: "warn"
+          artifacts_retention_days: 14

@@ -1,74 +1,11 @@
 # ==============================================================================
-# Political Sphere — Reusable Workflow: License Compliance
+# Political Sphere — License Compliance (Caller)
 # ==============================================================================
-#
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Enforce OSS license compliance using the Political Sphere policy file and
-# repository lockfile evidence. Produces audit-friendly reports/logs artifacts
-# and a machine-readable summary.
-#
-#
-# METADATA
-# ------------------------------------------------------------------------------
-# - Created:      2025-12-20
-# - Last updated: 2025-12-24
-# - Owner:        political-sphere
-# - Classification: internal
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI
-#   - Run license compliance checks against a declared policy + lockfile
-#   - Upload reports/logs as evidence artifacts with controlled retention
-#   - Publish a structured summary JSON
-#
-# DOES NOT:
-#   - Deploy, release, or publish packages
-#   - Mutate repository state
-#   - Require elevated permissions
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before checks execute
-# - Single canonical bootstrap path (ps-init)
-# - External actions (if used) must be SHA-pinned
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call (consumer-facing)
-# - Optional pull_request trigger supported for platform repo usage
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Egress policy defaults to audit (observability without blocking)
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Artifacts are always uploaded best-effort (if: always())
-# - Summary is always produced
-# - Inputs are typed and use consistent "0"/"1" string booleans where applicable
-#
+# Wrapper workflow that delegates to the reusable job definition.
 # ==============================================================================
 
 name: License Compliance
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ------------------------------------------------------------------------------
-# - Reusable workflow invoked via workflow_call
-# - Optional direct PR trigger (platform repo convenience)
-# ==============================================================================
 on:
   workflow_call:
 
@@ -177,123 +114,26 @@ on:
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
-permissions:
-  contents: read
-
-# ==============================================================================
-# CONCURRENCY CONTROL
-# ------------------------------------------------------------------------------
-# Ensures a single license-compliance run per ref.
-# ==============================================================================
-concurrency:
-  group: license-compliance-${{ github.repository }}-${{ github.ref }}
-  cancel-in-progress: true
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
-
-# ==============================================================================
-# GLOBAL ENVIRONMENT
-# ==============================================================================
-env:
-  CI: "1"
-  FORCE_COLOR: "1"
-  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
-  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
 jobs:
-  # ============================================================================
-  # POLICY GATE — VALIDATE CI
-  # ----------------------------------------------------------------------------
-  # Purpose:
-  #   Enforce repository CI policy before any license compliance work executes.
-  #
-  # Blocking:
-  #   Yes
-  # ============================================================================
-  validate-ci:
-    name: Validate CI (policy gate)
-    uses: ./.github/workflows/validate-ci.yml
+  call:
+    name: License Compliance
+    uses: ./.github/workflows/_reusable-license-compliance.yml
     permissions:
       contents: read
     with:
-      runner: ${{ inputs.runner }}
-      node_version: ${{ inputs.node_version }}
-      fetch_depth: ${{ inputs.fetch_depth }}
-      cache: ${{ inputs.cache }}
-      platform_ref: ${{ inputs.platform_ref }}
-      artifact_name: license-compliance-validate-ci
-      retention_days: ${{ inputs.retention_days }}
+      runner: ${{ inputs.runner || 'ubuntu-22.04' }}
+      node_version: ${{ inputs.node_version || '22' }}
+      fetch_depth: ${{ inputs.fetch_depth || 1 }}
+      cache: ${{ inputs.cache || '1' }}
+      install_dependencies: ${{ inputs.install_dependencies || '1' }}
+      license_timeout_minutes: ${{ inputs.license_timeout_minutes || 15 }}
+      platform_ref: ${{ inputs.platform_ref || 'f6eac5049f626a672c84f3899f0572a87af07ca1' }}
+      platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref || 'true' }}
+      policy_path: ${{ inputs.policy_path || 'configs/security/license-policy.yml' }}
+      lock_path: ${{ inputs.lock_path || 'package-lock.json' }}
+      report_dir: ${{ inputs.report_dir || 'reports/security' }}
+      log_dir: ${{ inputs.log_dir || 'logs/security' }}
+      retention_days: ${{ inputs.retention_days || 7 }}
     secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
-  # ============================================================================
-  # COMPLIANCE GATE — LICENSE CHECK
-  # ----------------------------------------------------------------------------
-  # Purpose:
-  #   Validate dependency license compliance against platform policy + lockfile.
-  #
-  # Blocking:
-  #   Yes
-  # ============================================================================
-  license:
-    name: License compliance
-    runs-on: ${{ inputs.runner }}
-    needs: [validate-ci]
-    permissions:
-      contents: read
-    timeout-minutes: ${{ inputs.license_timeout_minutes }}
-    steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
-        with:
-          fetch_depth: ${{ inputs.fetch_depth }}
-
-          platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          install_tools: "0"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-          install_dependencies: ${{ inputs.install_dependencies }}
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
-      - name: License compliance (PS)
-        uses: ./.github/actions/ps-task/license-check
-        with:
-          policy_path: ${{ inputs.policy_path }}
-          lock_path: ${{ inputs.lock_path }}
-          report_dir: ${{ inputs.report_dir }}
-          log_dir: ${{ inputs.log_dir }}
-
-      - name: Job teardown (PS)
-        if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
-        with:
-          summary_workflow: license-compliance
-          summary_output_path: reports/summary/license-compliance.json
-          summary_results: license=${{ job.status }}
-          artifacts_name: license-compliance-report
-          artifacts_paths: |
-            reports/**
-            logs/**
-          artifacts_if_no_files_found: "warn"
-          artifacts_retention_days: ${{ inputs.retention_days }}

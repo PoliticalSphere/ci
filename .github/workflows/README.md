@@ -29,6 +29,10 @@ Primary workflows:
 - `build-artifacts.yml`: deterministic builds + artifact upload
 - `release.yml`: optional release/tagging flow
 
+Reusable definitions live in `_reusable-*.yml`. The non-prefixed workflows are
+callers that bind events (pull_request/schedule/dispatch) or external `uses:`
+calls to the reusable job definitions.
+
 Each workflow documents:
 
 - required inputs

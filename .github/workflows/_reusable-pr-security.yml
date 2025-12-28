@@ -1,0 +1,478 @@
+# ======================================================================
+# Political Sphere — Reusable Workflow: PR Security
+# ======================================================================
+#
+# METADATA
+# ----------------------------------------------------------------------
+# id: pr-security
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-28
+# last_updated: 2025-12-28
+#
+# PURPOSE
+# ----------------------------------------------------------------------
+# Provide focused PR-scoped security checks (fast secrets, dependency review)
+# as a separate reusable workflow. Follows the same design and security
+# principles as `pr-gates` but narrows scope to security-related work.
+#
+# EXECUTION MODEL
+# ----------------------------------------------------------------------
+# - Triggered via workflow_call
+# - Reusable workflow for downstream consumers
+# ======================================================================
+
+name: PR Security
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        type: string
+        required: false
+        default: "ubuntu-22.04"
+
+      fetch_depth:
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
+        required: false
+        default: 1
+
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
+      platform_ref:
+        description: "Platform repository ref for shared scripts/configs"
+        type: string
+        required: false
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+      artifact_paths:
+        description: "Artifact paths to upload"
+        type: string
+        required: false
+        default: |
+          reports/**
+          logs/**
+
+      retention_days:
+        description: "Artifact retention in days"
+        type: number
+        required: false
+        default: 7
+
+      pr_number:
+        description: "Pull request number (enables dependency review + PR comments)"
+        type: string
+        required: false
+        default: ""
+
+      pr_is_fork:
+        description: "Whether the PR originates from a fork (true/false)"
+        type: string
+        required: false
+        default: "false"
+
+      allow_pr_comments:
+        description: "Allow PR failure comments (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "0"
+
+      pr_base_ref:
+        description: "PR base SHA (diff-based checks, dependency review)"
+        type: string
+        required: false
+        default: ""
+
+      pr_head_ref:
+        description: "PR head SHA (diff-based checks, dependency review)"
+        type: string
+        required: false
+        default: ""
+
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: >-
+    pr-security-${{ github.repository }}-${{
+    inputs.pr_number != '' && inputs.pr_number || github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    shell: bash
+
+env:
+  CI: "1"
+  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
+  NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+jobs:
+  # -----------------------------------------------------------------------
+  # POLICY GATE — VALIDATE CI
+  # -----------------------------------------------------------------------
+  validate-ci:
+    name: Validate CI (policy gate)
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner }}
+      fetch_depth: ${{ inputs.fetch_depth }}
+      cache: ${{ inputs.cache }}
+      platform_ref: ${{ inputs.platform_ref }}
+      pr_only: "1"
+      pr_base_ref: ${{ inputs.pr_base_ref }}
+      pr_head_ref: ${{ inputs.pr_head_ref }}
+      artifact_name: pr-security-validate-ci
+      retention_days: ${{ inputs.retention_days }}
+    secrets:
+      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+
+  # -----------------------------------------------------------------------
+  # SECURITY GATE — FAST SECRETS SCAN
+  # -----------------------------------------------------------------------
+  secrets-scan:
+    name: Secrets scan (fast)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
+          install_tools: "1"
+          tools_bundle: "security"
+
+      - name: Secrets scan (PR)
+        uses: ./.github/actions/ps-task/secret-scan-pr
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security-secrets.json
+          summary_results: secrets=${{ job.status }}
+          artifacts_name: pr-security-secrets
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # -----------------------------------------------------------------------
+  # SECURITY GATE — DEPENDENCY REVIEW
+  # -----------------------------------------------------------------------
+  dependency-review:
+    name: Dependency review
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    if: ${{ inputs.pr_number != '' && inputs.pr_base_ref != '' && inputs.pr_head_ref != '' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "true"
+          install_tools: "0"
+          tools_bundle: "none"
+
+      - name: Dependency review (PS)
+        uses: ./.github/actions/ps-task/dependency-review
+        with:
+          base_ref: ${{ inputs.pr_base_ref }}
+          head_ref: ${{ inputs.pr_head_ref }}
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security-dependency-review.json
+          summary_results: dependency-review=${{ job.status }}
+          artifacts_name: pr-security-dependency-review
+          artifacts_paths: |
+            reports/**
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # -----------------------------------------------------------------------
+  # SECURITY GATE — SCORECARD
+  # -----------------------------------------------------------------------
+  scorecard:
+    name: OpenSSF Scorecard
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
+          install_tools: "1"
+          tools_bundle: "security"
+
+      - name: Scorecard (PS)
+        uses: ./.github/actions/ps-task/scorecard
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security-scorecard.json
+          summary_results: scorecard=${{ job.status }}
+          artifacts_name: pr-security-scorecard
+          artifacts_paths: |
+            reports/security/scorecard.json
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # -----------------------------------------------------------------------
+  # SECURITY GATE — TRIVY
+  # -----------------------------------------------------------------------
+  trivy:
+    name: Trivy (filesystem)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
+          install_tools: "1"
+          tools_bundle: "security"
+
+      - name: Trivy (PS)
+        uses: ./.github/actions/ps-task/trivy
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security-trivy.json
+          summary_results: trivy=${{ job.status }}
+          artifacts_name: pr-security-trivy
+          artifacts_paths: |
+            reports/security/trivy.sarif
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # -----------------------------------------------------------------------
+  # SECURITY GATE — TRUFFLEHOG
+  # -----------------------------------------------------------------------
+  trufflehog:
+    name: TruffleHog (PR)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
+          install_tools: "1"
+          tools_bundle: "security"
+
+      - name: TruffleHog (PS)
+        uses: ./.github/actions/ps-task/trufflehog
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security-trufflehog.json
+          summary_results: trufflehog=${{ job.status }}
+          artifacts_name: pr-security-trufflehog
+          artifacts_paths: |
+            reports/security/trufflehog.sarif
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # -----------------------------------------------------------------------
+  # PR FEEDBACK — FAILURE COMMENT (OPTIONAL)
+  # -----------------------------------------------------------------------
+  notify:
+    name: PR failure comment (security)
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci, secrets-scan, dependency-review, scorecard, trivy, trufflehog]
+    if: >-
+      ${{ failure() &&
+      inputs.pr_number != '' &&
+      inputs.pr_is_fork != 'true' &&
+      inputs.allow_pr_comments == '1' }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: write  # Justification: post PR failure summary comment
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
+          install_tools: "0"
+          tools_bundle: "none"
+
+      - name: Post failure summary (PR)
+        uses: ./.github/actions/ps-teardown/ps-exit
+        continue-on-error: true
+        with:
+          pr_number: ${{ inputs.pr_number }}
+          github_token: ${{ github.token }}
+          expected_base_sha: ${{ inputs.pr_base_ref }}
+          expected_head_sha: ${{ inputs.pr_head_ref }}
+          pr_comment_body: |
+            ❌ PR Security checks failed.
+
+            Results:
+            - Secrets: ${{ needs.secrets-scan.result }}
+            - Dependency review: ${{ needs.dependency-review.result }}
+            - OpenSSF Scorecard: ${{ needs.scorecard.result }}
+            - Trivy: ${{ needs.trivy.result }}
+            - TruffleHog: ${{ needs.trufflehog.result }}
+
+            Check the workflow run for detailed logs and artifacts.
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security-notify.json
+          summary_results: notify=${{ job.status }}
+          artifacts_name: pr-security-notify
+          artifacts_paths: |
+            reports/**
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # -----------------------------------------------------------------------
+  # AGGREGATION & REPORTING — PR SECURITY SUMMARY
+  # -----------------------------------------------------------------------
+  summary:
+    name: PR security summary
+    runs-on: ${{ inputs.runner }}
+    needs:
+      - validate-ci
+      - secrets-scan
+      - dependency-review
+      - notify
+    if: ${{ always() }}
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Job setup (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-init
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          egress_policy: audit
+          home_dir: ".home"
+          platform_repo: PoliticalSphere/ci
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_path: ".ps-platform"
+          platform_allowed_repositories: PoliticalSphere/ci
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          skip_platform_checkout: "false"
+          install_tools: "0"
+          tools_bundle: "none"
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-exit
+        with:
+          summary_workflow: pr-security
+          summary_output_path: reports/summary/pr-security.json
+          summary_results: |
+            validate-ci=${{ needs.validate-ci.result }}
+            secrets=${{ needs.secrets-scan.result }}
+            dependency-review=${{ needs.dependency-review.result }}
+            notify=${{ needs.notify.result }}
+          artifacts_name: pr-security-summary
+          artifacts_paths: |
+            reports/**
+            logs/**
+            reports/summary/pr-security.json
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
