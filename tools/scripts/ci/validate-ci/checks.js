@@ -1041,7 +1041,7 @@ function checkBinaryDownloadWithoutChecksum({ rel, jobId, step }) {
       /\b(curl|wget)\b[^\n]*\s(?:-o|--output|-O)\s+([^\s"'`]+)/,
     );
     if (!match) continue;
-    const target = match[2].replace(/^['"]|['"]$/g, '');
+    const target = match[2].replaceAll(/(^['"]|['"]$)/g, '');
     if (target) downloads.add(target);
   }
 
@@ -1054,13 +1054,13 @@ function checkBinaryDownloadWithoutChecksum({ rel, jobId, step }) {
   if (hasChecksum || hasGpgVerify) return violations;
 
   const escapeRegex = (value) =>
-    value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    value.replaceAll(/[.*+?^${}()|[\]\\]/g, String.raw`\\$&`);
 
   for (const file of downloads) {
     const escaped = escapeRegex(file);
-    const execRegex = new RegExp(`(^|\\s|;)(\\./)?${escaped}(\\s|$|;)`);
-    const chmodRegex = new RegExp(`\\bchmod\\s+\\+x\\s+${escaped}(\\s|$)`);
-    const installRegex = new RegExp(`\\binstall\\b[^\\n]*\\s${escaped}(\\s|$)`);
+    const execRegex = new RegExp(String.raw`(^|\s|;)(\./)?${escaped}(\s|$|;)`);
+    const chmodRegex = new RegExp(String.raw`\bchmod\s+\+x\s+${escaped}(\s|$)`);
+    const installRegex = new RegExp(String.raw`\binstall\b[^\n]*\s${escaped}(\s|$)`);
 
     const execLineIdx = runLines.findIndex(
       (line) =>
