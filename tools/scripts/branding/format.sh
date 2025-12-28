@@ -63,6 +63,8 @@ PS_LOG_PATH="${PS_LOG_PATH:-}"
 PS_FMT_RESET="${PS_FMT_RESET:-$'\033[0m'}"
 PS_FMT_DIM="${PS_FMT_DIM:-$'\033[2m'}"
 PS_FMT_BOLD="${PS_FMT_BOLD:-$'\033[1m'}"
+# Reusable color-format wrapper for printf format strings (no trailing newline)
+PS_FMT_COLOR_WRAP="${PS_FMT_COLOR_WRAP:-%b%s%b}"
 
 # Build the shared rule line exactly once
 PS_FMT_RULE="${PS_FMT_RULE:-}"
@@ -104,11 +106,9 @@ ps_log_enabled() {
 
 ps_epoch_ms() {
   local now="" out=""
-  if out="$(date -u +%s%3N 2>/dev/null)"; then
-    if [[ "${out}" =~ ^[0-9]+$ ]]; then
-      printf '%s' "${out}"
-      return 0
-    fi
+  if out="$(date -u +%s%3N 2>/dev/null)" && [[ "${out}" =~ ^[0-9]+$ ]]; then
+    printf '%s' "${out}"
+    return 0
   fi
   if command -v python3 >/dev/null 2>&1; then
     python3 - <<'PY'
@@ -227,9 +227,9 @@ _ps_print() {
 
   if ps_supports_color && [[ -n "${prefix}${suffix}" ]]; then
     if [[ "${fd}" == "2" ]]; then
-      printf "%b%s%b\n" "${prefix}" "${msg}" "${suffix}" >&2
+      printf "${PS_FMT_COLOR_WRAP}\n" "${prefix}" "${msg}" "${suffix}" >&2
     else
-      printf "%b%s%b\n" "${prefix}" "${msg}" "${suffix}"
+      printf "${PS_FMT_COLOR_WRAP}\n" "${prefix}" "${msg}" "${suffix}"
     fi
   else
     if [[ "${fd}" == "2" ]]; then
@@ -329,9 +329,9 @@ ps_cli_header() {
       header_text="CLI RUN"
     fi
 
-    printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
-    printf "%b%s%b %b%s%b\n" "${c_green}" "${icon}" "${c_reset}" "${c_bold}${c_cyan}" "${header_text}" "${c_reset}"
-    printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
+    printf "${PS_FMT_COLOR_WRAP}\n" "${c_dim}" "${rule}" "${c_reset}"
+    printf "${PS_FMT_COLOR_WRAP} %b%s%b\n" "${c_green}" "${icon}" "${c_reset}" "${c_bold}${c_cyan}" "${header_text}" "${c_reset}"
+    printf "${PS_FMT_COLOR_WRAP}\n" "${c_dim}" "${rule}" "${c_reset}"
   else
     if [[ -n "${title}" && -n "${command}" ]]; then
       printf '%s %s %s %s\n' "${icon}" "${title}" "${separator}" "${command}"
