@@ -67,6 +67,13 @@ function loadExceptionSet(entries, label) {
   return set;
 }
 
+function resolveGeneratedAt(sourceDateEpoch = process.env.SOURCE_DATE_EPOCH) {
+  if (sourceDateEpoch && /^\d+$/.test(String(sourceDateEpoch))) {
+    return new Date(Number(sourceDateEpoch) * 1000).toISOString();
+  }
+  return new Date().toISOString();
+}
+
 function listWorkflowFiles(repoRoot) {
   const workflowsDir = path.join(repoRoot, '.github', 'workflows');
   if (!fs.existsSync(workflowsDir)) return [];
@@ -516,8 +523,8 @@ function checkUnresolvedImports(
 ) {
   for (const item of imports) {
     if (item.resolved) continue;
-    const key = `${rel}:${item.target}`;
-    if (importAllow.has(key) || importAllow.has(item.target)) {
+    const allowKey = `${rel}:${item.target}`;
+    if (importAllow.has(allowKey) || importAllow.has(item.target)) {
       continue;
     }
     if (failOnMissing) {
@@ -634,17 +641,17 @@ function checkPathIntegrity({
   }
 }
 
-function stableClone(value) {
-  if (Array.isArray(value)) {
-    return value.map((item) => stableClone(item));
+function stableClone(node) {
+  if (Array.isArray(node)) {
+    return node.map((item) => stableClone(item));
   }
-  if (value && typeof value === 'object') {
-    const entries = Object.keys(value)
+  if (node && typeof node === 'object') {
+    const entries = Object.keys(node)
       .sort()
-      .map((key) => [key, stableClone(value[key])]);
+      .map((property) => [property, stableClone(node[property])]);
     return Object.fromEntries(entries);
   }
-  return value;
+  return node;
 }
 
 function buildComparableReport(report) {
@@ -655,8 +662,11 @@ function buildComparableReport(report) {
   });
 }
 
-function isPolicyEnabled(value) {
-  return value !== false && String(value || '').toLowerCase() !== 'false';
+function isPolicyEnabled(settingValue) {
+  return (
+    settingValue !== false &&
+    String(settingValue || '').toLowerCase() !== 'false'
+  );
 }
 
 function resolveContractPaths(repoRoot, args) {
@@ -1008,7 +1018,7 @@ async function main() {
     reportData: {
       format: 'ps.contract',
       schema_version: '1.0.0',
-      generated_at: new Date().toISOString(),
+      generated_at: resolveGeneratedAt(),
       summary,
       policy: {
         mode,

@@ -1,10 +1,24 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+repo_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE:-$(pwd)}}"
+if [[ -f "${repo_root}/tools/scripts/egress.sh" ]]; then
+  # shellcheck source=tools/scripts/egress.sh
+  . "${repo_root}/tools/scripts/egress.sh"
+  load_egress_allowlist || { echo "ERROR: egress allowlist load failed" >&2; exit 1; }
+fi
+
 version="${PS_RELEASE_VERSION:-}"
 tag="v${version}"
 
 bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.verify" "Verify tag + release match intended ref" 2>/dev/null || true
+
+if declare -F assert_egress_allowed_git_remote >/dev/null 2>&1; then
+  assert_egress_allowed_git_remote origin
+fi
+if declare -F assert_egress_allowed_url >/dev/null 2>&1; then
+  assert_egress_allowed_url "${GITHUB_API_URL:-https://api.github.com}"
+fi
 
 git fetch --quiet --tags --force
 expected_sha="$(git rev-parse --verify "${PS_RELEASE_REF}^{commit}")"

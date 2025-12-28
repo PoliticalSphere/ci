@@ -1,8 +1,120 @@
 # ==============================================================================
 # Political Sphere — Composite Action: PS Node Setup
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Setup Node.js and optionally install dependencies using bootstrap scripts.
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-bootstrap/ps-node/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Node Setup composite action to Setup Node.js (optional
+#     cache) and install dependencies.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [node_version, cache, install_dependencies, working_directory,
+#     cache_dependency_path]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-bootstrap/ps-node
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-bootstrap/ps-bootstrap-resolve-roots.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-bootstrap-validate-node.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-bootstrap-install-deps.sh]
+#   external: [bash, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - tools/scripts/actions/ps-bootstrap/ps-bootstrap-resolve-roots.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-bootstrap-validate-node.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-bootstrap-install-deps.sh
+#
 # ==============================================================================
 
 name: "PS Node Setup"

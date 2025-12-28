@@ -4,6 +4,13 @@ set -euo pipefail
 # Compute release plan (dry-run) and write JSON to reports/summary/release-plan.json
 bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" "release.plan" "Compute release plan (no mutation)" 2>/dev/null || true
 
+repo_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE:-$(pwd)}}"
+if [[ -f "${repo_root}/tools/scripts/egress.sh" ]]; then
+  # shellcheck source=tools/scripts/egress.sh
+  . "${repo_root}/tools/scripts/egress.sh"
+  load_egress_allowlist || { echo "ERROR: egress allowlist load failed" >&2; exit 1; }
+fi
+
 version="${PS_RELEASE_VERSION:-}"
 if [[ -z "${version}" ]]; then
   echo "ERROR: release_version is required" >&2
@@ -14,11 +21,20 @@ if [[ "${version}" == v* ]]; then
   exit 1
 fi
 
+release_ref="${PS_RELEASE_REF:-}"
+if [[ -z "${release_ref}" ]]; then
+  echo "ERROR: release_ref is required" >&2
+  exit 1
+fi
+
 tag="v${version}"
+if declare -F assert_egress_allowed_git_remote >/dev/null 2>&1; then
+  assert_egress_allowed_git_remote origin
+fi
 git fetch --quiet --tags --force
-target_sha="$(git rev-parse --verify "${PS_RELEASE_REF}^{commit}")"
+target_sha="$(git rev-parse --verify "${release_ref}^{commit}")"
 echo "PS.RELEASE_PLAN: tag=${tag}"
-echo "PS.RELEASE_PLAN: ref=${PS_RELEASE_REF}"
+echo "PS.RELEASE_PLAN: ref=${release_ref}"
 echo "PS.RELEASE_PLAN: target_sha=${target_sha}"
 
 if git rev-parse --verify --quiet "refs/tags/${tag}" >/dev/null; then
@@ -46,7 +62,7 @@ cat > reports/summary/release-plan.json <<JSON
 {
   "dry_run": true,
   "tag": "${tag}",
-  "release_ref": "${PS_RELEASE_REF}",
+  "release_ref": "${release_ref}",
   "target_sha": "${target_sha}",
   "notes_mode": "${notes_mode}"
 }

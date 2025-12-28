@@ -6,6 +6,7 @@
 // ==============================================================================
 
 import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
 
 import { getSafePathEnv } from './safe-path.js';
 
@@ -14,21 +15,29 @@ export function isCI() {
 }
 
 export function getRepoRoot() {
-  try {
-    let safePath = '';
-    try {
-      safePath = getSafePathEnv();
-    } catch {
-      return process.cwd();
+  const configured =
+    process.env.PS_REPO_ROOT || process.env.GITHUB_WORKSPACE || '';
+  if (configured) {
+    if (!fs.existsSync(configured) || !fs.statSync(configured).isDirectory()) {
+      throw new Error(`repo root not found at ${configured}`);
     }
-    const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
-      stdio: ['ignore', 'pipe', 'ignore'],
-      encoding: 'utf8',
-      env: { PATH: safePath },
-    });
-    if (r && r.status === 0) return String(r.stdout || '').trim();
-    return process.cwd();
-  } catch {
-    return process.cwd();
+    return configured;
   }
+
+  let safePath = '';
+  try {
+    safePath = getSafePathEnv();
+  } catch (err) {
+    throw new Error(`Safe PATH validation failed: ${err?.message || err}`);
+  }
+  const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: 'utf8',
+    env: { PATH: safePath },
+  });
+  const root = r && r.status === 0 ? String(r.stdout || '').trim() : '';
+  if (root) return root;
+  throw new Error(
+    'repo root not configured and git root unavailable; set PS_REPO_ROOT',
+  );
 }

@@ -1,43 +1,118 @@
 # ==============================================================================
 # Political Sphere — Composite Action: PS Checkout (Repo)
+# License: Proprietary
 # ==============================================================================
+# ps_header_v: 6
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Standardize *repository* checkout with validated inputs and consistent logging.
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-bootstrap/ps-checkout-repo/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: ps-checkout-repo
-# version: 1.1.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-26
-# last_updated: 2025-12-26
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
 #
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Checkout (Repo) composite action to Checkout current
+#     repository with validated inputs and a pinned action.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [fetch_depth, ref, persist_credentials, submodules, require_full_history]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-bootstrap/ps-checkout-repo
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
 # DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh]
+#   external: [bash, actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8]
 #
-# DEPENDENTS
-# ------------------------------------------------------------------------------
-# - ./.github/actions/ps-bootstrap/ps-init
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
 #
-# SECURITY TIERING
-# ------------------------------------------------------------------------------
-# Level 0 — Critical (this action controls repository ingress into the job)
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
 #
-# THREAT MODEL
-# ------------------------------------------------------------------------------
-# Purpose: Prevents unsafe checkout parameters, enforces deterministic history
-#          depth, and reduces credential persistence risk before build steps run.
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
 #
-# AUDIT LOG
-# ------------------------------------------------------------------------------
-# Records validated checkout parameters via logs and environment outputs for
-# traceability in CI audits.
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-bootstrap/ps-checkout-repo/README.md
+#     - tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh
 #
 # ==============================================================================
+
 name: "PS Checkout (Repo)"
 description: "Checkout current repository with validated inputs and a pinned action"
 
@@ -80,95 +155,9 @@ runs:
         PS_REQUIRE_FULL_HISTORY_INPUT: ${{ inputs.require_full_history }}
       run: |
         set -euo pipefail
-
-        format_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh"
-        if [[ -f "${format_sh}" ]]; then
-          # shellcheck source=/dev/null
-          . "${format_sh}"
-        fi
-
-        log_info() {
-          if type -t ps_detail >/dev/null 2>&1; then
-            ps_detail "$*"
-          else
-            printf 'PS.CHECKOUT.REPO: %s\n' "$*"
-          fi
-        }
-
-        emit_env() {
-          local key="$1"
-          local val="$2"
-          local sanitized delimiter attempts
-          sanitized="${val//$'\r'/}"
-          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-          attempts=0
-          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
-            attempts=$((attempts + 1))
-            if [[ "${attempts}" -gt 6 ]]; then
-              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' \
-                "${key}" >&2
-              exit 1
-            fi
-            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-          done
-          printf '%s<<%s\n%s\n%s\n' \
-            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
-            >> "${GITHUB_ENV}"
-        }
-
-        depth="${PS_FETCH_DEPTH_INPUT:-1}"
-        if ! [[ "${depth}" =~ ^[0-9]+$ ]]; then
-          printf 'ERROR: inputs.fetch_depth must be a non-negative integer (got %q)\n' \
-            "${depth}" >&2
-          exit 1
-        fi
-
-        req="${PS_REQUIRE_FULL_HISTORY_INPUT:-false}"
-        case "${req}" in
-          true|false) ;;
-          *)
-            printf 'ERROR: inputs.require_full_history must be true|false (got %q)\n' "${req}" >&2
-            exit 1
-            ;;
-        esac
-        if [[ "${req}" == "true" && "${depth}" != "0" ]]; then
-          printf 'ERROR: full history required but fetch_depth=%s (expected 0)\n' "${depth}" >&2
-          exit 1
-        fi
-
-        pc="${PS_PERSIST_CREDENTIALS_INPUT:-false}"
-        case "${pc}" in
-          true|false) ;;
-          *)
-            printf 'ERROR: inputs.persist_credentials must be true|false (got %q)\n' "${pc}" >&2
-            exit 1
-            ;;
-        esac
-
-        sm="${PS_SUBMODULES_INPUT:-false}"
-        case "${sm}" in
-          false|true|recursive) ;;
-          *)
-            printf 'ERROR: inputs.submodules must be false|true|recursive (got %q)\n' "${sm}" >&2
-            exit 1
-            ;;
-        esac
-
-        emit_env "PS_FETCH_DEPTH_VALIDATED" "${depth}"
-        emit_env "PS_PERSIST_CREDENTIALS_VALIDATED" "${pc}"
-        emit_env "PS_SUBMODULES_VALIDATED" "${sm}"
-        emit_env "PS_REQUIRE_FULL_HISTORY_VALIDATED" "${req}"
-
-        ref="${PS_REF_INPUT:-}"
-        log_info "fetch_depth=${depth}"
-        log_info "require_full_history=${req}"
-        log_info "persist_credentials=${pc}"
-        log_info "submodules=${sm}"
-        if [[ -n "${ref}" ]]; then
-          log_info "ref=${ref}"
-        else
-          log_info "ref=<default>"
-        fi
+        PS_LOG_PREFIX="PS.CHECKOUT.REPO" \
+        PS_ENV_PREFIX="PS" \
+          bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh"
 
     - name: Checkout repository (PS)
       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8

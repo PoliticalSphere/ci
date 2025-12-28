@@ -1,3 +1,18 @@
+<!--
+# ==============================================================================
+# Political Sphere — Composite Actions (README)
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Document the composite action catalog, conventions, and governance model.
+#
+# Dependencies:
+#   - None
+#
+# Dependents:
+#   - Contributors updating or consuming platform actions
+# ==============================================================================
+-->
+
 # Composite Actions
 
 Shared, reusable composite actions for the Political Sphere CI/CD platform.
@@ -48,6 +63,14 @@ Inline shell is allowed **only** where unavoidable and must be minimal.
 
 ---
 
+## Directory Layout
+
+- Each top-level folder is a composite action namespace (e.g. `ps-bootstrap`).
+- Nested folders are sub-actions consumed directly (e.g. `ps-bootstrap/ps-init`).
+- `action.yml` is required at the action root and is the single source of truth.
+
+---
+
 ## AI-First Design Commitments
 
 Composite actions must be:
@@ -77,7 +100,7 @@ Risky changes require an explicit, documented decision.
 Baseline building blocks:
 
 - `ps-bootstrap`
-- `ci-validate`
+- `ps-ci-validate`
 - `ps-task`
 - `ps-teardown`
 
@@ -126,7 +149,7 @@ Lint + quality:
 
 Security:
 
-- `ci-validate`: enforce CI policy validation
+- `ps-ci-validate`: enforce CI policy validation
 - `consumer-contract`: validate consumer repositories against contract policy
 - `license-check`: license compliance against policy allowlists
 

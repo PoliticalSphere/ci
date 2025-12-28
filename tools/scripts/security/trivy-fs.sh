@@ -57,10 +57,10 @@ import json
 import sys
 
 with open(sys.argv[1], "r", encoding="utf-8") as f:
-    data = json.load(f)
+    report_doc = json.load(f)
 
 results = []
-for run in data.get("runs", []):
+for run in report_doc.get("runs", []):
     results.extend(run.get("results", []))
 
 severities = {}

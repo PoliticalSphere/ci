@@ -20,6 +20,7 @@ import {
   isCI,
   section,
 } from '../ci/validate-ci/console.js';
+import { safeCompileRegex } from '../lib/regex.js';
 
 const repoRoot = process.env.PS_REPO_ROOT || getRepoRoot();
 const policyPath =
@@ -53,8 +54,6 @@ const typescriptRule = policy.typescript || null;
 const workflowRule = rules.workflows;
 const actionRule = rules.actions;
 const scriptRule = rules.scripts;
-
-const violations = [];
 
 function hasDisallowedTerm(name) {
   if (disallowedTerms.length === 0) return null;
@@ -105,13 +104,14 @@ function checkDirExists(dir, label) {
 }
 
 function checkWorkflows() {
-  if (!workflowRule) return;
+  const violations = [];
+  if (!workflowRule) return violations;
   const root = path.join(repoRoot, workflowRule.path);
   section('workflows', 'Workflow naming', workflowRule.description || root);
 
-  if (!checkDirExists(root, 'workflows')) return;
+  if (!checkDirExists(root, 'workflows')) return violations;
 
-  const pattern = new RegExp(workflowRule.pattern);
+  const pattern = safeCompileRegex(workflowRule.pattern);
   const allow = new Set(allowlist.workflow_files || []);
 
   const entries = fs.readdirSync(root, { withFileTypes: true });
@@ -130,16 +130,18 @@ function checkWorkflows() {
       );
     }
   }
+  return violations;
 }
 
 function checkActions() {
-  if (!actionRule) return;
+  const violations = [];
+  if (!actionRule) return violations;
   const root = path.join(repoRoot, actionRule.path);
   section('actions', 'Action naming', actionRule.description || root);
 
-  if (!checkDirExists(root, 'actions')) return;
+  if (!checkDirExists(root, 'actions')) return violations;
 
-  const pattern = new RegExp(actionRule.pattern);
+  const pattern = safeCompileRegex(actionRule.pattern);
   const allow = new Set(allowlist.action_dirs || []);
 
   const entries = fs.readdirSync(root, { withFileTypes: true });
@@ -157,16 +159,18 @@ function checkActions() {
       );
     }
   }
+  return violations;
 }
 
 function checkScripts() {
-  if (!scriptRule) return;
+  const violations = [];
+  if (!scriptRule) return violations;
   const root = path.join(repoRoot, scriptRule.path);
   section('scripts', 'Script naming', scriptRule.description || root);
 
-  if (!checkDirExists(root, 'scripts')) return;
+  if (!checkDirExists(root, 'scripts')) return violations;
 
-  const pattern = new RegExp(scriptRule.pattern);
+  const pattern = safeCompileRegex(scriptRule.pattern);
   const allow = new Set(allowlist.script_files || []);
 
   const files = [];
@@ -200,10 +204,12 @@ function checkScripts() {
       );
     }
   }
+  return violations;
 }
 
 function checkTypeScriptIdentifiers() {
-  if (!typescriptRule) return;
+  const violations = [];
+  if (!typescriptRule) return violations;
   section(
     'typescript',
     'TypeScript identifier naming',
@@ -262,27 +268,31 @@ function checkTypeScriptIdentifiers() {
       scriptKind,
     );
 
+    const checkIdentifierNode = (node) => {
+      if (!ts.isIdentifier(node)) return;
+      const name = node.text;
+      if (allowIdentifiers.has(name)) return;
+      const term = identifierHasDisallowedTerm(name);
+      if (!term) return;
+      addViolation(file, name, term);
+    };
+
     const visit = (node) => {
-      if (ts.isIdentifier(node)) {
-        const name = node.text;
-        if (!allowIdentifiers.has(name)) {
-          const term = identifierHasDisallowedTerm(name);
-          if (term) {
-            addViolation(file, name, term);
-          }
-        }
-      }
+      checkIdentifierNode(node);
       ts.forEachChild(node, visit);
     };
 
     visit(sourceFile);
   }
+  return violations;
 }
 
-checkWorkflows();
-checkActions();
-checkScripts();
-checkTypeScriptIdentifiers();
+const violations = [
+  ...checkWorkflows(),
+  ...checkActions(),
+  ...checkScripts(),
+  ...checkTypeScriptIdentifiers(),
+];
 
 if (violations.length > 0) {
   section('result', 'Naming checks failed', `${violations.length} issue(s)`);

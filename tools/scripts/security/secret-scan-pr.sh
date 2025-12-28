@@ -10,6 +10,8 @@ set -euo pipefail
 # Policy:
 #   - In CI: secret scanning is mandatory. If the scanner is not available,
 #     this is a configuration error and CI must fail.
+#   - In CI: requires a base ref (PS_BASE_REF or GITHUB_BASE_REF) to scope the
+#     diff; missing base ref is a configuration error.
 #   - Locally (bootstrap): if the scanner is not yet installed, exit cleanly
 #     with a clear message to avoid blocking development.
 #
@@ -69,7 +71,12 @@ if [[ -f "${baseline_path}" ]]; then
 fi
 
 if [[ "${CI:-0}" == "1" ]]; then
-  base_ref="${GITHUB_BASE_REF:-main}"
+  base_ref="${PS_BASE_REF:-${GITHUB_BASE_REF:-}}"
+  if [[ -z "${base_ref}" ]]; then
+    error "base ref is required for CI secret scanning but was not provided"
+    detail_err "HINT: set PS_BASE_REF or GITHUB_BASE_REF to the PR base branch."
+    exit 1
+  fi
   log_ref="origin/${base_ref}"
   if git rev-parse --verify "${log_ref}" >/dev/null 2>&1; then
     gitleaks detect \

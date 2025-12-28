@@ -22,6 +22,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.eslint"
+lint_log_init "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" "$(lint_log_mode)"
 
 if [[ -z "${repo_root:-}" ]]; then
   repo_root="$(pwd)"
@@ -29,12 +31,14 @@ fi
 
 config_path="${repo_root}/configs/lint/eslint.config.mjs"
 if [[ ! -f "${config_path}" ]]; then
+  lint_log_set_status "ERROR"
   ps_error "ESLint config not found: ${config_path}"
   exit 1
 fi
 
 ESLINT_BIN="${repo_root}/node_modules/.bin/eslint"
 if [[ ! -x "${ESLINT_BIN}" ]]; then
+  lint_log_set_status "ERROR"
   ps_error "ESLint not found at ${ESLINT_BIN}"
   ps_detail "Fix: npm ci"
   exit 1
@@ -53,12 +57,16 @@ if [[ "${full_scan}" == "1" ]]; then
 else
   collect_targets_staged "*.js|*.mjs|*.cjs|*.jsx|*.ts|*.mts|*.cts|*.tsx"
   if [[ "${#targets[@]}" -eq 0 ]]; then
+    lint_log_set_targets 0
+    lint_log_set_status "SKIPPED"
     ps_detail "ESLint: no staged JS/TS files to check."
     exit 0
   fi
 fi
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "ESLint: no targets to check."
   exit 0
 fi
@@ -71,9 +79,12 @@ done
 targets=("${filtered_targets[@]}")
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "ESLint: no targets to check."
   exit 0
 fi
+lint_log_set_targets "${#targets[@]}"
 
 # Run ESLint:
 # - --max-warnings 0 means warnings fail the step (gate-quality)
@@ -96,6 +107,7 @@ rc=$?
 set -e
 
 if [[ "${rc}" -ne 0 ]]; then
+  lint_log_set_status "FAIL"
   # Provide actionable guidance for common "missing plugin" / dependency issues.
   # (ESLint prints these to stderr; we already streamed output.)
   ps_error "ESLint failed (exit ${rc})."

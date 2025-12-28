@@ -43,7 +43,7 @@
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
 # - ./.github/actions/ps-bootstrap/ps-init
-# - ./.github/actions/ci-validate
+# - ./.github/actions/ps-ci-validate
 # - ./.github/actions/ps-upload-artifacts
 # - tools/scripts/branding/print-section.sh (platform)
 #
@@ -282,7 +282,7 @@ jobs:
           script: tools/scripts/ci/install-platform-deps.sh
 
       - name: Validate CI (policy)
-        uses: ./.github/actions/ci-validate
+        uses: ./.github/actions/ps-ci-validate
 
       - name: Job teardown (PS)
         if: always()

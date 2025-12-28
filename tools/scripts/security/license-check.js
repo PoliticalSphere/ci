@@ -13,10 +13,15 @@ import path from 'node:path';
 
 import yaml from 'yaml';
 
-import { bullet, detail, fatal, section } from '../ci/validate-ci/console.js';
+import {
+  bullet,
+  detail,
+  fatal,
+  getRepoRoot,
+  section,
+} from '../ci/validate-ci/console.js';
 import { parseArgs, readText, resolvePath, writeOutputs } from '../lib/cli.js';
-
-const nameFromPathCache = new Map();
+import { safeCompileRegex } from '../lib/regex.js';
 
 function normalizeLicense(raw) {
   if (!raw) return '';
@@ -30,14 +35,14 @@ function normalizeLicense(raw) {
   return String(raw).trim();
 }
 
-function nameFromPath(entryPath) {
-  const cached = nameFromPathCache.get(entryPath);
+function nameFromPath(entryPath, cache) {
+  const cached = cache.get(entryPath);
   if (cached) {
     return cached;
   }
   const parts = entryPath.split('node_modules/').filter(Boolean);
   if (parts.length === 0) {
-    nameFromPathCache.set(entryPath, entryPath);
+    cache.set(entryPath, entryPath);
     return entryPath;
   }
   let tail = parts[parts.length - 1];
@@ -46,16 +51,16 @@ function nameFromPath(entryPath) {
   }
   const segments = tail.split('/').filter(Boolean);
   if (segments.length === 0) {
-    nameFromPathCache.set(entryPath, entryPath);
+    cache.set(entryPath, entryPath);
     return entryPath;
   }
   if (segments[0].startsWith('@') && segments.length >= 2) {
     const scoped = `${segments[0]}/${segments[1]}`;
-    nameFromPathCache.set(entryPath, scoped);
+    cache.set(entryPath, scoped);
     return scoped;
   }
   const name = segments[0];
-  nameFromPathCache.set(entryPath, name);
+  cache.set(entryPath, name);
   return name;
 }
 
@@ -67,7 +72,7 @@ function compileRegex(list, label) {
   const compiled = [];
   for (const pattern of list) {
     try {
-      compiled.push(new RegExp(pattern, 'i'));
+      compiled.push(safeCompileRegex(pattern, 'i'));
     } catch (err) {
       throw new Error(`${label} regex '${pattern}' is invalid: ${err.message}`);
     }
@@ -83,11 +88,11 @@ function loadPolicy(policyPath) {
   if (!raw.trim()) {
     throw new Error('license policy file is empty');
   }
-  const data = yaml.parse(raw);
-  if (!data || typeof data !== 'object') {
+  const policyDoc = yaml.parse(raw);
+  if (!policyDoc || typeof policyDoc !== 'object') {
     throw new Error('license policy is not a valid YAML object');
   }
-  const policy = data.policy || {};
+  const policy = policyDoc.policy || {};
   const allowlist = Array.isArray(policy.allowlist) ? policy.allowlist : [];
   const denylist = Array.isArray(policy.denylist) ? policy.denylist : [];
   const allowRegex = compileRegex(
@@ -148,15 +153,15 @@ function resolvePackagePolicy(basePolicy, name) {
   };
 }
 
-function matchDetails(list, regexes, value) {
-  const normalized = value.toLowerCase();
+function matchDetails(list, regexes, licenseValue) {
+  const normalized = licenseValue.toLowerCase();
   for (const item of list) {
     if (String(item).toLowerCase() === normalized) {
       return { matched: true, type: 'exact', pattern: String(item) };
     }
   }
   for (const rx of regexes) {
-    if (rx.test(value)) {
+    if (rx.test(licenseValue)) {
       return { matched: true, type: 'regex', pattern: rx.source };
     }
   }
@@ -422,9 +427,10 @@ function evaluateLicense(policy, license) {
 
 function collectPackages(lockData) {
   const packages = [];
+  const nameCache = new Map();
   if (!isRecord(lockData)) return packages;
   if (isRecord(lockData.packages)) {
-    collectPackagesFromEntries(lockData.packages, packages);
+    collectPackagesFromEntries(lockData.packages, packages, nameCache);
     return packages;
   }
   if (isRecord(lockData.dependencies)) {
@@ -433,8 +439,8 @@ function collectPackages(lockData) {
   return packages;
 }
 
-function isRecord(value) {
-  return value && typeof value === 'object';
+function isRecord(candidate) {
+  return candidate && typeof candidate === 'object';
 }
 
 function pushPackage(packages, name, meta) {
@@ -445,10 +451,10 @@ function pushPackage(packages, name, meta) {
   });
 }
 
-function collectPackagesFromEntries(entries, packages) {
+function collectPackagesFromEntries(entries, packages, nameCache) {
   for (const [entryPath, meta] of Object.entries(entries)) {
     if (entryPath === '') continue;
-    const name = meta?.name || nameFromPath(entryPath);
+    const name = meta?.name || nameFromPath(entryPath, nameCache);
     pushPackage(packages, name, meta);
   }
 }
@@ -469,7 +475,12 @@ function collectPackagesFromDependencies(dependencies, packages) {
 }
 
 const args = parseArgs(process.argv.slice(2));
-const repoRoot = process.env.GITHUB_WORKSPACE || process.cwd();
+const repoRoot = process.env.PS_LICENSE_REPO_ROOT || getRepoRoot();
+if (process.env.PS_LICENSE_REPO_ROOT) {
+  if (!fs.existsSync(repoRoot) || !fs.statSync(repoRoot).isDirectory()) {
+    fatal(`repo root not found at ${repoRoot}`);
+  }
+}
 const policyPath = resolvePath(
   repoRoot,
   args.policy ||
@@ -525,9 +536,9 @@ const packages = collectPackages(lockData)
   }))
   .filter((pkg) => pkg.name && !policy.ignore.has(pkg.name))
   .filter((pkg) => {
-    const key = `${pkg.name}@${pkg.version || ''}`;
-    if (seen.has(key)) return false;
-    seen.add(key);
+    const packageKey = `${pkg.name}@${pkg.version || ''}`;
+    if (seen.has(packageKey)) return false;
+    seen.add(packageKey);
     return true;
   });
 

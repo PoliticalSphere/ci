@@ -1,63 +1,119 @@
 # ==============================================================================
 # Political Sphere — Composite Action: License Compliance
+# License: Proprietary
 # ==============================================================================
+# ps_header_v: 6
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: license-check
-# version: 1.1.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-26
-# last_updated: 2025-12-26
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-task/license-check/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the License Compliance composite action to Check dependency
+#     licenses against the platform policy.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [policy_path, lock_path, report_dir, log_dir]
+#   outputs: [status, report_path, log_path]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-task/license-check
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
 # DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/actions/ps-task/ps-run
-# - tools/scripts/security/license-check.sh
-# - tools/scripts/security/license-check.js
-# - configs/security/license-policy.yml (default policy)
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [configs/security/license-policy.yml, tools/scripts/security/license-check.sh]
+#   external: [bash]
 #
-# DEPENDENTS
-# ------------------------------------------------------------------------------
-# - Workflow jobs that invoke license-check for compliance gating
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Enforce OSS license compliance using a policy file + dependency lockfile, and
-# emit evidence (reports/logs) in a deterministic, CI-safe manner.
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
 #
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Validate output directories
-#   - Run the license check via ps-run
-#   - Emit deterministic reports/logs for audit
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
 #
-# DOES NOT:
-#   - Install dependencies or lockfiles
-#   - Modify job permissions
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Policy-driven enforcement
-# - Audit-friendly evidence outputs
-#
-# SECURITY TIERING
-# ------------------------------------------------------------------------------
-# Level 1 — High (policy enforcement for OSS compliance)
-#
-# THREAT MODEL
-# ------------------------------------------------------------------------------
-# Purpose: Prevents unapproved OSS licenses from entering the build by enforcing
-#          policy against the dependency lockfile.
-#
-# AUDIT LOG
-# ------------------------------------------------------------------------------
-# Reports and logs are emitted to configured directories for compliance review.
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-task/license-check/README.md
+#     - configs/security/license-policy.yml
+#     - tools/scripts/security/license-check.sh
 #
 # ==============================================================================
+
 name: "License Compliance"
 description: "Check dependency licenses against the platform policy"
 

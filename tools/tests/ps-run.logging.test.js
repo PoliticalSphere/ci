@@ -2,7 +2,6 @@
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import {
   buildPsRunEnv,
   createPsRunWorkspace,
@@ -10,7 +9,7 @@ import {
   getLogPath,
   getPsRunHelper,
 } from './ps-run-utils.js';
-import { fail, getRepoRoot } from './test-utils.js';
+import { buildSafeEnv, fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 
@@ -23,12 +22,12 @@ function readLog(logPath) {
 // Test: basic security logging
 // ----------------------------------------------------------------------------
 (function testBasicLogging() {
-  const tmp = createPsRunWorkspace();
+  const workspaceRoot = createPsRunWorkspace();
 
   // target script placed under platform root
   const scriptRel = 'scripts/echo-args.sh';
   createScript(
-    tmp,
+    workspaceRoot,
     scriptRel,
     '#!/usr/bin/env bash\nset -euo pipefail\necho "SCRIPT-RUN: $@"\n',
   );
@@ -38,7 +37,7 @@ function readLog(logPath) {
   const env_kv = 'FOO=1\nBAR=2\n';
   const args = 'alpha beta';
 
-  const env = buildPsRunEnv(tmp, {
+  const env = buildPsRunEnv(workspaceRoot, {
     PS_ID: id,
     PS_TITLE: title,
     PS_DESCRIPTION: '',
@@ -51,16 +50,10 @@ function readLog(logPath) {
 
   // Run the helper script directly
   const helper = getPsRunHelper(repoRoot);
-  const logPath = getLogPath(tmp, id);
+  const logPath = getLogPath(workspaceRoot, id);
   const command = `exec > "${logPath}" 2>&1; ${helper}`;
   try {
-    let safePath = '';
-    try {
-      safePath = getSafePathEnv();
-    } catch (err) {
-      fail(`Safe PATH validation failed: ${err?.message || err}`);
-    }
-    env.PATH = safePath;
+    Object.assign(env, buildSafeEnv());
     execFileSync('bash', ['-lc', command], { encoding: 'utf8', env });
   } catch (err) {
     const out = (err.stdout || '') + (err.stderr || '');

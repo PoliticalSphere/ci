@@ -1,12 +1,116 @@
 # ==============================================================================
-# Political Sphere — Composite Action: Lint (ps-task adapter)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Run the fast lint/validation gate with platform defaults via PS Task Runner.
+# Political Sphere — Composite Action: Lint
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
 #
-# Notes:
-#   - Intentionally thin: delegates execution, logging, and reporting to ps-run.
-#   - Provides safe defaults aligned with PR-gates (fast lint; no secrets scan).
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-task/lint/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the Lint composite action to Run fast lint gate (pre-commit style)
+#     with standardized PS reporting.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [script, working_directory, ps_full_scan, skip_secrets_scan]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-task/lint
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/gates/gate-pre-commit.sh]
+#   external: [none]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [skip_secrets_scan]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-task/lint/README.md
+#     - tools/scripts/gates/gate-pre-commit.sh
+#
 # ==============================================================================
 
 name: "Lint"

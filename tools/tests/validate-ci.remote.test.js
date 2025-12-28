@@ -22,6 +22,9 @@ import { fail, info, section } from './test-utils.js';
 
 section('remote', 'createRemoteVerifier — deterministic behavior');
 
+const API_ROOT = 'https://api.github.com/';
+const SHA = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+
 function assert(condition, message) {
   if (!condition) fail(message);
 }
@@ -55,6 +58,63 @@ function assertFail(result, expectedError, label) {
     result.error,
     expectedError,
     `${label}: expected error=${String(expectedError)}`,
+  );
+}
+
+function commitUrl(ownerRepo, sha = SHA) {
+  return `${API_ROOT}repos/${ownerRepo}/commits/${sha}`;
+}
+
+function makeVerifier(
+  fetch,
+  { verifyRemoteShas = true, isCI = true, allowedHosts = ['api.github.com'] } = {},
+) {
+  return createRemoteVerifier({
+    verifyRemoteShas,
+    detailImpl: () => {},
+    isCIImpl: () => isCI,
+    fetchImpl: fetch.fetchImpl,
+    allowedHosts,
+  });
+}
+
+async function runLookupCase({
+  label,
+  status,
+  expectedError,
+  expectOk,
+  repeat = 1,
+  expectedLookupCount = 1,
+  verifierAction = 'actions/checkout',
+}) {
+  const lookupUrl = commitUrl('actions/checkout', SHA);
+  const fetch = makeFetchStub({
+    statusByUrl: {
+      [API_ROOT]: 200,
+      [lookupUrl]: status,
+    },
+  });
+
+  const verifier = makeVerifier(fetch, { isCI: false });
+  const results = [];
+  for (let i = 0; i < repeat; i++) {
+    results.push(await verifier(verifierAction, SHA));
+  }
+
+  for (const [index, res] of results.entries()) {
+    const runLabel = repeat > 1 ? `${label} call ${index + 1}` : label;
+    if (expectOk) {
+      assertOk(res, expectedError, runLabel);
+    } else {
+      assertFail(res, expectedError, runLabel);
+    }
+  }
+
+  assertEqual(fetch.countUrl(API_ROOT), 1, `${label}: network probe once`);
+  assertEqual(
+    fetch.countUrl(lookupUrl),
+    expectedLookupCount,
+    `${label}: commit lookup count`,
   );
 }
 
@@ -103,28 +163,21 @@ function makeFetchStub({
     countUrl(url) {
       return calls.filter((c) => c.url === url).length;
     },
-    last() {
-      return calls[calls.length - 1] || null;
-    },
   };
 }
 
 async function main() {
+  const sha = SHA;
   // ---------------------------------------------------------------------------
   // 1) Local actions should bypass verification entirely (no network check).
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub();
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => true, // doesn't matter; local action bypass should win
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { isCI: true });
 
     const res = await verifier(
       './.github/actions/foo',
-      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      sha,
     );
     assertOk(res, 'local_action', 'local action bypass');
     assertEqual(
@@ -140,16 +193,11 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub();
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: false,
-      detailImpl: () => {},
-      isCIImpl: () => true,
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { verifyRemoteShas: false, isCI: true });
 
     const res = await verifier(
       'actions/checkout',
-      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      sha,
     );
     assertOk(res, 'verification_disabled', 'verification disabled');
     assertEqual(
@@ -165,14 +213,9 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub();
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => true,
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { isCI: true });
 
-    const res1 = await verifier('', 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef');
+    const res1 = await verifier('', sha);
     assertOk(res1, 'missing_action_or_ref', 'missing action');
     const res2 = await verifier('actions/checkout', '');
     assertOk(res2, 'missing_action_or_ref', 'missing ref');
@@ -189,12 +232,7 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub();
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => true,
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { isCI: true });
 
     const res = await verifier('actions/checkout', 'v4'); // not a 40-char sha
     assertOk(res, 'not_sha', 'non-sha ref');
@@ -208,19 +246,14 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub({
-      throwByUrl: { 'https://api.github.com/': 'network down' },
+      throwByUrl: { [API_ROOT]: 'network down' },
     });
 
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => true,
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { isCI: true });
 
     const res = await verifier(
       'actions/checkout',
-      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      sha,
     );
     assertFail(res, 'api_unreachable', 'CI unreachable network probe');
     assertEqual(
@@ -229,7 +262,7 @@ async function main() {
       'CI unreachable: should only do the network probe',
     );
     assertEqual(
-      fetch.countUrl('https://api.github.com/'),
+      fetch.countUrl(API_ROOT),
       1,
       'CI unreachable: probe URL must be hit exactly once',
     );
@@ -241,19 +274,14 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub({
-      throwByUrl: { 'https://api.github.com/': 'network down' },
+      throwByUrl: { [API_ROOT]: 'network down' },
     });
 
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => false,
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { isCI: false });
 
     const res = await verifier(
       'actions/checkout',
-      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+      sha,
     );
     assertOk(
       res,
@@ -272,33 +300,12 @@ async function main() {
   // 7) Successful lookup: network probe 200, commit lookup 200 => ok:true error:null.
   // ---------------------------------------------------------------------------
   {
-    const commitUrl =
-      'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
-    const fetch = makeFetchStub({
-      statusByUrl: {
-        'https://api.github.com/': 200,
-        [commitUrl]: 200,
-      },
+    await runLookupCase({
+      label: 'success lookup',
+      status: 200,
+      expectedError: null,
+      expectOk: true,
     });
-
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => false,
-      fetchImpl: fetch.fetchImpl,
-    });
-
-    const res = await verifier(
-      'actions/checkout',
-      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-    );
-    assertOk(res, null, 'success lookup');
-    assertEqual(
-      fetch.countUrl('https://api.github.com/'),
-      1,
-      'success: network probe once',
-    );
-    assertEqual(fetch.countUrl(commitUrl), 1, 'success: commit lookup once');
     info('OK: verified SHA found (200)');
   }
 
@@ -306,27 +313,12 @@ async function main() {
   // 8) Missing SHA: network probe 200, commit lookup 404 => ok:false ref_not_found.
   // ---------------------------------------------------------------------------
   {
-    const commitUrl =
-      'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
-    const fetch = makeFetchStub({
-      statusByUrl: {
-        'https://api.github.com/': 200,
-        [commitUrl]: 404,
-      },
+    await runLookupCase({
+      label: 'missing SHA',
+      status: 404,
+      expectedError: 'ref_not_found',
+      expectOk: false,
     });
-
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => false,
-      fetchImpl: fetch.fetchImpl,
-    });
-
-    const res = await verifier(
-      'actions/checkout',
-      'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
-    );
-    assertFail(res, 'ref_not_found', 'missing SHA');
     info('OK: missing SHA returns ref_not_found (404)');
   }
 
@@ -335,28 +327,22 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const mk = async ({ status, expectedError, headers = {} }) => {
-      const commitUrl =
-        'https://api.github.com/repos/actions/checkout/commits/deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
+      const lookupUrl = commitUrl('actions/checkout', sha);
       const fetch = makeFetchStub({
         statusByUrl: {
-          'https://api.github.com/': 200,
-          [commitUrl]: status,
+          [API_ROOT]: 200,
+          [lookupUrl]: status,
         },
         headersByUrl: {
-          [commitUrl]: headers,
+          [lookupUrl]: headers,
         },
       });
 
-      const verifier = createRemoteVerifier({
-        verifyRemoteShas: true,
-        detailImpl: () => {},
-        isCIImpl: () => false,
-        fetchImpl: fetch.fetchImpl,
-      });
+      const verifier = makeVerifier(fetch, { isCI: false });
 
       const res = await verifier(
         'actions/checkout',
-        'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef',
+        sha,
       );
       assertFail(res, expectedError, `status mapping ${status}`);
     };
@@ -377,25 +363,18 @@ async function main() {
   // 10) Action normalization: `@sha` and subpath actions resolve to owner/repo.
   // ---------------------------------------------------------------------------
   {
-    const sha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
-
-    const commitCheckout = `https://api.github.com/repos/actions/checkout/commits/${sha}`;
-    const commitCodeql = `https://api.github.com/repos/github/codeql-action/commits/${sha}`;
+    const commitCheckout = commitUrl('actions/checkout', sha);
+    const commitCodeql = commitUrl('github/codeql-action', sha);
 
     const fetch = makeFetchStub({
       statusByUrl: {
-        'https://api.github.com/': 200,
+        [API_ROOT]: 200,
         [commitCheckout]: 200,
         [commitCodeql]: 200,
       },
     });
 
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => false,
-      fetchImpl: fetch.fetchImpl,
-    });
+    const verifier = makeVerifier(fetch, { isCI: false });
 
     const resAt = await verifier(`actions/checkout@${sha}`, sha);
     assertOk(resAt, null, '@sha action normalization');
@@ -419,38 +398,17 @@ async function main() {
 
   // ---------------------------------------------------------------------------
   // 11) Caching: same repo@sha should only fetch commit lookup once.
-  //     (network probe is also cached by networkChecked)
+  //     (network probe is also cached across calls)
   // ---------------------------------------------------------------------------
   {
-    const sha = 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef';
-    const commitUrl = `https://api.github.com/repos/actions/checkout/commits/${sha}`;
-
-    const fetch = makeFetchStub({
-      statusByUrl: {
-        'https://api.github.com/': 200,
-        [commitUrl]: 200,
-      },
+    await runLookupCase({
+      label: 'cache',
+      status: 200,
+      expectedError: null,
+      expectOk: true,
+      repeat: 2,
+      expectedLookupCount: 1,
     });
-
-    const verifier = createRemoteVerifier({
-      verifyRemoteShas: true,
-      detailImpl: () => {},
-      isCIImpl: () => false,
-      fetchImpl: fetch.fetchImpl,
-    });
-
-    const r1 = await verifier('actions/checkout', sha);
-    const r2 = await verifier('actions/checkout', sha);
-
-    assertOk(r1, null, 'cache first call');
-    assertOk(r2, null, 'cache second call');
-
-    assertEqual(
-      fetch.countUrl('https://api.github.com/'),
-      1,
-      'cache: network probe only once',
-    );
-    assertEqual(fetch.countUrl(commitUrl), 1, 'cache: commit lookup only once');
 
     info('OK: caching prevents duplicate lookups');
   }

@@ -12,6 +12,13 @@ import path from 'node:path';
 import { detail, section } from './console.js';
 import {
   extractUploadPaths,
+  getJobLocation,
+  getStepRunLocation,
+  getStepStartLocation,
+  getStepUsesLocation,
+  getStepWithLocation,
+  hasJobPermissionJustification,
+  hasWorkflowPermissionJustification,
   isActionUpload,
   isDockerAction,
   isLocalAction,
@@ -21,6 +28,7 @@ import {
   workflowKeyFromPath,
 } from './parser.js';
 import { permissionLevel } from './policies.js';
+import { classifyRemoteVerifyResult } from './remote-verify.js';
 
 // Optionally use the RE2 engine (if available) to protect against
 // catastrophic backtracking. We try to require it at load time and fall
@@ -333,30 +341,18 @@ async function checkUsesReference({
     );
   } else if (validateRemoteAction) {
     const result = await validateRemoteAction(action, ref);
-    const ok = result?.ok ?? true;
-    if (result?.error === 'api_unreachable_local_skip') {
+    const info = classifyRemoteVerifyResult(result);
+    if (info.shouldSkip) {
       return { violations, handled: false };
     }
-    if (!ok) {
-      const ERROR_REASONS = {
-        ref_not_found: 'ref not found',
-        api_unreachable: 'GitHub API unreachable',
-        api_unreachable_local_skip: 'GitHub API unreachable (local skip)',
-        unauthorized: 'unauthorized',
-        forbidden_or_rate_limited: 'forbidden or rate limited',
-        rate_limited: 'rate limited',
-        unexpected_status: 'unexpected status',
-        invalid_action_ref: 'invalid action reference',
-      };
-      const reason = ERROR_REASONS[result?.error] || 'remote lookup failed';
-      const weight = result?.error === 'invalid_action_ref' ? 3 : 2;
+    if (!info.ok) {
       violations.push(
         makeViolation(
           rel,
-          `action ref could not be verified (${reason}): ${uses}`,
+          `action ref could not be verified (${info.reason}): ${uses}`,
           line,
           col,
-          weight,
+          info.weight,
         ),
       );
     }
@@ -375,11 +371,12 @@ function reportUnsafePatternViolation({
 }) {
   const allow = isAllowlisted(unsafeAllowlist, rel, jobId, step);
   if (!allow) {
+    const { line, column } = getStepStartLocation(step);
     return makeViolation(
       rel,
       `unsafe pattern ${pattern.id} in job '${jobId}'`,
-      step.startLine || 1,
-      step.startColumn || null,
+      line,
+      column,
       weight,
     );
   }
@@ -435,15 +432,17 @@ function checkWorkflowPermissions({
     return violations;
   }
 
-  for (const [perm, value] of Object.entries(parsed.workflowPermissions)) {
-    const base = baseline[perm] || permissionsBaseline.defaults.unspecified;
-    if (permissionLevel(value) > permissionLevel(base)) {
-      const meta = parsed.workflowPermissionsMeta[perm] || {};
-      if (!meta.hasJustification) {
+  for (const [permissionName, permissionValue] of Object.entries(
+    parsed.workflowPermissions,
+  )) {
+    const base =
+      baseline[permissionName] || permissionsBaseline.defaults.unspecified;
+    if (permissionLevel(permissionValue) > permissionLevel(base)) {
+      if (!hasWorkflowPermissionJustification(parsed, permissionName)) {
         violations.push(
           makeViolation(
             rel,
-            `permissions '${perm}' elevated without justification`,
+            `permissions '${permissionName}' elevated without justification`,
             1,
             null,
             2,
@@ -484,28 +483,28 @@ function checkJobPermissions({
 }) {
   const violations = [];
   if (!job.permissionsDeclared) {
-    const line = job.startLine || 1;
-    const col = job.startColumn || null;
+    const { line, column } = getJobLocation(job);
     violations.push(
-      makeViolation(rel, `job '${jobId}' missing permissions`, line, col, 3),
+      makeViolation(rel, `job '${jobId}' missing permissions`, line, column, 3),
     );
   }
 
   if (!baseline) return violations;
 
-  for (const [perm, value] of Object.entries(job.permissions)) {
-    const base = baseline[perm] || permissionsBaseline.defaults.unspecified;
-    if (permissionLevel(value) > permissionLevel(base)) {
-      const meta = job.permissionsMeta[perm] || {};
-      if (!meta.hasJustification) {
-        const line = job.startLine || 1;
-        const col = job.startColumn || null;
+  for (const [permissionName, permissionValue] of Object.entries(
+    job.permissions,
+  )) {
+    const base =
+      baseline[permissionName] || permissionsBaseline.defaults.unspecified;
+    if (permissionLevel(permissionValue) > permissionLevel(base)) {
+      if (!hasJobPermissionJustification(job, permissionName)) {
+        const { line, column } = getJobLocation(job);
         violations.push(
           makeViolation(
             rel,
-            `job '${jobId}' permission '${perm}' elevated without justification`,
+            `job '${jobId}' permission '${permissionName}' elevated without justification`,
             line,
-            col,
+            column,
             2,
           ),
         );
@@ -535,19 +534,19 @@ function checkHardenRunnerFirst({
   // explicitly permitted harden-runner actions (local paths or repo names).
   const combinedAllowlist = [...allowlist, ...actionAllowlist];
 
-  const isHardenStep = (value) =>
+  const isHardenStep = (usesRef) =>
     combinedAllowlist.some((entry) => {
       // If entry is a prefix pattern (ends with @), allow prefix matches
-      if (entry.endsWith('@')) return value.startsWith(entry);
+      if (entry.endsWith('@')) return usesRef.startsWith(entry);
       // If entry looks like an owner/repo (contains '/' but not a local path),
       // allow repo@sha references (e.g., step-security/harden-runner@...)
       if (entry.includes('/') && !entry.startsWith('./'))
-        return value.startsWith(`${entry}@`) || value === entry;
+        return usesRef.startsWith(`${entry}@`) || usesRef === entry;
       // Otherwise, do an exact match (useful for local paths like './.github/actions/ps-harden-runner')
-      return value === entry;
-    }) || value.startsWith('step-security/harden-runner@');
+      return usesRef === entry;
+    }) || usesRef.startsWith('step-security/harden-runner@');
 
-  const isCheckoutStep = (value) => value.startsWith('actions/checkout@');
+  const isCheckoutStep = (usesRef) => usesRef.startsWith('actions/checkout@');
 
   const hardenOk = isHardenStep(uses);
   const checkoutBootstrapOk =
@@ -556,14 +555,13 @@ function checkHardenRunnerFirst({
     isHardenStep(job.steps[1].uses || '');
 
   if (!hardenOk && !checkoutBootstrapOk) {
-    const line = first.startLine || job.startLine || 1;
-    const col = first.startColumn || job.startColumn || null;
+    const { line, column } = getStepStartLocation(first, job);
     violations.push(
       makeViolation(
         rel,
         `job '${jobId}' first step must be hardened runner`,
         line,
-        col,
+        column,
         2,
       ),
     );
@@ -628,6 +626,20 @@ function checkLocalActionInputs({ rel, jobId, step }) {
     return violations;
   }
 
+  const egressPolicy = String(step.with?.egress_policy || '').trim();
+  if (!egressPolicy) {
+    const { line, column } = getStepWithLocation(step);
+    violations.push(
+      makeViolation(
+        rel,
+        `ps-init requires explicit egress_policy in job '${jobId}'`,
+        line,
+        column,
+        2,
+      ),
+    );
+  }
+
   const skipRaw = String(step.with?.skip_platform_checkout || '')
     .split('#')[0]
     .replaceAll('"', '')
@@ -642,12 +654,13 @@ function checkLocalActionInputs({ rel, jobId, step }) {
 
   const allowlist = String(step.with?.platform_allowed_repositories || '');
   if (!allowlist.trim()) {
+    const { line, column } = getStepStartLocation(step);
     violations.push(
       makeViolation(
         rel,
         `ps-init requires platform_allowed_repositories allowlist in job '${jobId}'`,
-        step.startLine || 1,
-        step.startColumn || null,
+        line,
+        column,
         2,
       ),
     );
@@ -665,24 +678,26 @@ function checkLocalActionStep({ rel, uses, step, workspaceRoot }) {
   const actionsRelative = path.relative(actionsRoot, resolved);
 
   if (relative.startsWith('..') || path.isAbsolute(relative)) {
+    const { line, column } = getStepStartLocation(step);
     violationsLocal.push(
       makeViolation(
         rel,
         `local action path escapes repo: ${uses}`,
-        step.startLine || 1,
-        step.startColumn || null,
+        line,
+        column,
       ),
     );
     return violationsLocal;
   }
 
   if (actionsRelative.startsWith('..') || path.isAbsolute(actionsRelative)) {
+    const { line, column } = getStepStartLocation(step);
     violationsLocal.push(
       makeViolation(
         rel,
         `local actions must live under .github/actions: ${uses}`,
-        step.startLine || 1,
-        step.startColumn || null,
+        line,
+        column,
         2,
       ),
     );
@@ -698,12 +713,13 @@ function checkLocalActionStep({ rel, uses, step, workspaceRoot }) {
   const hasYaml = fs.existsSync(path.join(actionDir, 'action.yaml'));
 
   if (!hasYml && !hasYaml) {
+    const { line, column } = getStepStartLocation(step);
     violationsLocal.push(
       makeViolation(
         rel,
         `local action missing action.yml or action.yaml: ${uses}`,
-        step.startLine || 1,
-        step.startColumn || null,
+        line,
+        column,
         2,
       ),
     );
@@ -724,11 +740,12 @@ async function checkRemoteActionStep({
 }) {
   const violations = [];
   // Validate `uses:` reference for remote/docker/allowlist/pinning.
+  const usesLocation = getStepUsesLocation(step);
   const check = await checkUsesReference({
     rel,
     uses,
-    line: step.startLine || 1,
-    col: step.usesColumn || step.startColumn || null,
+    line: usesLocation.line,
+    col: usesLocation.column,
     allowedActions,
     validateRemoteAction,
   });
@@ -790,23 +807,25 @@ function checkInlineRun({
     );
   } else {
     if (runLineCount > inlineMaxLines) {
+      const { line, column } = getStepRunLocation(step);
       violations.push(
         makeViolation(
           rel,
           `inline bash too long in job '${jobId}'`,
-          step.runLineNumbers?.[0] || step.startLine || 1,
-          step.runLineColumns?.[0] || step.startColumn || null,
+          line,
+          column,
           1,
         ),
       );
     }
     if (!hasStrictMode) {
+      const { line, column } = getStepRunLocation(step);
       violations.push(
         makeViolation(
           rel,
           `inline bash missing 'set -euo pipefail' in job '${jobId}'`,
-          step.runLineNumbers?.[0] || step.startLine || 1,
-          step.runLineColumns?.[0] || step.startColumn || null,
+          line,
+          column,
           1,
         ),
       );
@@ -829,12 +848,13 @@ function checkInlineRun({
 function checkInlineSecrets({ rel, jobId, step }) {
   const violations = [];
   if (/\${{\s*secrets\./.test(step.run)) {
+    const { line, column } = getStepRunLocation(step);
     violations.push(
       makeViolation(
         rel,
         `secrets interpolated in run in job '${jobId}'`,
-        step.runLineNumbers?.[0] || step.startLine || 1,
-        step.runLineColumns?.[0] || step.startColumn || null,
+        line,
+        column,
         3,
       ),
     );
@@ -854,24 +874,26 @@ function checkInlineAllowlistConstraints({
     try {
       re = compileRegex(r);
     } catch (err) {
+      const { line, column } = getStepRunLocation(step);
       violations.push(
         makeViolation(
           rel,
           `invalid inline allowlist regex '${r}': ${err.message}`,
-          step.runLineNumbers?.[0] || step.startLine || 1,
-          step.runLineColumns?.[0] || step.startColumn || null,
+          line,
+          column,
           3,
         ),
       );
       continue;
     }
     if (re.test(step.run)) {
+      const { line, column } = getStepRunLocation(step);
       violations.push(
         makeViolation(
           rel,
           `inline bash allowlist constraints violated in job '${jobId}'`,
-          step.runLineNumbers?.[0] || step.startLine || 1,
-          step.runLineColumns?.[0] || step.startColumn || null,
+          line,
+          column,
           2,
         ),
       );
@@ -880,12 +902,13 @@ function checkInlineAllowlistConstraints({
   }
 
   if (!runHasAll(step.runLines, inlineConstraints.requireContains)) {
+    const { line, column } = getStepRunLocation(step);
     violations.push(
       makeViolation(
         rel,
         `inline bash allowlist missing required content in job '${jobId}'`,
-        step.runLineNumbers?.[0] || step.startLine || 1,
-        step.runLineColumns?.[0] || step.startColumn || null,
+        line,
+        column,
         2,
       ),
     );
@@ -908,12 +931,13 @@ function checkUnsafeRunPatterns({
       try {
         re = compileRegex(reStr);
       } catch (err) {
+        const { line, column } = getStepRunLocation(step);
         violations.push(
           makeViolation(
             rel,
             `invalid unsafe pattern regex '${reStr}' (${pattern.id}): ${err.message}`,
-            step.runLineNumbers?.[0] || step.startLine || 1,
-            step.runLineColumns?.[0] || step.startColumn || null,
+            line,
+            column,
             3,
           ),
         );
@@ -937,12 +961,13 @@ function checkSectionHeaders({ rel, jobId, step }) {
   const violations = [];
   if (step.runLines.length === 0) return violations;
   if (!/print-section\.sh/.test(step.run)) {
+    const { line, column } = getStepRunLocation(step);
     violations.push(
       makeViolation(
         rel,
         `inline run missing section header in job '${jobId}'`,
-        step.runLineNumbers?.[0] || step.startLine || 1,
-        step.runLineColumns?.[0] || step.startColumn || null,
+        line,
+        column,
         1,
       ),
     );
@@ -959,8 +984,7 @@ function checkSecretsHandling({ rel, jobId, step }) {
   const hasSecretsInWith = withValues.some((v) => /\${{\s*secrets\./.test(v));
 
   if (hasSecretsInWith) {
-    const wLine = step.withLineNumbers?.[0] || step.startLine || 1;
-    const wCol = step.withLineColumns?.[0] || step.startColumn || null;
+    const { line: wLine, column: wCol } = getStepWithLocation(step);
     violations.push(
       makeViolation(
         rel,
@@ -973,8 +997,7 @@ function checkSecretsHandling({ rel, jobId, step }) {
   }
 
   if (hasSecretsInRun) {
-    const rLine = step.runLineNumbers?.[0] || step.startLine || 1;
-    const rCol = step.runLineColumns?.[0] || step.startColumn || null;
+    const { line: rLine, column: rCol } = getStepRunLocation(step);
     if (/\bset\s+-x\b|\bset\s+-o\s+xtrace\b/.test(run)) {
       violations.push(
         makeViolation(
@@ -990,14 +1013,68 @@ function checkSecretsHandling({ rel, jobId, step }) {
       (line) => /\${{\s*secrets\./.test(line) && /\b(echo|printf)\b/.test(line),
     );
     if (echoLineIdx >= 0) {
-      const line = step.runLineNumbers?.[echoLineIdx] || rLine;
-      const col = step.runLineColumns?.[echoLineIdx] || rCol;
+      const { line, column } = getStepRunLocation(step, echoLineIdx);
       violations.push(
         makeViolation(
           rel,
           `echo/printf used alongside secrets in job '${jobId}'`,
           line,
-          col,
+          column,
+          3,
+        ),
+      );
+    }
+  }
+
+  return violations;
+}
+
+function checkBinaryDownloadWithoutChecksum({ rel, jobId, step }) {
+  const violations = [];
+  const run = step.run || '';
+  if (!run) return violations;
+  const runLines = step.runLines || [];
+
+  const downloads = new Set();
+  for (const line of runLines) {
+    const match = line.match(
+      /\b(curl|wget)\b[^\n]*\s(?:-o|--output|-O)\s+([^\s"'`]+)/,
+    );
+    if (!match) continue;
+    const target = match[2].replace(/^['"]|['"]$/g, '');
+    if (target) downloads.add(target);
+  }
+
+  if (downloads.size === 0) return violations;
+
+  const hasChecksum = runLines.some((line) =>
+    /\b(sha256sum|shasum)\b/.test(line) && /\s(-c|--check)\b/.test(line),
+  );
+  const hasGpgVerify = runLines.some((line) => /\bgpg\b/.test(line) && /--verify\b/.test(line));
+  if (hasChecksum || hasGpgVerify) return violations;
+
+  const escapeRegex = (value) =>
+    value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+  for (const file of downloads) {
+    const escaped = escapeRegex(file);
+    const execRegex = new RegExp(`(^|\\s|;)(\\./)?${escaped}(\\s|$|;)`);
+    const chmodRegex = new RegExp(`\\bchmod\\s+\\+x\\s+${escaped}(\\s|$)`);
+    const installRegex = new RegExp(`\\binstall\\b[^\\n]*\\s${escaped}(\\s|$)`);
+
+    const execLineIdx = runLines.findIndex(
+      (line) =>
+        !/\b(curl|wget)\b/.test(line) &&
+        (execRegex.test(line) || chmodRegex.test(line) || installRegex.test(line)),
+    );
+    if (execLineIdx >= 0) {
+      const { line, column } = getStepRunLocation(step, execLineIdx);
+      violations.push(
+        makeViolation(
+          rel,
+          `downloaded binary '${file}' executed without checksum or GPG verification in job '${jobId}'`,
+          line,
+          column,
           3,
         ),
       );
@@ -1091,6 +1168,11 @@ async function processStep({
       unsafeAllowlist,
     }),
     ...checkSecretsHandling({
+      rel,
+      jobId,
+      step,
+    }),
+    ...checkBinaryDownloadWithoutChecksum({
       rel,
       jobId,
       step,

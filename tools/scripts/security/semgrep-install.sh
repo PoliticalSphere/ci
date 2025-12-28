@@ -15,6 +15,13 @@
 # ==============================================================================
 set -euo pipefail
 
+repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
+if [[ -f "${repo_root}/tools/scripts/egress.sh" ]]; then
+  # shellcheck source=tools/scripts/egress.sh
+  . "${repo_root}/tools/scripts/egress.sh"
+  load_egress_allowlist || { echo "ERROR: egress allowlist load failed" >&2; exit 1; }
+fi
+
 if ! command -v python3 >/dev/null 2>&1; then
   echo "ERROR: python3 is required to install Semgrep." >&2
   exit 1
@@ -26,6 +33,16 @@ python3 -m venv "${venv_dir}"
 
 # shellcheck source=/dev/null
 source "${venv_dir}/bin/activate"
+
+if declare -F assert_egress_allowed_url >/dev/null 2>&1; then
+  pip_index="${PIP_INDEX_URL:-https://pypi.org/simple}"
+  assert_egress_allowed_url "${pip_index}"
+  if [[ -n "${PIP_EXTRA_INDEX_URL:-}" ]]; then
+    for extra in ${PIP_EXTRA_INDEX_URL}; do
+      assert_egress_allowed_url "${extra}"
+    done
+  fi
+fi
 
 checksum="${SEMGREP_SHA256_INPUT:-}"
 if [[ -n "${checksum}" ]]; then

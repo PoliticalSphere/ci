@@ -24,7 +24,7 @@ graph TB
 
     subgraph "Platform Actions"
         JOB_SETUP[ps-bootstrap<br/>Canonical Bootstrap]
-        CI_VALIDATE[ci-validate<br/>Policy Validation]
+        CI_VALIDATE[ps-ci-validate<br/>Policy Validation]
         UPLOAD_ARTIFACTS[ps-upload-artifacts<br/>Evidence Collection]
         PS_RUN[ps-run<br/>Script Execution]
         PS_SUMMARY[ps-write-summary<br/>Reporting]

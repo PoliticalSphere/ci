@@ -7,7 +7,7 @@
 //
 // Goals:
 //   - No network calls (remote verifier stubbed)
-//   - Real YAML files written to a temp workspace (exercise parser + checks)
+//   - Real YAML files written to a scratch workspace (exercise parser + checks)
 //   - Assert key violations *and* some metadata (path/weight/line)
 //   - Avoid brittleness by controlling baselines + allowed-first-steps
 // ============================================================================
@@ -59,11 +59,11 @@ const alwaysOkVerifier = async () => ({ ok: true, error: null });
 
 try {
   // ----------------------------------------------------------------------------
-  // Setup temp workspace
+  // Setup scratch workspace
   // ----------------------------------------------------------------------------
-  const tmp = mktemp();
-  const workflowsDir = path.join(tmp, '.github', 'workflows');
-  const actionsDir = path.join(tmp, '.github', 'actions');
+  const workspaceRoot = mktemp();
+  const workflowsDir = path.join(workspaceRoot, '.github', 'workflows');
+  const actionsDir = path.join(workspaceRoot, '.github', 'actions');
   fs.mkdirSync(workflowsDir, { recursive: true });
   fs.mkdirSync(actionsDir, { recursive: true });
 
@@ -111,7 +111,7 @@ try {
 
   const { violations } = await scanWorkflows({
     workflows: [wfPath],
-    workspaceRoot: tmp,
+    workspaceRoot,
 
     // Supply-chain policy: nothing allowlisted
     allowedActions: new Set([]),
@@ -203,7 +203,7 @@ try {
 
   const actionViolations = await scanActions({
     actions: [actionYml],
-    platformRoot: tmp,
+    platformRoot: workspaceRoot,
     allowedActions: new Set([]),
     validateRemoteAction: alwaysOkVerifier,
     quiet: true,

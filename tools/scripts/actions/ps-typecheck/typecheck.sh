@@ -22,8 +22,51 @@ if [[ -f "${format_sh}" ]]; then
   . "${format_sh}"
 fi
 
+PS_LOG_COMPONENT="lint.typecheck"
+typecheck_status_override=""
+typecheck_start_ms=""
+if command -v ps_epoch_ms >/dev/null 2>&1; then
+  typecheck_start_ms="$(ps_epoch_ms)"
+fi
+if command -v ps_log >/dev/null 2>&1; then
+  ps_log info lint.tool.start "id=lint.typecheck" "title=TYPECHECK" "detail=Type checking (tsc)"
+fi
+typecheck_log_finish() {
+  local rc="${1:-0}"
+  local status=""
+  local end_ms=""
+  local duration_ms=""
+
+  if [[ -n "${typecheck_status_override}" ]]; then
+    status="${typecheck_status_override}"
+  elif [[ "${rc}" -eq 0 ]]; then
+    status="PASS"
+  else
+    status="FAIL"
+  fi
+
+  if command -v ps_epoch_ms >/dev/null 2>&1; then
+    end_ms="$(ps_epoch_ms)"
+  fi
+  if [[ -n "${typecheck_start_ms}" && -n "${end_ms}" ]]; then
+    duration_ms=$((end_ms - typecheck_start_ms))
+  fi
+
+  if command -v ps_log >/dev/null 2>&1; then
+    ps_log info lint.tool.finish \
+      "id=lint.typecheck" \
+      "title=TYPECHECK" \
+      "status=${status}" \
+      "exit_code=${rc}" \
+      ${duration_ms:+"duration_ms=${duration_ms}"}
+  fi
+  return 0
+}
+trap 'typecheck_log_finish $?' EXIT
+
 project_tsconfig="${repo_root}/tsconfig.json"
 if [[ ! -f "${project_tsconfig}" ]]; then
+  typecheck_status_override="ERROR"
   if command -v ps_error >/dev/null 2>&1; then
     ps_error "project tsconfig not found: ${project_tsconfig}"
     ps_detail_err "HINT: create tsconfig.json that extends configs/lint/tsconfig.base.json and defines include/files."
@@ -41,8 +84,10 @@ elif command -v tsc >/dev/null 2>&1; then
   TSC_BIN="$(command -v tsc)"
 else
   if command -v ps_error >/dev/null 2>&1; then
+    typecheck_status_override="ERROR"
     ps_error "tsc not found. Fix: npm ci"
   else
+    typecheck_status_override="ERROR"
     echo "ERROR: tsc not found. Fix: npm ci" >&2
   fi
   exit 1
@@ -61,6 +106,7 @@ TSC_ARGS=("$@")
 # fail early with a clear message.
 for arg in "${TSC_ARGS[@]:-}"; do
   if [[ "${arg}" == *.ts || "${arg}" == *.tsx ]]; then
+    typecheck_status_override="ERROR"
     echo "ERROR: typecheck.sh must not receive source files when using --project" >&2
     exit 1
   fi

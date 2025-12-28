@@ -33,17 +33,21 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.actionlint"
+lint_log_init "lint.actionlint" "ACTIONLINT" "GitHub Actions workflow validation" "$(lint_log_mode)"
 
 cd "${repo_root}"
 
 config_path="${repo_root}/configs/lint/actionlint.yml"
 if [[ ! -f "${config_path}" ]]; then
+  lint_log_set_status "ERROR"
   ps_error "actionlint config not found: ${config_path}"
   exit 1
 fi
 
 ACTIONLINT_BIN="${ACTIONLINT_BIN:-actionlint}"
 if ! command -v "${ACTIONLINT_BIN}" >/dev/null 2>&1; then
+  lint_log_set_status "ERROR"
   ps_error "actionlint is required but not found on PATH"
   ps_detail_err "HINT: install actionlint (or set ACTIONLINT_BIN=/path/to/actionlint)"
   exit 1
@@ -82,6 +86,8 @@ else
 fi
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "Actionlint: no workflow files to check."
   exit 0
 fi
@@ -104,9 +110,12 @@ for f in "${targets[@]}"; do
 done
 
 if [[ "${#lintable[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "Actionlint: nothing to lint after filtering."
   exit 0
 fi
+lint_log_set_targets "${#lintable[@]}"
 
 # Run actionlint
 if [[ "${#ACTIONLINT_ARGS[@]}" -gt 0 ]]; then

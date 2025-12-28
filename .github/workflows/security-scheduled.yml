@@ -338,12 +338,14 @@ jobs:
           summary_workflow: security-scheduled
           summary_output_path: reports/summary/security-scheduled.json
           summary_results: |
-            validate-ci=${{ needs.validate-ci.result }}
+            validate-ci=${{ needs['validate-ci'].result }}
             secrets=${{ needs.secrets.result }}
             codeql=${{ needs.codeql.result }}
             semgrep=${{ needs.semgrep.result }}
           artifacts_name: security-scheduled-summary
           artifacts_paths: |
+            reports/**
+            logs/**
             reports/summary/security-scheduled.json
           artifacts_if_no_files_found: "warn"
           artifacts_retention_days: 14

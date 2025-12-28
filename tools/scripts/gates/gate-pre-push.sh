@@ -58,6 +58,7 @@ on_interrupt() {
     "gate.interrupted" \
     "${GATE_NAME} gate interrupted" \
     "Interrupted by user or signal"
+  gate_log_finish "FAIL" 130
   exit 130
 }
 
@@ -73,6 +74,7 @@ if ! command -v node >/dev/null 2>&1; then
   else
     echo "ERROR: node is required but not found on PATH" >&2
   fi
+  gate_log_finish "FAIL" 1
   exit 1
 fi
 
@@ -82,10 +84,12 @@ if ! command -v npm >/dev/null 2>&1; then
   else
     echo "ERROR: npm is required but not found on PATH" >&2
   fi
+  gate_log_finish "FAIL" 1
   exit 1
 fi
 
 bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
+gate_log_start
 
 run_step "typecheck" "TypeScript typecheck" "Strict TypeScript checks" \
   bash "${PS_TASKS_SCRIPTS}/typecheck.sh"

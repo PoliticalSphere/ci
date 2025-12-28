@@ -23,9 +23,12 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.biome"
+lint_log_init "lint.biome" "BIOME" "Formatting and correctness checks" "$(lint_log_mode)"
 
 config_path="${repo_root}/biome.json"
 if [[ ! -f "${config_path}" ]]; then
+  lint_log_set_status "ERROR"
   ps_error "Biome config not found: ${config_path}"
   exit 1
 fi
@@ -37,6 +40,7 @@ if [[ -x "${repo_root}/node_modules/.bin/biome" ]]; then
 elif command -v biome >/dev/null 2>&1; then
   BIOME_BIN="$(command -v biome)"
 else
+  lint_log_set_status "ERROR"
   ps_error "Biome not found. Fix: npm ci"
   exit 1
 fi
@@ -81,10 +85,13 @@ else
   _ps_collect_staged_targets "${file_selector}"
 
   if [[ "${#targets[@]}" -eq 0 ]]; then
+    lint_log_set_targets 0
+    lint_log_set_status "SKIPPED"
     ps_detail "Biome: no staged JS/TS/JSON files to check."
     exit 0
   fi
 fi
+lint_log_set_targets "${#targets[@]}"
 
 # Execute (handle empty/unset args safely)
 declare -a cmd_args=()

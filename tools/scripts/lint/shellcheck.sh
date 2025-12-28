@@ -15,15 +15,19 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.shellcheck"
+lint_log_init "lint.shellcheck" "SHELLCHECK" "Shell script safety checks" "$(lint_log_mode)"
 
 config_path="${repo_root}/configs/lint/shellcheckrc"
 if [[ ! -f "${config_path}" ]]; then
+  lint_log_set_status "ERROR"
   ps_error "shellcheck config not found: ${config_path}"
   exit 1
 fi
 
 SHELLCHECK_BIN="${SHELLCHECK_BIN:-shellcheck}"
 if ! command -v "${SHELLCHECK_BIN}" >/dev/null 2>&1; then
+  lint_log_set_status "ERROR"
   ps_error "shellcheck is required but not found on PATH"
   ps_detail_err "HINT: install shellcheck or provide it via your tooling image."
   exit 1
@@ -74,6 +78,8 @@ if [[ "${full_scan}" == "1" ]]; then
 
 else
   if [[ "${has_git:-0}" != "1" ]]; then
+    lint_log_set_targets 0
+    lint_log_set_status "SKIPPED"
     ps_detail "ShellCheck: git not available; nothing to check in staged mode."
     exit 0
   fi
@@ -92,9 +98,12 @@ else
 fi
 
 if [[ "${#files[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "ShellCheck: no shell scripts to check."
   exit 0
 fi
+lint_log_set_targets "${#files[@]}"
 
 if [[ "${#SHELLCHECK_ARGS[@]}" -gt 0 ]]; then
   "${SHELLCHECK_BIN}" -x --rcfile "${config_path}" "${SHELLCHECK_ARGS[@]}" "${files[@]}"

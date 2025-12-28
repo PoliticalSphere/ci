@@ -3,14 +3,14 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import {
   buildPsRunEnv,
   createPsRunWorkspace,
   createScript,
   getLogPath,
+  getPsRunHelper,
 } from './ps-run-utils.js';
-import { fail, getRepoRoot, readYamlFile } from './test-utils.js';
+import { buildSafeEnv, fail, getRepoRoot, readYamlFile } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
 const actionYaml = path.join(
@@ -43,12 +43,12 @@ function extractRunScript(outputPath) {
 // Test: log file hardening (symlink rejection + permissions)
 // ----------------------------------------------------------------------------
 (function testLogHardening() {
-  const tmp = createPsRunWorkspace();
-  extractRunScript(path.join(tmp, 'run.sh'));
+  const workspaceRoot = createPsRunWorkspace();
+  extractRunScript(path.join(workspaceRoot, 'run.sh'));
 
   const scriptRel = 'scripts/noop.sh';
   createScript(
-    tmp,
+    workspaceRoot,
     scriptRel,
     '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n',
   );
@@ -57,8 +57,8 @@ function extractRunScript(outputPath) {
   const title = 'Log Hardening Test';
 
   // Create a symlink at the expected log path to simulate attack
-  const target = path.join(tmp, '..', 'evil.log');
-  const logPath = getLogPath(tmp, id);
+  const target = path.join(workspaceRoot, '..', 'evil.log');
+  const logPath = getLogPath(workspaceRoot, id);
   try {
     fs.symlinkSync(target, logPath);
   } catch {
@@ -66,7 +66,7 @@ function extractRunScript(outputPath) {
     // but proceed — test will ensure we detect unsafe path via isSymbolicLink or failure to create
   }
 
-  const env = buildPsRunEnv(tmp, {
+  const env = buildPsRunEnv(workspaceRoot, {
     PS_TASK_ID: id,
     PS_TASK_TITLE: title,
     PS_TASK_DESC: '',
@@ -78,16 +78,10 @@ function extractRunScript(outputPath) {
 
   let out = '';
   try {
-    let safePath = '';
-    try {
-      safePath = getSafePathEnv();
-    } catch (err) {
-      fail(`Safe PATH validation failed: ${err?.message || err}`);
-    }
-    env.PATH = safePath;
+    Object.assign(env, buildSafeEnv());
     execFileSync(
       'bash',
-      ['-lc', `exec > "${logPath}" 2>&1; ${path.join(tmp, 'run.sh')}`],
+      ['-lc', `exec > "${logPath}" 2>&1; ${path.join(workspaceRoot, 'run.sh')}`],
       { encoding: 'utf8', env },
     );
     fail('expected run to fail due to unsafe log path (symlink)');
@@ -112,12 +106,11 @@ function extractRunScript(outputPath) {
 // Test: env_kv per-value size limit enforcement
 // ----------------------------------------------------------------------------
 (function testEnvKvSizeLimit() {
-  const tmp = createPsRunWorkspace();
-  extractRunScript(path.join(tmp, 'run.sh'));
+  const workspaceRoot = createPsRunWorkspace();
 
   const scriptRel = 'scripts/noop.sh';
   createScript(
-    tmp,
+    workspaceRoot,
     scriptRel,
     '#!/usr/bin/env bash\nset -euo pipefail\necho NOOP\n',
   );
@@ -126,27 +119,22 @@ function extractRunScript(outputPath) {
   const title = 'Env Size Test';
   const huge = 'A'.repeat(70000); // > 65536
   const env_kv = `FOO=${huge}\n`;
-  const logPath = getLogPath(tmp, id);
-  const command = `exec > "${logPath}" 2>&1; ${path.join(tmp, 'run.sh')}`;
+  const logPath = getLogPath(workspaceRoot, id);
+  const helper = getPsRunHelper(repoRoot);
+  const command = `exec > "${logPath}" 2>&1; ${helper}`;
 
-  const env = buildPsRunEnv(tmp, {
-    PS_TASK_ID: id,
-    PS_TASK_TITLE: title,
-    PS_TASK_DESC: '',
-    PS_TASK_SCRIPT: scriptRel,
-    PS_TASK_WORKDIR: '.',
-    PS_TASK_ENV_KV: env_kv,
-    PS_TASK_ARGS: '',
+  const env = buildPsRunEnv(workspaceRoot, {
+    PS_ID: id,
+    PS_TITLE: title,
+    PS_DESCRIPTION: '',
+    PS_REL_SCRIPT: scriptRel,
+    PS_REL_WD: '.',
+    PS_ENV_KV: env_kv,
+    PS_ARGS: '',
   });
 
   try {
-    let safePath = '';
-    try {
-      safePath = getSafePathEnv();
-    } catch (err) {
-      fail(`Safe PATH validation failed: ${err?.message || err}`);
-    }
-    env.PATH = safePath;
+    Object.assign(env, buildSafeEnv());
     execFileSync('bash', ['-lc', command], { encoding: 'utf8', env });
     fail('expected run to fail due to env_kv value too large');
   } catch (err) {

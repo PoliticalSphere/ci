@@ -1,55 +1,115 @@
 # ==============================================================================
-# Political Sphere — Composite Action: Upload Artifacts
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Upload workflow artifacts with platform defaults and explicit, validated inputs.
+# Political Sphere — Composite Action: PS Upload Artifacts
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
 #
-# Metadata:
-#   - id: ps-upload-artifacts
-#   - version: 1.0.0
-#   - owner: political-sphere
-#   - classification: internal
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-# Scope & Responsibilities:
-#   - Does: validate inputs and upload artifacts with configured retention/behaviour.
-#   - Does NOT: decide which files to include or when to run.
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-teardown/ps-upload-artifacts/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Explicit inputs + validation
-#   - SHA-pinned dependency
-#   - CI-safe behaviour (sane defaults, clear failures)
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
 #
-# Dependencies:
-#   - actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f
-#   - tools/scripts/actions/ps-teardown/ps-upload-artifacts/ps-upload-artifacts-validate.sh
-#   - tools/scripts/branding/validate-inputs.sh
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
 #
-# Dependents:
-#   - ./.github/workflows/validate-ci.yml
-#   - ./.github/workflows/pr-gates.yml
-#   - ./.github/workflows/build-artifacts.yml
-#   - ./.github/workflows/security-scheduled.yml
-#   - ./.github/workflows/release.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Upload Artifacts composite action to Upload workflow
+#     artifacts with platform defaults.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
 #
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#   - Invoked by: workflows (often with if: always())
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [name, path, retention_days, if_no_files_found, compression_level]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
 #
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller
-#   - Constraints:
-#       - Artifact name must be CI-safe (validated here)
-#       - No path traversal restrictions are imposed here (caller controls path)
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-teardown/ps-upload-artifacts
+#   model: deterministic
+#   idempotency: not guaranteed
 #
-# Operational Notes:
-#   - Allowlist enforcement is handled by Validate-CI (configs/ci/policies/artifact-policy.yml)
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: uploads caller-specified paths only
-#   - CI vs local: identical behavior
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-teardown]
+#   external: [bash, actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - tools/scripts/actions/ps-teardown
+#
 # ==============================================================================
 
 name: "PS Upload Artifacts"

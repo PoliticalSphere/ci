@@ -20,6 +20,8 @@ const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
 const actionDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 
 const violations = [];
+const sensitiveVarPattern =
+  /\$(\{)?(GITHUB_TOKEN|GH_TOKEN|SONAR_TOKEN|NODE_AUTH_TOKEN|TOKEN|SECRET|PASSWORD|API_KEY|APIKEY|ACCESS_KEY|AWS_SECRET_ACCESS_KEY|AWS_ACCESS_KEY_ID|CLIENT_SECRET)\b/i;
 
 for (const dir of actionDirs) {
   const actionFile = path.join(actionsRoot, dir, 'action.yml');
@@ -50,6 +52,14 @@ for (const dir of actionDirs) {
           line: i + 1,
           text: l.trim(),
           reason: 'echo with variable interpolation (prefer printf %q)',
+        });
+      }
+      if (/\b(echo|printf)\b/.test(l) && sensitiveVarPattern.test(l)) {
+        violations.push({
+          file: scriptPath,
+          line: i + 1,
+          text: l.trim(),
+          reason: 'echo/printf with sensitive variable interpolation',
         });
       }
     }

@@ -313,6 +313,8 @@ jobs:
           summary_results: contract=${{ job.status }}
           artifacts_name: consumer-contract-report
           artifacts_paths: |
+            reports/**
+            logs/**
             ${{ inputs.artifact_paths }}
           artifacts_if_no_files_found: "warn"
           artifacts_retention_days: ${{ inputs.retention_days }}

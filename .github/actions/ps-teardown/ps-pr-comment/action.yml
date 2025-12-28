@@ -1,48 +1,116 @@
 # ==============================================================================
-# Political Sphere — Composite Action: PR Comment
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Post a structured comment to a pull request for workflow status visibility.
+# Political Sphere — Composite Action: PS PR Comment
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
 #
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-teardown/ps-pr-comment/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
-# Scope & Responsibilities:
-#   - Does: publish a PR comment with a provided message body.
-#   - Does NOT: decide comment content or when to run.
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Minimal permissions (issues: write only when required)
-#   - Clear validation of required inputs
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
 #
-# Dependencies:
-#   - GitHub CLI (gh) available on the runner
-#   - ./.github/actions/ps-banner
-#   - tools/scripts/actions/ps-teardown/ps-pr-comment/ps-pr-comment-resolve-root.sh
-#   - tools/scripts/actions/ps-teardown/ps-pr-comment/ps-pr-comment-validate-inputs.sh
-#   - tools/scripts/actions/ps-teardown/ps-pr-comment/ps-pr-comment-post.sh
-#   - tools/scripts/ci/validate-pr-refs.sh
-#   - tools/scripts/branding/validate-inputs.sh
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS PR Comment composite action to Post a comment to a pull
+#     request.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
 #
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [pr_number, body, github_token, expected_base_sha, expected_head_sha]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
 #
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
-#   - Invoked by: PR workflows when failures occur
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-teardown/ps-pr-comment
+#   model: deterministic
+#   idempotency: not guaranteed
 #
-# Security & Policy Notes:
-#   - Secrets: requires github_token input for API auth
-#   - Permissions: issues: write required in caller
-#   - Constraints: only posts to the current repo
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-teardown, tools/scripts/ci]
+#   external: [bash]
 #
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: none
-#   - CI vs local: intended for CI only
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [github_token]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - tools/scripts/actions/ps-teardown
+#     - tools/scripts/ci
+#
 # ==============================================================================
 
 name: "PS PR Comment"

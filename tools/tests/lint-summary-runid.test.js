@@ -58,10 +58,14 @@ try {
   out = (err.stdout || '') + (err.stderr || '');
 }
 
-const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
+const filtered = String(out)
+  .split('\n')
+  .filter((line) => !line.startsWith('PS.LOG '))
+  .join('\n');
+const headerCount = (filtered.match(/LINT & TYPE CHECK/g) || []).length;
 if (headerCount !== 1) {
   fail(
-    `Unexpected header count with GITHUB_RUN_ID: expected 1, found ${headerCount}\nOutput:\n${out}`,
+    `Unexpected header count with GITHUB_RUN_ID: expected 1, found ${headerCount}\nOutput:\n${filtered}`,
   );
 }
 

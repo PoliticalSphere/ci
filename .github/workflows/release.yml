@@ -117,8 +117,7 @@ on:
 
       release_ref:
         description: "Git ref to release from (branch name or full SHA)"
-        required: false
-        default: "main"
+        required: true
         type: string
 
       # ==========================================================================
@@ -435,6 +434,8 @@ jobs:
             release=${{ needs.release.result }}
           artifacts_name: release-summary
           artifacts_paths: |
+            reports/**
+            logs/**
             reports/summary/release.json
           artifacts_if_no_files_found: "warn"
           artifacts_retention_days: ${{ inputs.retention_days }}

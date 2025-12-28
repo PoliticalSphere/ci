@@ -372,6 +372,8 @@ jobs:
             build=${{ needs.build.result }}
           artifacts_name: ${{ env.PS_ARTIFACT_PREFIX }}-summary
           artifacts_paths: |
+            reports/**
+            logs/**
             reports/summary/build-artifacts.json
           artifacts_if_no_files_found: "warn"
           artifacts_retention_days: ${{ inputs.retention_days }}

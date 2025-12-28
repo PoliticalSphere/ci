@@ -1,66 +1,121 @@
 # ==============================================================================
 # Political Sphere — Composite Action: PS Task Runner
+# License: Proprietary
 # ==============================================================================
+# ps_header_v: 6
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: ps-run
-# version: 1.1.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-26
-# last_updated: 2025-12-26
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-task/ps-run/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Task Runner composite action to Canonical task runner with
+#     uniform logs and report outputs.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [id, title, description, script, working_directory, working-directory,
+#     require_files, artifact_paths, continue_on_error, env_kv, args, allow_args,
+#     strict_artifacts]
+#   outputs: [status, log_path, report_path, duration_ms, exit_code, enabled]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-task/ps-run
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
 # DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - tools/scripts/ci/emit-report.py (optional; python3 required)
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/ci/emit-report.py,
+#     tools/scripts/actions/cross-cutting/string.sh,
+#     tools/scripts/actions/cross-cutting/path.sh]
+#   external: [bash]
 #
-# DEPENDENTS
-# ------------------------------------------------------------------------------
-# - ./.github/actions/ps-task/* (task wrappers)
-# - ./.github/actions/ps-bootstrap/ps-tools (security scans)
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Canonical task runner for repository scripts with uniform logging/reporting.
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
 #
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Validate inputs and path safety
-#   - Enforce deterministic execution
-#   - Validate required files before running
-#   - Execute script and capture logs + report JSON (best-effort)
-#   - Optionally validate expected outputs via glob-aware artifact_paths
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
 #
-# DOES NOT:
-#   - Install dependencies
-#   - Modify job permissions
-#   - Perform repository checkout
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Repo-local path enforcement with realpath checks
-# - Best-effort reporting even on failure
-#
-# SECURITY TIERING
-# ------------------------------------------------------------------------------
-# Level 1 — High (executes repository scripts with strict guardrails)
-#
-# THREAT MODEL
-# ------------------------------------------------------------------------------
-# Purpose: Prevents path traversal, argument splitting, and artifact spoofing
-#          while preserving audit-ready logs for downstream systems.
-#
-# AUDIT LOG
-# ------------------------------------------------------------------------------
-# Records task outputs via structured JSON reports and canonical log paths.
-#
-# NOTES
-# ------------------------------------------------------------------------------
-# - artifact_paths entries are treated as globs (newline-separated).
-# - A report is written best-effort even when validation fails early.
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-task/ps-run/README.md
+#     - tools/scripts/ci/emit-report.py
+#     - tools/scripts/actions/cross-cutting/string.sh
+#     - tools/scripts/actions/cross-cutting/path.sh
 #
 # ==============================================================================
 
@@ -177,9 +232,16 @@ runs:
         PS_TASK_STRICT_ARTIFACTS: ${{ inputs.strict_artifacts }}
       run: |
         set -euo pipefail
+        readonly MAX_ENV_KV_ENTRIES=100
+        readonly MAX_ENV_KV_VALUE_BYTES=65536
+        readonly MAX_ENV_KV_TOTAL_BYTES=262144
 
         now_ms() {
           # Prefer GNU date with millisecond precision; fallback to seconds*1000.
+          if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+            printf '%s000' "${SOURCE_DATE_EPOCH}"
+            return 0
+          fi
           if out=$(date +%s%3N 2>/dev/null) && printf '%s' "$out" | grep -qE '^[0-9]+$'; then
             printf '%s' "$out"
           else
@@ -187,30 +249,14 @@ runs:
           fi
         }
 
-        trim() {
-          # shellcheck disable=SC2001
-          printf '%s' "$1" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//'
-        }
+        # shellcheck source=tools/scripts/actions/cross-cutting/string.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/string.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/path.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/path.sh"
 
         fail() {
           printf 'ERROR: %s\n' "$*" >&2
           exit 1
-        }
-
-        # Safe repo-relative path:
-        # - not empty
-        # - not absolute
-        # - no traversal segments (/../ or ../ or ..\)
-        safe_relpath() {
-          local p="$1"
-          [[ -n "${p}" ]] || return 1
-          [[ "${p}" != /* ]] || return 1
-          [[ "${p}" != *".."* ]] || true
-          # Reject traversal segments rather than any ".." substring.
-          case "${p}" in
-            *"/../"*|../*|*/..|*"\../"*|..\\*|*\\..|*"/.."|*"..\\" ) return 1 ;;
-          esac
-          return 0
         }
 
         resolve_abs_path() {
@@ -252,7 +298,15 @@ runs:
           local msg="$*"
           msg="$(printf '%s' "${msg}" | tr -d '\r\n' | tr -c '[:print:]\t' ' ')"
           local ts
-          ts="$(date -u +%FT%T%z 2>/dev/null || date -u +%FT%T)"
+          if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+            if date -u -r "${SOURCE_DATE_EPOCH}" +%FT%T%z >/dev/null 2>&1; then
+              ts="$(date -u -r "${SOURCE_DATE_EPOCH}" +%FT%T%z)"
+            else
+              ts="$(date -u -d "@${SOURCE_DATE_EPOCH}" +%FT%T%z)"
+            fi
+          else
+            ts="$(date -u +%FT%T%z 2>/dev/null || date -u +%FT%T)"
+          fi
           if [[ -n "${log_abs:-}" ]]; then
             printf '%s %s %s\n' "${ts}" "${level}" "${msg}" >> "${log_abs}"
           else
@@ -366,31 +420,21 @@ runs:
           dur=$((end_ms - start_ms))
 
           emit_script="${repo_root}/tools/scripts/ci/emit-report.py"
+          export REPORT_PATH="${report_abs}"
+          export TASK_ID="${id}"
+          export TASK_TITLE="${title}"
+          export TASK_DESC="${desc}"
+          export TASK_STATUS="${s}"
+          export TASK_EXIT_CODE="${ec}"
+          export TASK_DURATION_MS="${dur}"
+          export TASK_LOG_PATH="${log_rel}"
+          export TASK_REPORT_PATH="${report_rel}"
+          export TASK_SCRIPT="${script_rel}"
+          export TASK_WORKDIR="${working_directory}"
+
           if command -v python3 >/dev/null 2>&1 && [[ -f "${emit_script}" ]]; then
-            REPORT_PATH="${report_abs}" \
-            TASK_ID="${id}" \
-            TASK_TITLE="${title}" \
-            TASK_DESC="${desc}" \
-            TASK_STATUS="${s}" \
-            TASK_EXIT_CODE="${ec}" \
-            TASK_DURATION_MS="${dur}" \
-            TASK_LOG_PATH="${log_rel}" \
-            TASK_REPORT_PATH="${report_rel}" \
-            TASK_SCRIPT="${script_rel}" \
-            TASK_WORKDIR="${working_directory}" \
             python3 "${emit_script}"
           elif command -v python3 >/dev/null 2>&1; then
-            REPORT_PATH="${report_abs}" \
-            TASK_ID="${id}" \
-            TASK_TITLE="${title}" \
-            TASK_DESC="${desc}" \
-            TASK_STATUS="${s}" \
-            TASK_EXIT_CODE="${ec}" \
-            TASK_DURATION_MS="${dur}" \
-            TASK_LOG_PATH="${log_rel}" \
-            TASK_REPORT_PATH="${report_rel}" \
-            TASK_SCRIPT="${script_rel}" \
-            TASK_WORKDIR="${working_directory}" \
             python3 - <<'PY'
         import json, os
         p = {
@@ -510,11 +554,11 @@ runs:
 
             # enforce per-value and total size limits
             val_len=${#value}
-            if (( val_len > 65536 )); then
+            if (( val_len > MAX_ENV_KV_VALUE_BYTES )); then
               fail "env_kv value too large (key: ${key})"
             fi
             total_env_kv_bytes=$((total_env_kv_bytes + val_len))
-            if (( total_env_kv_bytes > 262144 )); then
+            if (( total_env_kv_bytes > MAX_ENV_KV_TOTAL_BYTES )); then
               fail "env_kv total size too large"
             fi
 
@@ -524,7 +568,7 @@ runs:
 
         # Limit the number of env entries to prevent resource abuse
         env_kv_count=${#env_args[@]:-0}
-        if (( env_kv_count > 100 )); then
+        if (( env_kv_count > MAX_ENV_KV_ENTRIES )); then
           fail "env_kv has too many entries (${env_kv_count})"
         fi
 

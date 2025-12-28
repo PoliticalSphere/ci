@@ -126,8 +126,6 @@ jobs:
     # Only pass *required* secrets to the called workflow instead of inheriting
     # all repository secrets (least privilege). For example, pass NODE_AUTH_TOKEN
     # when private registry access is needed.
-    secrets:
-      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
 
   # ============================================================================
   # POLICY ENFORCEMENT — LICENSE COMPLIANCE (REUSABLE)
@@ -157,9 +155,6 @@ jobs:
       runner: ubuntu-22.04
       node_version: "22"
       fetch_depth: 1
-      platform_ref: "main"
 
     # Optional: enable only if license workflow needs secrets (e.g. private npm).
     # Only pass required secrets (avoid secrets: inherit).
-    secrets:
-      NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}

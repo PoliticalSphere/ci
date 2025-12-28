@@ -18,6 +18,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.markdown"
+lint_log_init "lint.markdown" "MARKDOWN" "Markdown quality checks" "$(lint_log_mode)"
 
 # Prefer '.markdownlint.json' (markdownlint-cli2), then jsonc/json/yml fallbacks.
 config_dot="${repo_root}/configs/lint/.markdownlint.json"
@@ -38,6 +40,7 @@ elif [[ -f "${config_json}" ]]; then
 elif [[ -f "${config_yaml}" ]]; then
   config_path="${config_yaml}"
 else
+  lint_log_set_status "ERROR"
   ps_error "markdownlint config not found (expected .markdownlint.json / markdownlint-cli2.jsonc / markdownlint.json[c] / markdownlint.yml)"
   exit 1
 fi
@@ -48,6 +51,7 @@ if [[ -x "${repo_root}/node_modules/.bin/markdownlint-cli2" ]]; then
 elif command -v markdownlint-cli2 >/dev/null 2>&1; then
   MDL_BIN="$(command -v markdownlint-cli2)"
 else
+  lint_log_set_status "ERROR"
   ps_error "markdownlint-cli2 is required but not found (run: npm ci)"
   exit 1
 fi
@@ -80,19 +84,15 @@ else
 fi
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "Markdownlint: no Markdown files to check."
   exit 0
 fi
+lint_log_set_targets "${#targets[@]}"
 
 # markdownlint-cli2 works best from repo root with relative paths
-declare -a relative_targets=()
-  for target in "${targets[@]}"; do
-    if [[ "${target}" == "${repo_root}/"* ]]; then
-      relative_targets+=("${target#"${repo_root}"/}")
-    else
-      relative_targets+=("${target}")
-    fi
-  done
+set_relative_targets
 
 # Run and capture output + exit code reliably
 output=""
@@ -126,6 +126,7 @@ if [[ -n "${output}" ]]; then
 fi
 
 if [[ -n "${timeout_cmd}" && "${status}" -eq 124 ]]; then
+  lint_log_set_status "ERROR"
   ps_error "Markdownlint timed out after ${timeout_s}s."
 fi
 

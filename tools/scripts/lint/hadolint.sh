@@ -18,15 +18,19 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.hadolint"
+lint_log_init "lint.hadolint" "HADOLINT" "Dockerfile security and quality" "$(lint_log_mode)"
 
 config_path="${repo_root}/configs/lint/hadolint.yaml"
 if [[ ! -f "${config_path}" ]]; then
+  lint_log_set_status "ERROR"
   ps_error "hadolint config not found: ${config_path}"
   exit 1
 fi
 
 HADOLINT_BIN="${HADOLINT_BIN:-hadolint}"
 if ! command -v "${HADOLINT_BIN}" >/dev/null 2>&1; then
+  lint_log_set_status "ERROR"
   ps_error "hadolint is required but not found on PATH"
   ps_detail_err "HINT: install hadolint or provide it via your tooling image."
   exit 1
@@ -54,6 +58,8 @@ if [[ "${full_scan}" == "1" ]]; then
   collect_targets_find \( -name "Dockerfile" -o -name "Dockerfile.*" -o -name "*.Dockerfile" \)
 
   if [[ "${#targets[@]}" -eq 0 ]]; then
+    lint_log_set_targets 0
+    lint_log_set_status "SKIPPED"
     ps_detail "Hadolint: no Dockerfiles found."
     exit 0
   fi
@@ -73,6 +79,8 @@ else
   collect_targets_staged "Dockerfile|Dockerfile.*|*.Dockerfile"
 
   if [[ "${#targets[@]}" -eq 0 ]]; then
+    lint_log_set_targets 0
+    lint_log_set_status "SKIPPED"
     ps_detail "Hadolint: no staged Dockerfiles to check."
     exit 0
   fi
@@ -87,8 +95,11 @@ else
 fi
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "Hadolint: no Dockerfiles to check."
   exit 0
 fi
+lint_log_set_targets "${#targets[@]}"
 
 "${HADOLINT_BIN}" --config "${config_path}" "${HADOLINT_ARGS[@]}" "${targets[@]}"

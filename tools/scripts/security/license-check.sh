@@ -59,7 +59,24 @@ section() {
   return 0
 }
 
-now_iso() { date -u +"%Y-%m-%dT%H:%M:%SZ"; return 0; }
+epoch_now() {
+  if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+    printf '%s' "${SOURCE_DATE_EPOCH}"
+    return 0
+  fi
+  date +%s
+}
+
+epoch_to_iso() {
+  local epoch="$1"
+  if date -u -r "${epoch}" +"%Y-%m-%dT%H:%M:%SZ" >/dev/null 2>&1; then
+    date -u -r "${epoch}" +"%Y-%m-%dT%H:%M:%SZ"
+    return 0
+  fi
+  date -u -d "@${epoch}" +"%Y-%m-%dT%H:%M:%SZ"
+}
+
+now_iso() { epoch_to_iso "$(epoch_now)"; return 0; }
 
 hash_file_sha256() {
   local p="$1"
@@ -203,8 +220,8 @@ fi
 
 lock_mtime_pre="$(stat_mtime "${lock_path}")"
 
-start_ts="$(now_iso)"
-start_epoch="$(date +%s)"
+start_epoch="$(epoch_now)"
+start_ts="$(epoch_to_iso "${start_epoch}")"
 
 # Run node tool; tee to log. pipefail ensures we keep the node exit code.
 node "${repo_root}/tools/scripts/security/license-check.js" \
@@ -222,8 +239,8 @@ if [[ "${lock_mtime_pre}" != "${lock_mtime_post}" ]]; then
   exit_code=1
 fi
 
-end_ts="$(now_iso)"
-end_epoch="$(date +%s)"
+end_epoch="$(epoch_now)"
+end_ts="$(epoch_to_iso "${end_epoch}")"
 duration_s=$(( end_epoch - start_epoch ))
 
 # ------------------------------------------------------------------------------
@@ -238,8 +255,8 @@ if [[ -n "${policy_baseline_hash}" ]]; then
     python3 - <<'PY' "${report_path}"
 import json, sys
 with open(sys.argv[1], "r", encoding="utf-8") as f:
-    data = json.load(f)
-print(data.get("policy_sha256", ""))
+    report_doc = json.load(f)
+print(report_doc.get("policy_sha256", ""))
 PY
   )"
   expected_hash="$(printf '%s' "${policy_baseline_hash}" | tr "${upper_class}" "${lower_class}")"

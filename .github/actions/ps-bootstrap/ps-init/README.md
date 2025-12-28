@@ -74,7 +74,7 @@ Option B (recommended): step-scoped escape hatch for specific actions.
     egress_policy: audit
     fetch_depth: "1"
     platform_repo: PoliticalSphere/ci
-    platform_ref: main
+    platform_ref: 0123456789abcdef0123456789abcdef01234567
     platform_path: .ps-platform
     install_tools: "1"
     tools_bundle: lint
@@ -108,7 +108,8 @@ HOME isolation:
 Platform checkout (optional):
 
 - `platform_repo`: Platform repository (`OWNER/REPO`). Default: `PoliticalSphere/ci`.
-- `platform_ref`: Platform ref. Default: `main`.
+- `platform_ref`: Platform ref (branch/tag/SHA). Required unless
+  `skip_platform_checkout` is `true`.
 - `platform_path`: Repo-relative platform checkout path. Default: `.ps-platform`.
 - `skip_platform_checkout`: Skip platform checkout (`0/1/true/false`). Default: `false`.
 - `platform_fetch_depth`: Platform fetch depth (0 = full history). Default: `1`.

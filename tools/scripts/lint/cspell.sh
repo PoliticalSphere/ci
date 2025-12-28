@@ -22,6 +22,8 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.cspell"
+lint_log_init "lint.cspell" "CSPELL" "Spelling checks" "$(lint_log_mode)"
 
 config_dot="${repo_root}/configs/lint/.cspell.json"
 config_json="${repo_root}/configs/lint/cspell.json"
@@ -32,6 +34,7 @@ if [[ -f "${config_dot}" ]]; then
 elif [[ -f "${config_json}" ]]; then
   config_path="${config_json}"
 else
+  lint_log_set_status "ERROR"
   ps_error "cspell config not found (expected configs/lint/.cspell.json or configs/lint/cspell.json)"
   exit 1
 fi
@@ -49,6 +52,7 @@ elif [[ "${CI:-0}" != "1" ]] && command -v npx >/dev/null 2>&1; then
   CSP_VIA_NPX=1
   ps_detail "cspell not found locally — using npx (non-deterministic). Prefer: npm ci"
 else
+  lint_log_set_status "ERROR"
   ps_error "cspell is required but not found (run: npm ci)"
   exit 1
 fi
@@ -74,19 +78,15 @@ else
 fi
 
 if [[ "${#targets[@]}" -eq 0 ]]; then
+  lint_log_set_targets 0
+  lint_log_set_status "SKIPPED"
   ps_detail "CSpell: no files to check."
   exit 0
 fi
+lint_log_set_targets "${#targets[@]}"
 
 # Relative paths (cspell output is nicer and config often assumes repo-root)
-declare -a relative_targets=()
-  for target in "${targets[@]}"; do
-    if [[ "${target}" == "${repo_root}/"* ]]; then
-      relative_targets+=("${target#"${repo_root}"/}")
-    else
-      relative_targets+=("${target}")
-    fi
-  done
+set_relative_targets
 
 # Run and capture output + exit code reliably
 output=""

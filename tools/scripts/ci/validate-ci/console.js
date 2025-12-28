@@ -20,6 +20,78 @@ const DEFAULT_FORMAT = {
   sectionIdCase: 'upper',
 };
 
+const LOG_SCHEMA = process.env.PS_LOG_SCHEMA || 'ps.log.v1';
+
+function logEnabled() {
+  const mode = String(process.env.PS_LOG_MODE || 'both').toLowerCase();
+  return !['human', 'off', 'false', '0'].includes(mode);
+}
+
+function logStream() {
+  const stream = String(process.env.PS_LOG_STREAM || 'stdout').toLowerCase();
+  return stream === 'stderr' ? process.stderr : process.stdout;
+}
+
+function logTimestamp() {
+  const raw = process.env.SOURCE_DATE_EPOCH || '';
+  if (raw && /^\d+$/.test(raw)) {
+    const epoch = Number(raw) * 1000;
+    return new Date(epoch).toISOString();
+  }
+  return new Date().toISOString();
+}
+
+function escapeLogValue(value) {
+  const raw = String(value ?? '').replace(/[\r\n\t]+/g, ' ').trimEnd();
+  if (raw === '') return '""';
+  if (/[=\s"\\]/.test(raw)) {
+    return `"${raw.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
+  }
+  return raw;
+}
+
+function emitLog({ level = 'info', event = 'log', message = '', ...data }) {
+  if (!logEnabled()) return;
+
+  const base = {
+    schema: LOG_SCHEMA,
+    ts: logTimestamp(),
+    level,
+    event,
+  };
+
+  const component = process.env.PS_LOG_COMPONENT || '';
+  if (component) base.component = component;
+
+  const runId = process.env.PS_RUN_ID || process.env.GITHUB_RUN_ID || '';
+  if (runId) base.run_id = runId;
+
+  if (message) base.message = message;
+
+  const payload = { ...base, ...data };
+  const parts = ['PS.LOG'];
+  for (const [key, val] of Object.entries(payload)) {
+    if (val === undefined || val === null || val === '') continue;
+    parts.push(`${key}=${escapeLogValue(val)}`);
+  }
+  const line = `${parts.join(' ')}\n`;
+  logStream().write(line);
+
+  const logPath = process.env.PS_LOG_PATH || '';
+  if (logPath) {
+    try {
+      fs.mkdirSync(path.dirname(logPath), { recursive: true });
+      fs.appendFileSync(logPath, line);
+    } catch {
+      // Non-fatal: log sinks should not break validation output.
+    }
+  }
+}
+
+export function record(level, event, data = {}) {
+  emitLog({ level, event, ...data });
+}
+
 function parseEnvFile(raw) {
   const entries = {};
   const lines = raw.split(/\r?\n/);
@@ -28,15 +100,15 @@ function parseEnvFile(raw) {
     if (!trimmed || trimmed.startsWith('#')) continue;
     const eq = trimmed.indexOf('=');
     if (eq === -1) continue;
-    const key = trimmed.slice(0, eq).trim();
-    let value = trimmed.slice(eq + 1).trim();
+    const entryKey = trimmed.slice(0, eq).trim();
+    let entryValue = trimmed.slice(eq + 1).trim();
     if (
-      (value.startsWith('"') && value.endsWith('"')) ||
-      (value.startsWith("'") && value.endsWith("'"))
+      (entryValue.startsWith('"') && entryValue.endsWith('"')) ||
+      (entryValue.startsWith("'") && entryValue.endsWith("'"))
     ) {
-      value = value.slice(1, -1);
+      entryValue = entryValue.slice(1, -1);
     }
-    entries[key] = value;
+    entries[entryKey] = entryValue;
   }
   return entries;
 }
@@ -84,6 +156,7 @@ function formatSectionId(id) {
 
 export function section(id, title, detail = '') {
   const sid = formatSectionId(String(id));
+  emitLog({ level: 'info', event: 'section', id, title, detail });
   // CLI output: section headers are printed to stdout intentionally
   const useColor =
     process.env.NO_COLOR !== '1' &&
@@ -111,7 +184,10 @@ export function section(id, title, detail = '') {
   }
 }
 
-export function info(message) {
+export function info(message, opts = {}) {
+  if (!opts.skipLog) {
+    emitLog({ level: 'info', event: 'info', message });
+  }
   const useColor =
     process.env.NO_COLOR !== '1' &&
     (process.env.FORCE_COLOR === '1' || process.stdout.isTTY);
@@ -125,10 +201,17 @@ export function info(message) {
 }
 
 export function detail(message) {
-  info(`${FORMAT.detailIndent}${message}`);
+  emitLog({ level: 'info', event: 'detail', message });
+  info(`${FORMAT.detailIndent}${message}`, { skipLog: true });
 }
 
 export function bullet(message, opts = {}) {
+  emitLog({
+    level: opts.stream === 'stderr' ? 'warn' : 'info',
+    event: 'bullet',
+    message,
+    stream: opts.stream || 'stdout',
+  });
   const indent =
     typeof opts.indent === 'string' ? opts.indent : FORMAT.bulletIndent;
   const prefix = typeof opts.bullet === 'string' ? opts.bullet : FORMAT.bullet;
@@ -141,6 +224,7 @@ export function bullet(message, opts = {}) {
 }
 
 export function fatal(message) {
+  emitLog({ level: 'error', event: 'fatal', message, exit_code: 1 });
   const useColor =
     process.env.NO_COLOR !== '1' &&
     (process.env.FORCE_COLOR === '1' || process.stdout.isTTY);
@@ -156,23 +240,29 @@ export function fatal(message) {
 }
 
 export function getRepoRoot() {
-  try {
-    let safePath = '';
-    try {
-      safePath = getSafePathEnv();
-    } catch (err) {
-      fatal(`Safe PATH validation failed: ${err?.message || err}`);
+  const configured =
+    process.env.PS_REPO_ROOT || process.env.GITHUB_WORKSPACE || '';
+  if (configured) {
+    if (!fs.existsSync(configured) || !fs.statSync(configured).isDirectory()) {
+      fatal(`repo root not found at ${configured}`);
     }
-    const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
-      stdio: ['ignore', 'pipe', 'ignore'],
-      encoding: 'utf8',
-      env: { PATH: safePath },
-    });
-    if (r && r.status === 0) return String(r.stdout || '').trim();
-    return process.cwd();
-  } catch {
-    return process.cwd();
+    return configured;
   }
+
+  let safePath = '';
+  try {
+    safePath = getSafePathEnv();
+  } catch (err) {
+    fatal(`Safe PATH validation failed: ${err?.message || err}`);
+  }
+  const r = spawnSync('git', ['rev-parse', '--show-toplevel'], {
+    stdio: ['ignore', 'pipe', 'ignore'],
+    encoding: 'utf8',
+    env: { PATH: safePath },
+  });
+  const root = r && r.status === 0 ? String(r.stdout || '').trim() : '';
+  if (root) return root;
+  fatal('repo root not configured and git root unavailable; set PS_REPO_ROOT');
 }
 
 export function isCI() {

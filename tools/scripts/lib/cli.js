@@ -13,12 +13,12 @@ export function parseArgs(argv) {
   for (let i = 0; i < argv.length; i += 1) {
     const arg = argv[i];
     if (!arg.startsWith('--')) continue;
-    const key = arg.slice(2);
-    const value = argv[i + 1];
-    if (!value || value.startsWith('--')) {
-      args[key] = true;
+    const optionKey = arg.slice(2);
+    const optionValue = argv[i + 1];
+    if (!optionValue || optionValue.startsWith('--')) {
+      args[optionKey] = true;
     } else {
-      args[key] = value;
+      args[optionKey] = optionValue;
     }
   }
   return args;

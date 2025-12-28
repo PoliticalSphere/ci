@@ -22,15 +22,20 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 set_repo_root_and_git
 set_full_scan_flag
+PS_LOG_COMPONENT="lint.knip"
+lint_log_init "lint.knip" "KNIP" "Dependency audit (knip)" "$(lint_log_mode)"
 
 # Fast mode: only run when dependency manifests/lockfiles changed.
 if [[ "${full_scan}" != "1" ]]; then
   targets=()
   collect_targets_staged "package.json|package-lock.json|npm-shrinkwrap.json|yarn.lock|pnpm-lock.yaml"
   if [[ "${#targets[@]}" -eq 0 ]]; then
+    lint_log_set_targets 0
+    lint_log_set_status "SKIPPED"
     ps_detail "Knip: no staged package/lock files changed — skipping."
     exit 0
   fi
+  lint_log_set_targets "${#targets[@]}"
 fi
 
 KNIP_BIN="${KNIP_BIN:-}"
@@ -47,6 +52,7 @@ elif [[ "${CI:-0}" != "1" ]] && command -v npx >/dev/null 2>&1; then
   KNIP_VIA_NPX=1
   ps_detail "knip not found locally — using npx (non-deterministic). Prefer: npm ci"
 else
+  lint_log_set_status "ERROR"
   ps_error "knip is required but not found (run: npm ci)"
   exit 1
 fi

@@ -35,6 +35,14 @@ case "${ID_CASE}" in
   *)     section_id="${id}" ;;
 esac
 
+if type -t ps_log >/dev/null 2>&1; then
+  if [[ -n "${description}" ]]; then
+    ps_log info section "id=${id}" "title=${title}" "detail=${description}"
+  else
+    ps_log info section "id=${id}" "title=${title}"
+  fi
+fi
+
 echo
 if ps_supports_color; then
   C_RESET="\033[0m"

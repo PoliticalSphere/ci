@@ -8,17 +8,12 @@ set -euo pipefail
 #   Validate PR comment inputs.
 # ==============================================================================
 
-
-scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
-
-validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
-if [[ ! -f "${validate_sh}" ]]; then
-  printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
-  echo "HINT: ensure PS_PLATFORM_ROOT is set to the platform checkout OR vendor scripts into the repo." >&2
-  exit 1
-fi
-# shellcheck source=/dev/null
-. "${validate_sh}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=tools/scripts/actions/cross-cutting/resolve-validate-inputs.sh
+. "${script_dir}/../../cross-cutting/resolve-validate-inputs.sh"
+resolve_validate_inputs \
+  "HINT: ensure PS_PLATFORM_ROOT is set to the platform checkout OR vendor scripts into the repo." \
+  || exit 1
 
 require_nonempty "inputs.pr_number" "${PS_PR_NUMBER}" || exit 1
 require_number "inputs.pr_number" "${PS_PR_NUMBER}" || exit 1

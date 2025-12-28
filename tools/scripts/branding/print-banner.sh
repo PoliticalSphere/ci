@@ -92,6 +92,7 @@ fi
 
 print_banner() {
   local rule="${PS_FMT_RULE:-────────────────────────────────────────}"
+  local print_rule="${PS_BANNER_RULE:-1}"
 
   if _supports_color; then
     local c_reset=$'\033[0m'
@@ -102,11 +103,15 @@ print_banner() {
     printf "%b" "${c_bold}${c_cyan}"
     cat "${banner_path}"
     printf "%b\n" "${c_reset}"
-    printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
+    if [[ "${print_rule}" != "0" ]]; then
+      printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
+    fi
   else
     cat "${banner_path}"
     printf '\n'
-    printf '%s\n' "${rule}"
+    if [[ "${print_rule}" != "0" ]]; then
+      printf '%s\n' "${rule}"
+    fi
   fi
 
   return 0

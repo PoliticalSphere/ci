@@ -14,17 +14,10 @@ set -euo pipefail
 #   - ./.github/actions/ps-bootstrap/ps-tools/action.yml
 # ==============================================================================
 
-
-scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
-
-validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
-if [[ ! -f "${validate_sh}" ]]; then
-  printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
-  exit 1
-fi
-
-# shellcheck source=/dev/null
-. "${validate_sh}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=tools/scripts/actions/cross-cutting/resolve-validate-inputs.sh
+. "${script_dir}/../cross-cutting/resolve-validate-inputs.sh"
+resolve_validate_inputs || exit 1
 
 # install_dir validation (source of truth)
 install_dir="${PS_INSTALL_DIR_INPUT:-.tooling/bin}"

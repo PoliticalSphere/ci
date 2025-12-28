@@ -1,30 +1,116 @@
 # ==============================================================================
-# Political Sphere — Composite Action: Build
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Run the deterministic build step with platform defaults.
+# Political Sphere — Composite Action: Build (PS)
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
 #
-# Metadata:
-#   - id: build
-#   - version: 1.0.0
-#   - owner: political-sphere
-#   - classification: internal
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-24
-# Scope & Responsibilities:
-#   - Does: execute the build script in the configured working directory.
-#   - Does NOT: install dependencies, run tests, or modify permissions.
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-task/build/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - CI-safe logging via ps-task/ps-run
-#   - Strong input validation (paths, existence, traversal)
-#   - Minimal policy surface (caller chooses script/WD explicitly)
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
 #
-# Dependencies:
-#   - ./.github/actions/ps-task/ps-run
-#   - tools/scripts/actions/ps-build/build.sh (default)
-#   - tools/scripts/branding/print-section.sh (optional, for UX)
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the Build (PS) composite action to Run deterministic build steps
+#     via ps-task.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [id, title, description, working_directory, working-directory, script, args,
+#     allow_args, artifact_paths, env_kv]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-task/build
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-build/build.sh]
+#   external: [none]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-task/build/README.md
+#     - tools/scripts/actions/ps-build/build.sh
 #
 # ==============================================================================
 

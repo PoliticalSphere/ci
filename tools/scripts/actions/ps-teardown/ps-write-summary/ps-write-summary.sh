@@ -21,12 +21,12 @@ fi
 status_failure="failure"
 overall="success"
 keys=()
-vals=()
+result_values=()
 
 while IFS= read -r line; do
   [[ -z "${line}" ]] && continue
   key="${line%%=*}"
-  val="${line#*=}"
+  result_value="${line#*=}"
 
   if [[ "${key}" == "${line}" ]]; then
     printf "ERROR: invalid results entry '%s' (expected key=value).\n" "${line}" >&2
@@ -38,23 +38,23 @@ while IFS= read -r line; do
     exit 1
   fi
 
-  case "${val}" in
+  case "${result_value}" in
     success|failure|cancelled|skipped) ;;
     *)
-      printf "ERROR: invalid result value '%s' for '%s'.\n" "${val}" "${key}" >&2
+      printf "ERROR: invalid result value '%s' for '%s'.\n" "${result_value}" "${key}" >&2
       exit 1
       ;;
   esac
 
   keys+=("${key}")
-  vals+=("${val}")
+  result_values+=("${result_value}")
 
   # Determine overall status with precedence: failure > skipped > cancelled > success
-  if [[ "${val}" == "${status_failure}" ]]; then
+  if [[ "${result_value}" == "${status_failure}" ]]; then
     overall="${status_failure}"
-  elif [[ "${val}" == "skipped" && "${overall}" != "${status_failure}" ]]; then
+  elif [[ "${result_value}" == "skipped" && "${overall}" != "${status_failure}" ]]; then
     overall="skipped"
-  elif [[ "${val}" == "cancelled" && "${overall}" != "${status_failure}" && "${overall}" != "skipped" ]]; then
+  elif [[ "${result_value}" == "cancelled" && "${overall}" != "${status_failure}" && "${overall}" != "skipped" ]]; then
     overall="cancelled"
   fi
  done <<< "${results_block}"
@@ -65,11 +65,11 @@ mkdir -p "${output_dir}"
 json="{\"workflow\":\"${workflow}\",\"status\":\"${overall}\",\"results\":{"
 for i in "${!keys[@]}"; do
   key="${keys[$i]}"
-  val="${vals[$i]}"
+  result_value="${result_values[$i]}"
   if [[ "${i}" -gt 0 ]]; then
     json+=","
   fi
-  json+="\"${key}\":\"${val}\""
+  json+="\"${key}\":\"${result_value}\""
 done
 json+="}}"
 

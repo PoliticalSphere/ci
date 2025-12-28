@@ -7,7 +7,7 @@ action is strict and fails fast on missing inputs or paths.
 
 ```yaml
 - name: Validate CI
-  uses: ./.github/actions/ci-validate
+  uses: ./.github/actions/ps-ci-validate
   with:
     platform_root: ${{ env.PS_PLATFORM_ROOT }}
 ```

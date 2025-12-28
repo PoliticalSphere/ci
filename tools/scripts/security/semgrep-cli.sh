@@ -16,6 +16,13 @@
 # ==============================================================================
 set -euo pipefail
 
+repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
+if [[ -f "${repo_root}/tools/scripts/egress.sh" ]]; then
+  # shellcheck source=tools/scripts/egress.sh
+  . "${repo_root}/tools/scripts/egress.sh"
+  load_egress_allowlist || fail "egress allowlist load failed"
+fi
+
 fail() {
   printf 'ERROR: %s\n' "$*" >&2
   # If the script is being sourced, return so the caller can handle the error.
@@ -74,11 +81,15 @@ upload_sarif() {
   local repo="${GITHUB_REPOSITORY:-}"
   local sha="${GITHUB_SHA:-}"
   local ref="${GITHUB_REF:-}"
+  local api_url="${GITHUB_API_URL:-https://api.github.com}"
   [[ -n "${token}" ]] || fail "GITHUB_TOKEN is required to upload SARIF"
   [[ -n "${repo}" ]] || fail "GITHUB_REPOSITORY is required to upload SARIF"
   [[ -n "${sha}" ]] || fail "GITHUB_SHA is required to upload SARIF"
   [[ -n "${ref}" ]] || fail "GITHUB_REF is required to upload SARIF"
   [[ -f "${sarif_path}" ]] || fail "SARIF not found at ${sarif_path}"
+  if declare -F assert_egress_allowed_url >/dev/null 2>&1; then
+    assert_egress_allowed_url "${api_url}"
+  fi
 
   python3 - <<'PY'
 import base64
@@ -105,11 +116,11 @@ payload = {
     "compression": "gzip",
 }
 
-data = json.dumps(payload).encode("utf-8")
+payload_bytes = json.dumps(payload).encode("utf-8")
 url = f"{api_url}/repos/{repo}/code-scanning/sarifs"
 req = urllib.request.Request(
     url,
-    data=data,
+    data=payload_bytes,
     headers={
         "Authorization": f"token {token}",
         "Accept": "application/vnd.github+json",
@@ -122,10 +133,8 @@ try:
     with urllib.request.urlopen(req, timeout=60) as resp:
         if resp.status < 200 or resp.status >= 300:
             raise SystemExit(f"SARIF upload failed with status {resp.status}")
-        body = resp.read().decode("utf-8")
+        resp.read()
         print(f"PS.SEMGREP: upload status={resp.status}")
-        if body:
-            print(body)
 except Exception as exc:
     raise SystemExit(f"SARIF upload failed: {exc}") from exc
 PY

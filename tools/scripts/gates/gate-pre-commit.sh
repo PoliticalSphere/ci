@@ -53,6 +53,7 @@ export PS_LINT_PRINT_MODE="${PS_LINT_PRINT_MODE:-auto}"
 
 # Banner
 bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
+gate_log_start
 
 # ------------------------------------------------------------------------------
 # FAST CHECKS ONLY
@@ -98,6 +99,7 @@ if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
     "gate.failed" \
     "${GATE_NAME} gate failed" \
     "One or more lint/typecheck checks failed (see logs/lint/*.log)"
+  gate_log_finish "FAIL" 1
   exit 1
 fi
 

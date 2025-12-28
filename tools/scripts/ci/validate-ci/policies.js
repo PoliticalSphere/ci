@@ -33,7 +33,10 @@ function parseSelector(line) {
   const selMatch = line.match(
     /^\s*(workflow_path|job_id|step_id|step_name):\s*(.+)\s*$/,
   );
-  return selMatch ? { key: selMatch[1], value: selMatch[2] } : null;
+  if (!selMatch) return null;
+  const selectorKey = selMatch[1];
+  const selectorValue = selMatch[2];
+  return { key: selectorKey, value: selectorValue };
 }
 
 function shouldAddEntry(entry, entryHasStatus) {
@@ -101,28 +104,28 @@ function processSelectorEntryLine(state, entries, line, startMarker) {
 
   if (!state.inSelector) return;
 
-  const selector = parseSelector(line);
-  if (selector) {
-    state.current.selector[selector.key] = selector.value;
+  const selectorEntry = parseSelector(line);
+  if (selectorEntry) {
+    state.current.selector[selectorEntry.key] = selectorEntry.value;
   }
 }
 
-export function permissionLevel(value) {
-  if (value === 'none') return 0;
-  if (value === 'read') return 1;
-  if (value === 'write') return 2;
+export function permissionLevel(permissionValue) {
+  if (permissionValue === 'none') return 0;
+  if (permissionValue === 'read') return 1;
+  if (permissionValue === 'write') return 2;
   return -1;
 }
 
 function parseRepoEntry(line) {
   const trimmed = line.trim();
   if (!trimmed.startsWith('- repo:')) return null;
-  const value = trimmed.slice('- repo:'.length).trim();
-  if (!value) return null;
-  const slashIndex = value.indexOf('/');
-  if (slashIndex <= 0 || slashIndex === value.length - 1) return null;
-  const owner = value.slice(0, slashIndex);
-  const repo = value.slice(slashIndex + 1);
+  const repoEntryValue = trimmed.slice('- repo:'.length).trim();
+  if (!repoEntryValue) return null;
+  const slashIndex = repoEntryValue.indexOf('/');
+  if (slashIndex <= 0 || slashIndex === repoEntryValue.length - 1) return null;
+  const owner = repoEntryValue.slice(0, slashIndex);
+  const repo = repoEntryValue.slice(slashIndex + 1);
   const validPart = (s) => /^[A-Za-z0-9_. -]+$/.test(s);
   if (!validPart(owner) || !validPart(repo)) return null;
   return `${owner}/${repo}`;
@@ -225,14 +228,14 @@ function parseRegexEntry(line) {
   if (trimmed.startsWith('- ')) {
     // Use explicit substring handling so this function's implementation
     // is distinct from `cleanRegexEntry` while preserving behavior.
-    let val = trimmed.slice(2).trim();
+    let regexEntry = trimmed.slice(2).trim();
     if (
-      (val.startsWith('"') && val.endsWith('"')) ||
-      (val.startsWith("'") && val.endsWith("'"))
+      (regexEntry.startsWith('"') && regexEntry.endsWith('"')) ||
+      (regexEntry.startsWith("'") && regexEntry.endsWith("'"))
     ) {
-      val = val.slice(1, -1);
+      regexEntry = regexEntry.slice(1, -1);
     }
-    return val;
+    return regexEntry;
   }
   return null;
 }
@@ -428,16 +431,16 @@ function parseUses(line) {
   // and return the original value to preserve any additional subpath.
   const trimmed = line.trim();
   if (!trimmed.startsWith('uses:')) return null;
-  const val = trimmed.slice('uses:'.length).trim();
-  if (!val) return null;
-  const parts = val.split('/');
+  const usesValue = trimmed.slice('uses:'.length).trim();
+  if (!usesValue) return null;
+  const parts = usesValue.split('/');
   if (parts.length < 2) return null;
   const owner = parts[0];
   const repo = parts[1];
   if (!/^[A-Za-z0-9_. -]+$/.test(owner) || !/^[A-Za-z0-9_. -]+$/.test(repo)) {
     return null;
   }
-  return val;
+  return usesValue;
 }
 
 function parseEnabled(line) {
@@ -449,12 +452,12 @@ function parseWithEntry(line) {
   const trimmed = line.trim();
   const colon = trimmed.indexOf(':');
   if (colon <= 0) return null;
-  const key = trimmed.slice(0, colon).trim();
-  const value = trimmed.slice(colon + 1).trim();
-  if (!key || !value) return null;
-  if (!/^[A-Za-z0-9_-]+$/.test(key)) return null;
-  if (!/^[A-Za-z0-9_. -]+$/.test(value)) return null;
-  return { key, value };
+  const withKey = trimmed.slice(0, colon).trim();
+  const withValue = trimmed.slice(colon + 1).trim();
+  if (!withKey || !withValue) return null;
+  if (!/^[A-Za-z0-9_-]+$/.test(withKey)) return null;
+  if (!/^[A-Za-z0-9_. -]+$/.test(withValue)) return null;
+  return { key: withKey, value: withValue };
 }
 
 function cleanRegexEntry(line) {
@@ -595,15 +598,17 @@ function parseTrigger(line) {
 function parseWorkflowPath(line) {
   const trimmed = line.trim();
   if (!trimmed.startsWith('workflow_path:')) return null;
-  let value = trimmed.slice('workflow_path:'.length).trim();
-  if (!value) return null;
+  let workflowPathValue = trimmed.slice('workflow_path:'.length).trim();
+  if (!workflowPathValue) return null;
   if (
-    (value.startsWith('"') && value.endsWith('"')) ||
-    (value.startsWith("'") && value.endsWith("'"))
+    (workflowPathValue.startsWith('"') &&
+      workflowPathValue.endsWith('"')) ||
+    (workflowPathValue.startsWith("'") &&
+      workflowPathValue.endsWith("'"))
   ) {
-    value = value.slice(1, -1).trim();
+    workflowPathValue = workflowPathValue.slice(1, -1).trim();
   }
-  return value || null;
+  return workflowPathValue || null;
 }
 
 function shouldProcessEntry(current, status) {
@@ -771,14 +776,20 @@ function parsePermission(line) {
   const permMatch = line.match(
     /^\s{4}([A-Za-z\d_-]+):\s*(none|read|write)\s*$/,
   );
-  return permMatch ? { key: permMatch[1], value: permMatch[2] } : null;
+  if (!permMatch) return null;
+  const permissionKey = permMatch[1];
+  const permissionValue = permMatch[2];
+  return { key: permissionKey, value: permissionValue };
 }
 
 function parseBaselinePermission(line) {
   const permMatch = line.match(
     /^\s{6}([A-Za-z\d_-]+):\s*(none|read|write)\s*$/,
   );
-  return permMatch ? { key: permMatch[1], value: permMatch[2] } : null;
+  if (!permMatch) return null;
+  const permissionKey = permMatch[1];
+  const permissionValue = permMatch[2];
+  return { key: permissionKey, value: permissionValue };
 }
 
 export function loadPermissionsBaseline(filePath) {
@@ -885,16 +896,18 @@ function startWorkflowBaseline(state, line) {
 }
 
 function applyWorkflowBaselinePermission(state, baseline, line) {
-  const baselinePerm = parseBaselinePermission(line);
-  if (baselinePerm) {
-    baseline.workflows[state.current][baselinePerm.key] = baselinePerm.value;
+  const baselinePermission = parseBaselinePermission(line);
+  if (baselinePermission) {
+    baseline.workflows[state.current][baselinePermission.key] =
+      baselinePermission.value;
   }
 }
 
 function applyWorkflowPermission(state, baseline, line) {
-  const perm = parsePermission(line);
-  if (perm && state.current) {
-    baseline.workflows[state.current][perm.key] = perm.value;
+  const permissionEntry = parsePermission(line);
+  if (permissionEntry && state.current) {
+    baseline.workflows[state.current][permissionEntry.key] =
+      permissionEntry.value;
   }
 }
 

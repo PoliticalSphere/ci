@@ -1,8 +1,7 @@
 #!/usr/bin/env node
 
 import { spawnSync } from 'node:child_process';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
-import { fail, section } from './test-utils.js';
+import { buildSafeEnv, fail, section } from './test-utils.js';
 
 section('validation', 'Input validation tests', 'Sourcing validate-inputs.sh');
 
@@ -10,18 +9,7 @@ section('validation', 'Input validation tests', 'Sourcing validate-inputs.sh');
 // writable or user-controlled directories. Only include fixed, system-owned
 // directories that are typically immutable to normal users.
 function runShell(cmd) {
-  let safePath = '';
-  try {
-    safePath = getSafePathEnv();
-  } catch (err) {
-    fail(`Safe PATH validation failed: ${err?.message || err}`);
-  }
-  const env = {
-    PATH: safePath,
-    HOME: process.env.HOME,
-    USER: process.env.USER,
-    TERM: process.env.TERM || 'dumb',
-  };
+  const env = buildSafeEnv();
   const r = spawnSync('bash', ['-c', cmd], { encoding: 'utf8', env });
   return r;
 }

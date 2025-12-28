@@ -1,9 +1,0 @@
-name: 'ps-teardown'
-description: 'Umbrella composite action for teardown utilities (use specific sub-actions)'
-runs:
-  using: 'composite'
-  steps:
-    - name: Informational
-      shell: bash
-      run: |
-        echo "This is an umbrella action; invoke specific sub-actions like ps-teardown/ps-exit"

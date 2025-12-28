@@ -1,63 +1,118 @@
 # ==============================================================================
 # Political Sphere — Composite Action: PS Harden Runner
+# License: Proprietary
 # ==============================================================================
+# ps_header_v: 6
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: ps-harden-runner
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-26
-# last_updated: 2025-12-26
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-bootstrap/ps-harden-runner/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Harden Runner composite action to Harden the runner using a
+#     pinned action with validated inputs.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [egress_policy, home_dir]
+#   outputs: [hardened, egress_policy]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-bootstrap/ps-harden-runner
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
 # DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/cross-cutting/validate.sh]
+#   external: [bash, step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76]
 #
-# DEPENDENTS
-# ------------------------------------------------------------------------------
-# - ./.github/actions/ps-bootstrap/ps-init
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Standardize runner hardening with validated inputs and consistent logging.
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
 #
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Validate hardening inputs (fail-fast)
-#   - Set a safe HOME for runner tools (optional but recommended)
-#   - Harden the runner using a SHA-pinned dependency
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
 #
-# DOES NOT:
-#   - Checkout repositories
-#   - Install dependencies or tools
-#   - Modify job permissions
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Secure-by-default
-# - Minimal input surface, explicit opt-outs only
-# - SHA-pinned external dependencies
-#
-# SECURITY TIERING
-# ------------------------------------------------------------------------------
-# Level 0 — Critical (this action defines the hardened runner baseline for
-#                    all subsequent steps)
-#
-# THREAT MODEL
-# ------------------------------------------------------------------------------
-# Purpose: Prevents network egress bypass, reduces exposure to supply-chain
-#          attacks, and enforces a hardened runner boundary before any code runs.
-#
-# AUDIT LOG
-# ------------------------------------------------------------------------------
-# Records hardening policy (egress policy) via outputs and console logs to
-# support traceability in CI audits.
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-bootstrap/ps-harden-runner/README.md
+#     - tools/scripts/actions/cross-cutting/validate.sh
 #
 # ==============================================================================
+
 name: "PS Harden Runner"
 description: "Harden the runner using a pinned action with validated inputs"
 
@@ -91,35 +146,13 @@ runs:
       run: |
         set -euo pipefail
 
-        emit_env() {
-          local key="$1"
-          local val="$2"
-          local sanitized delimiter attempts
-          sanitized="${val//$'\r'/}"
-          delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-          attempts=0
-          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
-            attempts=$((attempts + 1))
-            if [[ "${attempts}" -gt 6 ]]; then
-              printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
-              exit 1
-            fi
-            delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-          done
-          printf '%s<<%s\n%s\n%s\n' \
-            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
-            >> "${GITHUB_ENV}"
-        }
+        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
 
-        policy="${PS_EGRESS_POLICY_INPUT:-audit}"
-        case "${policy}" in
-          audit|block) ;;
-          *)
-            printf 'ERROR: inputs.egress_policy must be "audit" or "block" (got %q)\n' \
-              "${policy}" >&2
-            exit 1
-            ;;
-        esac
+        policy="$(require_enum "inputs.egress_policy" "${PS_EGRESS_POLICY_INPUT:-audit}" \
+          audit block)"
 
         if type -t ps_detail >/dev/null 2>&1; then
           ps_detail "PS.HARDEN: egress_policy=${policy}"

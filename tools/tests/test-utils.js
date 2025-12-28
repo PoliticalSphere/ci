@@ -45,21 +45,25 @@ import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 
 export const SAFE_PATH = getSafePathEnv();
 
-export function runLintSummary(envOverrides = {}) {
-  const repoRoot = getRepoRoot();
+export function buildSafeEnv(overrides = {}) {
   let safePath = '';
   try {
     safePath = getSafePathEnv();
   } catch (err) {
     fail(`Safe PATH validation failed: ${err?.message || err}`);
   }
-  const env = {
+  return {
     PATH: safePath,
     HOME: process.env.HOME,
     USER: process.env.USER,
-    TERM: 'dumb',
-    ...envOverrides,
+    TERM: process.env.TERM || 'dumb',
+    ...overrides,
   };
+}
+
+export function runLintSummary(envOverrides = {}) {
+  const repoRoot = getRepoRoot();
+  const env = buildSafeEnv({ TERM: 'dumb', ...envOverrides });
   const commandString = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary; print_lint_summary`;
   let out = '';
   try {
@@ -76,17 +80,21 @@ export function runLintSummary(envOverrides = {}) {
 }
 
 export function assertLintSummaryOnce(out, rel = 'lint summary') {
-  const headerCount = (out.match(/LINT & TYPE CHECK/g) || []).length;
+  const filtered = String(out)
+    .split('\n')
+    .filter((line) => !line.startsWith('PS.LOG '))
+    .join('\n');
+  const headerCount = (filtered.match(/LINT & TYPE CHECK/g) || []).length;
   if (headerCount !== 1) {
     fail(
-      `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${out}`,
+      `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${filtered}`,
     );
   }
 
-  const biomeCount = (out.match(/BIOME/g) || []).length;
+  const biomeCount = (filtered.match(/BIOME/g) || []).length;
   if (biomeCount !== 1) {
     fail(
-      `${rel}: Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${out}`,
+      `${rel}: Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${filtered}`,
     );
   }
 }

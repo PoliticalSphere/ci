@@ -22,7 +22,7 @@ path without compromising workspace integrity.
   uses: ./.github/actions/ps-bootstrap/ps-checkout-platform
   with:
     repository: PoliticalSphere/ci
-    ref: main
+    ref: 0123456789abcdef0123456789abcdef01234567
     path: .ps-platform
     fetch_depth: "1"
 ```
@@ -30,7 +30,7 @@ path without compromising workspace integrity.
 ## Inputs
 
 - `repository` (required): Platform repository in `OWNER/REPO` form.
-- `ref`: Git ref (branch/tag/SHA). Default: `main`.
+- `ref`: Git ref (branch/tag/SHA). Required.
 - `path`: Repo-relative checkout path. Default: `.ps-platform`.
 - `fetch_depth`: Git fetch depth (0 = full history). Default: `1`.
 - `persist_credentials`: Persist credentials in git config (`true`|`false`).

@@ -29,10 +29,54 @@ export function repoFromAction(action) {
   return `${parts[0]}/${parts[1]}`;
 }
 
-export function parsePermissionValue(value) {
-  const v = String(value).replaceAll('"', '').toLowerCase();
-  if (v === 'none' || v === 'read' || v === 'write') return v;
+export function parsePermissionValue(rawValue) {
+  const normalized = String(rawValue).replaceAll('"', '').toLowerCase();
+  if (normalized === 'none' || normalized === 'read' || normalized === 'write')
+    return normalized;
   return 'unknown';
+}
+
+export function getJobLocation(job) {
+  return {
+    line: job?.startLine ?? 1,
+    column: job?.startColumn ?? null,
+  };
+}
+
+export function getStepStartLocation(step, fallback) {
+  return {
+    line: step?.startLine ?? fallback?.startLine ?? 1,
+    column: step?.startColumn ?? fallback?.startColumn ?? null,
+  };
+}
+
+export function getStepUsesLocation(step) {
+  return {
+    line: step?.startLine ?? 1,
+    column: step?.usesColumn ?? step?.startColumn ?? null,
+  };
+}
+
+export function getStepRunLocation(step, index = 0) {
+  return {
+    line: step?.runLineNumbers?.[index] ?? step?.startLine ?? 1,
+    column: step?.runLineColumns?.[index] ?? step?.startColumn ?? null,
+  };
+}
+
+export function getStepWithLocation(step, index = 0) {
+  return {
+    line: step?.withLineNumbers?.[index] ?? step?.startLine ?? 1,
+    column: step?.withLineColumns?.[index] ?? step?.startColumn ?? null,
+  };
+}
+
+export function hasWorkflowPermissionJustification(parsed, perm) {
+  return Boolean(parsed?.workflowPermissionsMeta?.[perm]?.hasJustification);
+}
+
+export function hasJobPermissionJustification(job, perm) {
+  return Boolean(job?.permissionsMeta?.[perm]?.hasJustification);
 }
 
 function createResult() {
@@ -128,8 +172,8 @@ function applyTriggersFromDoc(result, doc) {
     return;
   }
   if (typeof on === 'object') {
-    for (const key of Object.keys(on)) {
-      if (key) result.triggers.add(key);
+    for (const triggerName of Object.keys(on)) {
+      if (triggerName) result.triggers.add(triggerName);
     }
   }
 }
@@ -163,12 +207,12 @@ function handleWorkflowPermsLine(state, result, line) {
   if (!state.inWorkflowPerms) return false;
   const permMatch = line.match(/^\s{2}([A-Za-z0-9_-]+):\s*([^\s#]+)\s*(#.*)?$/);
   if (!permMatch) return false;
-  const key = permMatch[1];
-  const value = parsePermissionValue(permMatch[2]);
-  result.workflowPermissions[key] = value;
+  const permissionKey = permMatch[1];
+  const permissionValue = parsePermissionValue(permMatch[2]);
+  result.workflowPermissions[permissionKey] = permissionValue;
   const hasJustification =
     Boolean(permMatch[3]) && /justification/i.test(permMatch[3]);
-  result.workflowPermissionsMeta[key] = { hasJustification };
+  result.workflowPermissionsMeta[permissionKey] = { hasJustification };
   return true;
 }
 
@@ -204,12 +248,14 @@ function handleJobPermsLine(state, result, line) {
   if (!state.inJobPerms || !state.currentJob) return false;
   const permMatch = line.match(/^\s{6}([A-Za-z0-9_-]+):\s*([^\s#]+)\s*(#.*)?$/);
   if (!permMatch) return false;
-  const key = permMatch[1];
-  const value = parsePermissionValue(permMatch[2]);
-  result.jobs[state.currentJob].permissions[key] = value;
+  const permissionKey = permMatch[1];
+  const permissionValue = parsePermissionValue(permMatch[2]);
+  result.jobs[state.currentJob].permissions[permissionKey] = permissionValue;
   const hasJustification =
     Boolean(permMatch[3]) && /justification/i.test(permMatch[3]);
-  result.jobs[state.currentJob].permissionsMeta[key] = { hasJustification };
+  result.jobs[state.currentJob].permissionsMeta[permissionKey] = {
+    hasJustification,
+  };
   return true;
 }
 
@@ -219,8 +265,8 @@ function handleStepsStart(state, line) {
   return true;
 }
 
-function startRunBlock(state, value, indent) {
-  if (value === '|' || value === '>') {
+function startRunBlock(state, blockIndicator, indent) {
+  if (blockIndicator === '|' || blockIndicator === '>') {
     state.inRunBlock = true;
     state.runBlockIndent = indent;
     return true;
@@ -267,12 +313,12 @@ function handleStepStart(state, result, line, lineNumber, indent) {
     state.currentStep.usesColumn = line.indexOf(usesMatch[1]) + 1;
   }
   if (runMatch) {
-    const value = runMatch[1];
-    if (!startRunBlock(state, value, 6)) {
-      state.currentStep.run = value;
-      state.currentStep.runLines = [value];
+    const runValue = runMatch[1];
+    if (!startRunBlock(state, runValue, 6)) {
+      state.currentStep.run = runValue;
+      state.currentStep.runLines = [runValue];
       state.currentStep.runLineNumbers = [lineNumber];
-      state.currentStep.runLineColumns = [line.indexOf(value) + 1];
+      state.currentStep.runLineColumns = [line.indexOf(runValue) + 1];
     }
   }
   return true;
@@ -298,12 +344,12 @@ function handleStepContinuation(state, line, indent, lineNumber) {
 
   const runMatch = line.match(/^\s{8}run:\s*(.*)$/);
   if (runMatch) {
-    const value = runMatch[1];
-    if (!startRunBlock(state, value, 8)) {
-      state.currentStep.run = value;
-      state.currentStep.runLines = [value];
+    const runValue = runMatch[1];
+    if (!startRunBlock(state, runValue, 8)) {
+      state.currentStep.run = runValue;
+      state.currentStep.runLines = [runValue];
       state.currentStep.runLineNumbers = [lineNumber];
-      state.currentStep.runLineColumns = [line.indexOf(value) + 1];
+      state.currentStep.runLineColumns = [line.indexOf(runValue) + 1];
     }
     return true;
   }
@@ -326,9 +372,11 @@ function handleStepContinuation(state, line, indent, lineNumber) {
   if (state.inWith && indent > state.withIndent) {
     const withMatch = line.match(/^\s{10}([A-Za-z0-9_-]+):\s*(.+)\s*$/);
     if (withMatch) {
-      state.currentStep.with[withMatch[1]] = withMatch[2];
+      const withKey = withMatch[1];
+      const withValue = withMatch[2];
+      state.currentStep.with[withKey] = withValue;
       state.currentStep.withLineNumbers.push(lineNumber);
-      state.currentStep.withLineColumns.push(line.indexOf(withMatch[2]) + 1);
+      state.currentStep.withLineColumns.push(line.indexOf(withValue) + 1);
       return true;
     }
   }
@@ -442,10 +490,10 @@ function extractBlockUploadPaths(step) {
     const trimmed = line.trimStart();
     const pathStart = isPathBlockStart(trimmed);
     if (pathStart) {
-      const value = extractInlinePathValue(trimmed);
+      const pathValue = extractInlinePathValue(trimmed);
       pathIndent = indent;
-      if (value) {
-        paths.push(value);
+      if (pathValue) {
+        paths.push(pathValue);
         inPath = false;
       } else {
         inPath = true;
@@ -453,8 +501,8 @@ function extractBlockUploadPaths(step) {
       continue;
     }
     if (inPath && indent > pathIndent) {
-      const val = line.trim();
-      if (val) paths.push(val);
+      const pathLine = line.trim();
+      if (pathLine) paths.push(pathLine);
     }
   }
   return paths;
@@ -471,9 +519,9 @@ function isPathBlockStart(trimmed) {
 
 function extractInlinePathValue(trimmed) {
   const colon = trimmed.indexOf(':');
-  const value = colon === -1 ? '' : trimmed.slice(colon + 1).trim();
-  if (!value || value === '|' || value === '>') return '';
-  return value.trim();
+  const inlineValue = colon === -1 ? '' : trimmed.slice(colon + 1).trim();
+  if (!inlineValue || inlineValue === '|' || inlineValue === '>') return '';
+  return inlineValue.trim();
 }
 
 export function isActionUpload(uses) {

@@ -1,47 +1,115 @@
 # ==============================================================================
-# Political Sphere — Composite Action: Write Summary
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Write a structured JSON summary artifact for workflow results.
+# Political Sphere — Composite Action: PS Write Summary
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
 #
-# Metadata:
-#   - id: ps-write-summary
-#   - version: 1.0.0
-#   - owner: political-sphere
-#   - classification: internal
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-# Scope & Responsibilities:
-#   - Does: compute overall status and write a JSON summary file.
-#   - Does NOT: upload artifacts or alter workflow permissions.
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-teardown/ps-write-summary/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
 #
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Explicit inputs with validation
-#   - CI-safe, machine-readable output
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
 #
-# Dependencies:
-#   - tools/scripts/actions/ps-teardown/ps-write-summary/ps-write-summary.sh
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
 #
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#   - ./.github/workflows/security-scheduled.yml
-#   - ./.github/workflows/build-artifacts.yml
-#   - ./.github/workflows/release.yml
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Write Summary composite action to Write structured summary
+#     JSON for workflow results.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
 #
-# Execution Model:
-#   - Trigger: N/A (invoked by workflow steps)
-#   - Type: composite action (internal-only)
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [workflow, output_path, results]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
 #
-# Security & Policy Notes:
-#   - Secrets: none
-#   - Permissions: inherited from the caller
-#   - Constraints: results must be simple key=value pairs
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-teardown/ps-write-summary
+#   model: deterministic
+#   idempotency: not guaranteed
 #
-# Operational Notes:
-#   - Timeouts: controlled by the calling job
-#   - Artifacts: writes a JSON file at inputs.output_path
-#   - CI vs local: identical behavior
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-teardown]
+#   external: [bash]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - tools/scripts/actions/ps-teardown
+#
 # ==============================================================================
 
 name: "PS Write Summary"

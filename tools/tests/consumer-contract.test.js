@@ -36,16 +36,47 @@ function writeFile(filePath, content) {
 
 section('contract', 'Consumer contract tests', 'Synthetic fixtures');
 
-const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'contract-'));
-detail(`Workspace: ${tmp}`);
+const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'contract-'));
+detail(`Workspace: ${workspaceRoot}`);
 
-const policyPath = path.join(tmp, 'configs', 'consumer', 'contract.json');
-const exceptionsPath = path.join(tmp, 'configs', 'consumer', 'exceptions.json');
-const reportPath = path.join(tmp, 'reports', 'contracts', 'contract.json');
-const summaryPath = path.join(tmp, 'reports', 'contracts', 'contract.txt');
+const policyPath = path.join(
+  workspaceRoot,
+  'configs',
+  'consumer',
+  'contract.json',
+);
+const exceptionsPath = path.join(
+  workspaceRoot,
+  'configs',
+  'consumer',
+  'exceptions.json',
+);
+const reportPath = path.join(
+  workspaceRoot,
+  'reports',
+  'contracts',
+  'contract.json',
+);
+const summaryPath = path.join(
+  workspaceRoot,
+  'reports',
+  'contracts',
+  'contract.txt',
+);
+
+function buildContractEnv(root) {
+  return {
+    ...process.env,
+    PATH: `${SAFE_PATH}:${path.dirname(process.execPath)}`,
+    CI: '1',
+    FORCE_COLOR: '1',
+    PS_REPO_ROOT: root,
+    PS_CONTRACT_REPO_ROOT: root,
+  };
+}
 
 writeFile(
-  path.join(tmp, 'package.json'),
+  path.join(workspaceRoot, 'package.json'),
   JSON.stringify(
     {
       name: 'consumer-fixture',
@@ -66,16 +97,16 @@ writeFile(
 );
 
 writeFile(
-  path.join(tmp, 'package-lock.json'),
+  path.join(workspaceRoot, 'package-lock.json'),
   JSON.stringify({ packages: {} }, null, 2),
 );
 writeFile(
-  path.join(tmp, 'tsconfig.json'),
+  path.join(workspaceRoot, 'tsconfig.json'),
   JSON.stringify({ compilerOptions: {} }, null, 2),
 );
 
 writeFile(
-  path.join(tmp, '.github', 'workflows', 'pr-gates.yml'),
+  path.join(workspaceRoot, '.github', 'workflows', 'pr-gates.yml'),
   [
     'name: PR Gates',
     'on: [pull_request]',
@@ -150,13 +181,8 @@ try {
       summaryPath,
     ],
     {
-      cwd: tmp,
-      env: {
-        ...process.env,
-        PATH: `${SAFE_PATH}:${path.dirname(process.execPath)}`,
-        CI: '1',
-        FORCE_COLOR: '1',
-      },
+      cwd: workspaceRoot,
+      env: buildContractEnv(workspaceRoot),
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     },
@@ -171,11 +197,11 @@ try {
 
 // FAIL case (missing script)
 const brokenPackage = JSON.parse(
-  fs.readFileSync(path.join(tmp, 'package.json'), 'utf8'),
+  fs.readFileSync(path.join(workspaceRoot, 'package.json'), 'utf8'),
 );
 delete brokenPackage.scripts.test;
 writeFile(
-  path.join(tmp, 'package.json'),
+  path.join(workspaceRoot, 'package.json'),
   JSON.stringify(brokenPackage, null, 2),
 );
 
@@ -185,13 +211,8 @@ try {
     process.execPath,
     [contractScript, '--policy', policyPath, '--exceptions', exceptionsPath],
     {
-      cwd: tmp,
-      env: {
-        ...process.env,
-        PATH: `${SAFE_PATH}:${path.dirname(process.execPath)}`,
-        CI: '1',
-        FORCE_COLOR: '1',
-      },
+      cwd: workspaceRoot,
+      env: buildContractEnv(workspaceRoot),
       stdio: ['ignore', 'pipe', 'pipe'],
       encoding: 'utf8',
     },

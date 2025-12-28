@@ -84,6 +84,66 @@ export NO_COLOR="${NO_COLOR:-0}"
 
 PS_LINT_INLINE="${PS_LINT_INLINE:-1}"
 PS_LINT_PRINT_MODE="${PS_LINT_PRINT_MODE:-auto}"
+PS_LINT_SECTION_HEADERS="${PS_LINT_SECTION_HEADERS:-1}"
+PS_LINT_STEP_LINES="${PS_LINT_STEP_LINES:-1}"
+
+# ----------------------------
+# Structured logging (gate context)
+# ----------------------------
+GATE_LOG_START_MS=""
+
+_ps_slugify() {
+  local raw="$1"
+  local slug
+  slug="$(printf '%s' "${raw}" | tr '[:upper:]' '[:lower:]' | tr ' ' '-' | tr -cd 'a-z0-9._-')"
+  [[ -n "${slug}" ]] || slug="gate"
+  printf '%s' "${slug}"
+  return 0
+}
+
+gate_log_start() {
+  local gate_name="${GATE_NAME:-Gate}"
+
+  if [[ -z "${PS_LOG_COMPONENT:-}" ]]; then
+    PS_LOG_COMPONENT="gate.$(_ps_slugify "${gate_name}")"
+  fi
+
+  if command -v ps_epoch_ms >/dev/null 2>&1; then
+    GATE_LOG_START_MS="$(ps_epoch_ms)"
+  fi
+
+  if command -v ps_log >/dev/null 2>&1; then
+    ps_log info gate.start "gate=${gate_name}"
+  fi
+
+  return 0
+}
+
+gate_log_finish() {
+  local status="${1:-PASS}"
+  local rc="${2:-0}"
+  local end_ms=""
+  local duration_ms=""
+  local gate_name="${GATE_NAME:-Gate}"
+
+  if command -v ps_epoch_ms >/dev/null 2>&1; then
+    end_ms="$(ps_epoch_ms)"
+  fi
+  if [[ -n "${GATE_LOG_START_MS:-}" && -n "${end_ms}" ]]; then
+    duration_ms=$((end_ms - GATE_LOG_START_MS))
+  fi
+
+  if command -v ps_log >/dev/null 2>&1; then
+    ps_log info gate.finish \
+      "gate=${gate_name}" \
+      "status=${status}" \
+      "exit_code=${rc}" \
+      ${duration_ms:+"duration_ms=${duration_ms}"} \
+      ${CURRENT_STEP_ID:+"step_id=${CURRENT_STEP_ID}"} \
+      ${CURRENT_STEP_TITLE:+"step_title=${CURRENT_STEP_TITLE}"}
+  fi
+  return 0
+}
 
 # ----------------------------
 # Load formatting helpers (single UI spec)
@@ -113,6 +173,7 @@ LINT_LABELS=()
 LINT_STATUSES=()
 LINT_LOGS=()
 LINT_PIDS=()
+LINT_START_MS=()
 
 # Status constants
 LINT_STATUS_RUNNING="Running"
@@ -154,6 +215,7 @@ on_error() {
     printf 'Last command: %s\n' "${cmd}" >&2
   fi
 
+  gate_log_finish "FAIL" "${exit_code}"
   exit "${exit_code}"
 }
 
@@ -342,62 +404,43 @@ print_lint_summary() {
     _ps_erase_inline_block "${LINT_SUMMARY_LINES:-0}"
   fi
 
-  local use_color=0
-  if type -t ps_supports_color >/dev/null 2>&1 && ps_supports_color; then
-    use_color=1
-  fi
-
-  local c_reset="" c_bold="" c_dim="" c_cyan="" c_green="" c_red="" c_yellow=""
-  if [[ "${use_color}" -eq 1 ]]; then
-    c_reset=$'\033[0m'
-    c_bold=$'\033[1m'
-    c_dim=$'\033[90m'
-    c_cyan=$'\033[36m'
-    c_green=$'\033[32m'
-    c_red=$'\033[31m'
-    c_yellow=$'\033[33m'
-  fi
-
   local buf=""
   _append() { local line="$1"; buf+="${line}"$'\n'; return 0; }
 
-  local icon="${PS_FMT_ICON:-▶}"
-  local rule="${PS_FMT_RULE:-────────────────────────────────────────}"
+  local rule_len="${PS_LINT_SUMMARY_RULE_LEN:-78}"
+  local rule_char="${PS_FMT_RULE_CHAR:-─}"
+  local rule=""
+  for ((i = 0; i < rule_len; i++)); do
+    rule+="${rule_char}"
+  done
 
-  if [[ "${use_color}" -eq 1 ]]; then
-    _append "${c_green}${icon}${c_reset} ${c_bold}${c_cyan}LINT & TYPE CHECK${c_reset}"
-    _append "${c_dim}${rule}${c_reset}"
-  else
-    _append "${icon} LINT & TYPE CHECK"
-    _append "${rule}"
-  fi
+  _append "${rule}"
+  _append " Linter Results"
+  _append "${rule}"
+  _append ""
+  _append "LINTER NAME          STATUS     FINDINGS (LOG REF)"
+  _append "─────────────────── ────────── ──────────────────────────────────────────────"
 
-  local lint_indent="  "
-  local pad=24
+  local name_pad=19
+  local status_pad=10
 
-  local i label status log_ref padded
+  local i label status log_ref padded_name padded_status
   for i in "${!LINT_IDS[@]}"; do
     label="${LINT_LABELS[$i]}"
     status="${LINT_STATUSES[$i]}"
     log_ref="$(_short_log_ref "${LINT_LOGS[$i]}")"
-    printf -v padded "%-${pad}s" "${label}"
+    printf -v padded_name "%-${name_pad}s" "${label}"
+    case "${status}" in
+      Running*) status="Running..." ;;
+      Waiting) status="Waiting..." ;;
+      *) : ;;
+    esac
+    printf -v padded_status "%-${status_pad}s" "${status}"
 
-    if [[ "${use_color}" -eq 1 ]]; then
-      case "${status}" in
-        PASS)     _append "${lint_indent}${padded} ${c_green}${c_bold}PASS${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
-        FAIL)     _append "${lint_indent}${padded} ${c_red}${c_bold}FAIL${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
-        ERROR)    _append "${lint_indent}${padded} ${c_yellow}${c_bold}ERROR${c_reset}  ${c_dim}${log_ref}${c_reset}" ;;
-        SKIPPED)  _append "${lint_indent}${padded} ${c_yellow}${c_bold}SKIPPED${c_reset}   ${c_dim}${log_ref}${c_reset}" ;;
-        Running*) _append "${lint_indent}${padded} ${c_cyan}Running...${c_reset}" ;;
-        Waiting)  _append "${lint_indent}${padded} ${c_dim}Waiting...${c_reset}" ;;
-        *)        _append "${lint_indent}${padded} ${status}" ;;
-      esac
+    if [[ "${status}" == "PASS" || "${status}" == "FAIL" || "${status}" == "ERROR" || "${status}" == "SKIPPED" ]]; then
+      _append "${padded_name} ${padded_status} ${log_ref}"
     else
-      if [[ "${status}" == "PASS" || "${status}" == "FAIL" || "${status}" == "ERROR" || "${status}" == "SKIPPED" ]]; then
-        _append "${lint_indent}${padded} ${status}   ${log_ref}"
-      else
-        _append "${lint_indent}${padded} ${status}"
-      fi
+      _append "${padded_name} ${padded_status}"
     fi
   done
 
@@ -420,8 +463,8 @@ PY
     fi
   fi
 
-  # 2 header lines + N rows
-  LINT_SUMMARY_LINES=$(( 2 + ${#LINT_IDS[@]} ))
+  # 5 header lines + N rows
+  LINT_SUMMARY_LINES=$(( 5 + ${#LINT_IDS[@]} ))
   LINT_SUMMARY_EVER_PRINTED=1
   return 0
 }
@@ -469,12 +512,30 @@ lint_print_tally() {
     esac
   done
 
-  local line="Summary: ${pass} passed, ${fail} failed, ${skipped} skipped, ${error} errors"
+  local line="Summary: ${pass} passed, ${fail} failed, ${skipped} skipped"
+  local refs=""
+  if [[ "${error}" -gt 0 ]]; then
+    line+=", ${error} errors"
+  fi
   if [[ "${#log_refs[@]}" -gt 0 ]]; then
-    local refs=""
     refs="$(printf '%s, ' "${log_refs[@]}")"
     refs="${refs%, }"
     line+=" (see ${refs})"
+  fi
+  if command -v ps_log >/dev/null 2>&1; then
+    local status="PASS"
+    if [[ "${fail}" -gt 0 || "${error}" -gt 0 ]]; then
+      status="FAIL"
+    elif [[ "${pass}" -eq 0 && "${skipped}" -gt 0 ]]; then
+      status="SKIPPED"
+    fi
+    ps_log info lint.summary \
+      "status=${status}" \
+      "passed=${pass}" \
+      "failed=${fail}" \
+      "skipped=${skipped}" \
+      "errors=${error}" \
+      ${refs:+"log_refs=${refs}"}
   fi
   printf '%s\n' "${line}"
   return 0
@@ -491,6 +552,7 @@ lint_init() {
   LINT_STATUSES=()
   LINT_LOGS=()
   LINT_PIDS=()
+  LINT_START_MS=()
   LINT_FAILED=0
   LINT_SUMMARY_LINES=0
   LINT_SUMMARY_EVER_PRINTED=0
@@ -562,6 +624,9 @@ lint_eval_status() {
 lint_emit_step_line() {
   local title="$1"
   local status="$2"
+  if [[ "${PS_LINT_STEP_LINES:-1}" == "0" ]]; then
+    return 0
+  fi
   if [[ "${PS_LINT_PRINT_MODE:-}" == "final" ]]; then
     return 0
   fi
@@ -586,7 +651,15 @@ lint_handle_log_fallback() {
   if [[ ${rc} -ne 0 && ! -s "${log_file}" ]]; then
     {
       printf "No output captured from %s (exit %d)\n" "${id}" "${rc}"
-      printf "Timestamp: %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+      if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+        if date -u -r "${SOURCE_DATE_EPOCH}" +'%Y-%m-%dT%H:%M:%SZ' >/dev/null 2>&1; then
+          printf "Timestamp: %s\n" "$(date -u -r "${SOURCE_DATE_EPOCH}" +'%Y-%m-%dT%H:%M:%SZ')"
+        else
+          printf "Timestamp: %s\n" "$(date -u -d "@${SOURCE_DATE_EPOCH}" +'%Y-%m-%dT%H:%M:%SZ')"
+        fi
+      else
+        printf "Timestamp: %s\n" "$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+      fi
       if [[ $# -gt 0 ]]; then
         printf "Command: "
         printf '%q ' "$@"
@@ -604,16 +677,95 @@ lint_finalize_step_by_index() {
   local id="${LINT_IDS[$idx]}"
   local title="${LINT_LABELS[$idx]}"
   local log_file="${LINT_LOGS[$idx]}"
+  local start_ms="${LINT_START_MS[$idx]}"
 
   lint_handle_log_fallback "${id}" "${rc}" "${log_file}"
   local status=""
   status="$(lint_eval_status "${id}" "${rc}" "${log_file}")"
   LINT_STATUSES[idx]="${status}"
   LINT_PIDS[idx]=""
+  LINT_START_MS[idx]=""
 
   lint_emit_step_line "${title}" "${status}"
+
+  if command -v ps_log >/dev/null 2>&1; then
+    local end_ms=""
+    local duration_ms=""
+    if command -v ps_epoch_ms >/dev/null 2>&1; then
+      end_ms="$(ps_epoch_ms)"
+    fi
+    if [[ -n "${start_ms}" && -n "${end_ms}" ]]; then
+      duration_ms=$((end_ms - start_ms))
+    fi
+
+    local level="info"
+    case "${status}" in
+      FAIL|ERROR) level="error" ;;
+      SKIPPED) level="warn" ;;
+      *) level="info" ;;
+    esac
+
+    ps_log "${level}" lint.step.finish \
+      "id=${id}" \
+      "title=${title}" \
+      "status=${status}" \
+      "exit_code=${rc}" \
+      "log_path=${log_file}" \
+      ${duration_ms:+"duration_ms=${duration_ms}"}
+  fi
+
   print_lint_summary
   return 0
+}
+
+lint_get_or_register_index() {
+  local id="$1"
+  local title="$2"
+  local needs_pid="${3:-0}"
+  local idx=-1 j
+
+  for j in "${!LINT_IDS[@]}"; do
+    if [[ "${LINT_IDS[$j]}" == "${id}" ]]; then
+      idx="${j}"
+      break
+    fi
+  done
+
+  if [[ "${idx}" -eq -1 ]]; then
+    LINT_IDS+=("${id}")
+    LINT_LABELS+=("${title}")
+    LINT_STATUSES+=("${LINT_STATUS_RUNNING}")
+    LINT_LOGS+=("")
+    LINT_START_MS+=("")
+    if [[ "${needs_pid}" -eq 1 ]]; then
+      LINT_PIDS+=("")
+    fi
+    idx=$(( ${#LINT_IDS[@]} - 1 ))
+  else
+    LINT_STATUSES[idx]="${LINT_STATUS_RUNNING}"
+  fi
+
+  printf '%s' "${idx}"
+  return 0
+}
+
+lint_finalize_if_done() {
+  local idx="$1"
+  local pid="$2"
+  local rc=0
+  local state
+
+  state="$(ps -o state= -p "${pid}" 2>/dev/null || true)"
+  state="$(printf '%s' "${state}" | tr -d '[:space:]')"
+  if [[ -z "${state}" || "${state}" == *Z* ]]; then
+    if ! wait "${pid}"; then
+      rc=$?
+    fi
+    lint_finalize_step_by_index "${idx}" "${rc}"
+    return 0
+  fi
+
+  return 1
 }
 
 # Usage: run_lint_step <id> <title> <description> <command...>
@@ -631,23 +783,8 @@ run_lint_step() {
   CURRENT_STEP_TITLE="${title}"
 
   # locate / register index
-  local idx=-1 j
-  for j in "${!LINT_IDS[@]}"; do
-    if [[ "${LINT_IDS[$j]}" == "${id}" ]]; then
-      idx="${j}"
-      break
-    fi
-  done
-
-  if [[ "${idx}" -eq -1 ]]; then
-    LINT_IDS+=("${id}")
-    LINT_LABELS+=("${title}")
-    LINT_STATUSES+=("${LINT_STATUS_RUNNING}")
-    LINT_LOGS+=("")
-    idx=$(( ${#LINT_IDS[@]} - 1 ))
-  else
-    LINT_STATUSES[idx]="${LINT_STATUS_RUNNING}"
-  fi
+  local idx
+  idx="$(lint_get_or_register_index "${id}" "${title}" 0)"
 
   # Mark that we have genuinely started linting (enables summary printing)
   LINT_SUMMARY_EVER_STARTED=1
@@ -656,6 +793,18 @@ run_lint_step() {
 
   mkdir -p "${LINT_DIR}"
   local log_file="${LINT_DIR}/${id}.log"
+  local start_ms=""
+  if command -v ps_epoch_ms >/dev/null 2>&1; then
+    start_ms="$(ps_epoch_ms)"
+  fi
+  LINT_START_MS[idx]="${start_ms}"
+  if command -v ps_log >/dev/null 2>&1; then
+    ps_log info lint.step.start \
+      "id=${id}" \
+      "title=${title}" \
+      "detail=${description}" \
+      "log_path=${log_file}"
+  fi
 
   set +e
   "$@" >"${log_file}" 2>&1
@@ -670,6 +819,32 @@ run_lint_step() {
   LINT_LOGS[idx]="${log_file}"
 
   lint_emit_step_line "${title}" "${status}"
+
+  if command -v ps_log >/dev/null 2>&1; then
+    local end_ms=""
+    local duration_ms=""
+    if command -v ps_epoch_ms >/dev/null 2>&1; then
+      end_ms="$(ps_epoch_ms)"
+    fi
+    if [[ -n "${start_ms}" && -n "${end_ms}" ]]; then
+      duration_ms=$((end_ms - start_ms))
+    fi
+
+    local level="info"
+    case "${status}" in
+      FAIL|ERROR) level="error" ;;
+      SKIPPED) level="warn" ;;
+      *) level="info" ;;
+    esac
+
+    ps_log "${level}" lint.step.finish \
+      "id=${id}" \
+      "title=${title}" \
+      "status=${status}" \
+      "exit_code=${rc}" \
+      "log_path=${log_file}" \
+      ${duration_ms:+"duration_ms=${duration_ms}"}
+  fi
 
   print_lint_summary
 
@@ -691,32 +866,31 @@ run_lint_step_async() {
 
   CURRENT_STEP_ID="${id}"
   CURRENT_STEP_TITLE="${title}"
-  bash "${branding_scripts}/print-section.sh" "${id}" "${title}" "${description}"
-
-  local idx=-1 j
-  for j in "${!LINT_IDS[@]}"; do
-    if [[ "${LINT_IDS[$j]}" == "${id}" ]]; then
-      idx="${j}"
-      break
-    fi
-  done
-
-  if [[ "${idx}" -eq -1 ]]; then
-    LINT_IDS+=("${id}")
-    LINT_LABELS+=("${title}")
-    LINT_STATUSES+=("${LINT_STATUS_RUNNING}")
-    LINT_LOGS+=("")
-    LINT_PIDS+=("")
-    idx=$(( ${#LINT_IDS[@]} - 1 ))
-  else
-    LINT_STATUSES[idx]="${LINT_STATUS_RUNNING}"
+  if [[ "${PS_LINT_SECTION_HEADERS:-1}" != "0" ]]; then
+    bash "${branding_scripts}/print-section.sh" "${id}" "${title}" "${description}"
   fi
+
+  local idx
+  idx="$(lint_get_or_register_index "${id}" "${title}" 1)"
 
   LINT_SUMMARY_EVER_STARTED=1
   print_lint_summary
 
   mkdir -p "${LINT_DIR}"
   local log_file="${LINT_DIR}/${id}.log"
+  local start_ms=""
+  if command -v ps_epoch_ms >/dev/null 2>&1; then
+    start_ms="$(ps_epoch_ms)"
+  fi
+  LINT_START_MS[idx]="${start_ms}"
+  if command -v ps_log >/dev/null 2>&1; then
+    ps_log info lint.step.start \
+      "id=${id}" \
+      "title=${title}" \
+      "detail=${description}" \
+      "log_path=${log_file}" \
+      "async=1"
+  fi
 
   set +e
   "$@" >"${log_file}" 2>&1 &
@@ -769,19 +943,12 @@ lint_wait_one() {
   local remaining=1
   while [[ "${remaining}" -eq 1 ]]; do
     remaining=0
-    local idx pid rc state
+    local idx pid
     for idx in "${!LINT_PIDS[@]}"; do
       pid="${LINT_PIDS[$idx]}"
       [[ -n "${pid}" ]] || continue
 
-      state="$(ps -o state= -p "${pid}" 2>/dev/null || true)"
-      state="$(printf '%s' "${state}" | tr -d '[:space:]')"
-      if [[ -z "${state}" || "${state}" == *Z* ]]; then
-        rc=0
-        if ! wait "${pid}"; then
-          rc=$?
-        fi
-        lint_finalize_step_by_index "${idx}" "${rc}"
+      if lint_finalize_if_done "${idx}" "${pid}"; then
         return 0
       fi
 
@@ -795,39 +962,8 @@ lint_wait_one() {
 }
 
 lint_wait_all() {
-  local remaining=1
-  while [[ "${remaining}" -eq 1 ]]; do
-    remaining=0
-    local idx pid rc state
-    for idx in "${!LINT_PIDS[@]}"; do
-      pid="${LINT_PIDS[$idx]}"
-      [[ -n "${pid}" ]] || continue
-
-      state="$(ps -o state= -p "${pid}" 2>/dev/null || true)"
-      state="$(printf '%s' "${state}" | tr -d '[:space:]')"
-      if [[ -z "${state}" ]]; then
-        rc=0
-        if ! wait "${pid}"; then
-          rc=$?
-        fi
-        lint_finalize_step_by_index "${idx}" "${rc}"
-        continue
-      fi
-
-      if [[ "${state}" == *Z* ]]; then
-        rc=0
-        if ! wait "${pid}"; then
-          rc=$?
-        fi
-        lint_finalize_step_by_index "${idx}" "${rc}"
-        continue
-      fi
-
-      remaining=1
-    done
-    if [[ "${remaining}" -eq 1 ]]; then
-      sleep 0.2
-    fi
+  while lint_wait_one; do
+    : # keep draining until no PIDs remain
   done
   return 0
 }
@@ -847,8 +983,48 @@ run_step() {
   CURRENT_STEP_ID="${id}"
   CURRENT_STEP_TITLE="${title}"
 
+  local start_ms=""
+  if command -v ps_epoch_ms >/dev/null 2>&1; then
+    start_ms="$(ps_epoch_ms)"
+  fi
+  if command -v ps_log >/dev/null 2>&1; then
+    ps_log info gate.step.start \
+      "id=${id}" \
+      "title=${title}" \
+      "detail=${description}"
+  fi
+
   bash "${branding_scripts}/print-section.sh" "${id}" "${title}" "${description}"
+  set +e
   "$@"
+  local rc=$?
+  set -e
+
+  if command -v ps_log >/dev/null 2>&1; then
+    local end_ms=""
+    local duration_ms=""
+    if command -v ps_epoch_ms >/dev/null 2>&1; then
+      end_ms="$(ps_epoch_ms)"
+    fi
+    if [[ -n "${start_ms}" && -n "${end_ms}" ]]; then
+      duration_ms=$((end_ms - start_ms))
+    fi
+
+    local level="info"
+    if [[ "${rc}" -ne 0 ]]; then
+      level="error"
+    fi
+    ps_log "${level}" gate.step.finish \
+      "id=${id}" \
+      "title=${title}" \
+      "status=$([[ "${rc}" -eq 0 ]] && printf '%s' PASS || printf '%s' FAIL)" \
+      "exit_code=${rc}" \
+      ${duration_ms:+"duration_ms=${duration_ms}"}
+  fi
+
+  if [[ "${rc}" -ne 0 ]]; then
+    return "${rc}"
+  fi
   return 0
 }
 
@@ -859,5 +1035,6 @@ print_success() {
     "gate.ok" \
     "${GATE_NAME:-Gate} gate passed" \
     "All checks completed successfully"
+  gate_log_finish "PASS" 0
   return 0
 }

@@ -19,6 +19,11 @@ repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ -z "${repo_root}" ]]; then
   repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
 fi
+if [[ -f "${repo_root}/tools/scripts/egress.sh" ]]; then
+  # shellcheck source=tools/scripts/egress.sh
+  . "${repo_root}/tools/scripts/egress.sh"
+  load_egress_allowlist || { error "egress allowlist load failed"; exit 1; }
+fi
 format_sh="${repo_root}/tools/scripts/branding/format.sh"
 if [[ -f "${format_sh}" ]]; then
   # shellcheck source=tools/scripts/branding/format.sh
@@ -96,6 +101,9 @@ curl_secure() {
     error "refusing non-HTTPS URL: ${url}"
     exit 1
   fi
+  if declare -F assert_egress_allowed_url >/dev/null 2>&1; then
+    assert_egress_allowed_url "${url}"
+  fi
   curl --proto '=https' --tlsv1.2 -fsSL "${url}" "$@"
   return 0
 }
@@ -139,16 +147,17 @@ install_actionlint() {
   require_cmd curl
   require_cmd sha256sum
   require_var ACTIONLINT_VERSION
+  local actionlint_sha=""
   if [[ "${ARCH}" == "arm64" ]]; then
     require_var ACTIONLINT_SHA256_ARM64
-    ACTIONLINT_SHA="${ACTIONLINT_SHA256_ARM64}"
+    actionlint_sha="${ACTIONLINT_SHA256_ARM64}"
   else
     require_var ACTIONLINT_SHA256
-    ACTIONLINT_SHA="${ACTIONLINT_SHA256}"
+    actionlint_sha="${ACTIONLINT_SHA256}"
   fi
   curl_secure "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ACTIONLINT_ARCH}.tar.gz" \
     -o "${_tmpdir}/actionlint.tar.gz"
-  printf '%s\n' "${ACTIONLINT_SHA}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
+  printf '%s\n' "${actionlint_sha}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/actionlint.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/actionlint" "${install_dir}/actionlint"
 
@@ -160,16 +169,17 @@ install_shellcheck() {
   require_cmd curl
   require_cmd sha256sum
   require_var SHELLCHECK_VERSION
+  local shellcheck_sha=""
   if [[ "${ARCH}" == "arm64" ]]; then
     require_var SHELLCHECK_SHA256_ARM64
-    SHELLCHECK_SHA="${SHELLCHECK_SHA256_ARM64}"
+    shellcheck_sha="${SHELLCHECK_SHA256_ARM64}"
   else
     require_var SHELLCHECK_SHA256
-    SHELLCHECK_SHA="${SHELLCHECK_SHA256}"
+    shellcheck_sha="${SHELLCHECK_SHA256}"
   fi
   curl_secure "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SHELLCHECK_ARCH}.tar.xz" \
     -o "${_tmpdir}/shellcheck.tar.xz"
-  printf '%s\n' "${SHELLCHECK_SHA}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
+  printf '%s\n' "${shellcheck_sha}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
   tar -xJf "${_tmpdir}/shellcheck.tar.xz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${install_dir}/shellcheck"
 
@@ -181,16 +191,17 @@ install_hadolint() {
   require_cmd curl
   require_cmd sha256sum
   require_var HADOLINT_VERSION
+  local hadolint_sha=""
   if [[ "${ARCH}" == "arm64" ]]; then
     require_var HADOLINT_SHA256_ARM64
-    HADOLINT_SHA="${HADOLINT_SHA256_ARM64}"
+    hadolint_sha="${HADOLINT_SHA256_ARM64}"
   else
     require_var HADOLINT_SHA256
-    HADOLINT_SHA="${HADOLINT_SHA256}"
+    hadolint_sha="${HADOLINT_SHA256}"
   fi
   curl_secure "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HADOLINT_ARCH}" \
     -o "${_tmpdir}/hadolint"
-  printf '%s\n' "${HADOLINT_SHA}  ${_tmpdir}/hadolint" | sha256sum -c -
+  printf '%s\n' "${hadolint_sha}  ${_tmpdir}/hadolint" | sha256sum -c -
   install -m 0755 "${_tmpdir}/hadolint" "${install_dir}/hadolint"
 
   return 0
@@ -207,14 +218,17 @@ install_yamllint() {
     exit 1
   fi
 
+  local wheel_url=""
   wheel_url="$(
     curl_secure "https://pypi.org/pypi/yamllint/${YAMLLINT_VERSION}/json" | \
-      python3 -c "import json,sys; data=json.load(sys.stdin); urls=data['urls']; wheel=next(u for u in urls if u['packagetype']=='bdist_wheel' and u['filename'].endswith('py3-none-any.whl')); print(wheel['url'])" || true
+      python3 -c "import json,sys; response_doc=json.load(sys.stdin); urls=response_doc['urls']; wheel=next(u for u in urls if u['packagetype']=='bdist_wheel' and u['filename'].endswith('py3-none-any.whl')); print(wheel['url'])" || true
   )"
   if [[ -z "${wheel_url}" ]]; then
     error "failed to resolve yamllint wheel URL (check network/PyPI availability)."
     exit 1
   fi
+  local wheel_name=""
+  local wheel_path=""
   wheel_name="$(basename "${wheel_url}")"
   wheel_path="${_tmpdir}/${wheel_name}"
 
@@ -240,16 +254,17 @@ install_gitleaks() {
   require_cmd curl
   require_cmd sha256sum
   require_var GITLEAKS_VERSION
+  local gitleaks_sha=""
   if [[ "${ARCH}" == "arm64" ]]; then
     require_var GITLEAKS_SHA256_ARM64
-    GITLEAKS_SHA="${GITLEAKS_SHA256_ARM64}"
+    gitleaks_sha="${GITLEAKS_SHA256_ARM64}"
   else
     require_var GITLEAKS_SHA256
-    GITLEAKS_SHA="${GITLEAKS_SHA256}"
+    gitleaks_sha="${GITLEAKS_SHA256}"
   fi
   curl_secure "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz" \
     -o "${_tmpdir}/gitleaks.tar.gz"
-  printf '%s\n' "${GITLEAKS_SHA}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
+  printf '%s\n' "${gitleaks_sha}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/gitleaks.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/gitleaks" "${install_dir}/gitleaks"
 
@@ -261,16 +276,17 @@ install_trivy() {
   require_cmd curl
   require_cmd sha256sum
   require_var TRIVY_VERSION
+  local trivy_sha=""
   if [[ "${ARCH}" == "arm64" ]]; then
     require_var TRIVY_SHA256_ARM64
-    TRIVY_SHA="${TRIVY_SHA256_ARM64}"
+    trivy_sha="${TRIVY_SHA256_ARM64}"
   else
     require_var TRIVY_SHA256
-    TRIVY_SHA="${TRIVY_SHA256}"
+    trivy_sha="${TRIVY_SHA256}"
   fi
   curl_secure "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" \
     -o "${_tmpdir}/trivy.tar.gz"
-  printf '%s\n' "${TRIVY_SHA}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
+  printf '%s\n' "${trivy_sha}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/trivy.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/trivy" "${install_dir}/trivy"
 

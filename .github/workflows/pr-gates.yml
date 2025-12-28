@@ -23,8 +23,7 @@
 # DOES:
 #   - Enforce CI policy compliance via Validate-CI (blocking)
 #   - Run lint, typecheck, tests, duplication detection, and build verification
-#   - Run fast PR-scoped secrets scanning
-#   - Run dependency review when PR base/head refs are provided
+#   - Delegate PR-scoped security checks (secrets scan, dependency review) to `pr-security.yml`
 #   - Optionally run SonarCloud baseline analysis (non-blocking)
 #   - Upload artifacts best-effort on failure and publish a structured summary
 #   - Optionally post a PR failure comment (non-fork PRs only, opt-in)
@@ -615,105 +614,7 @@ jobs:
           artifacts_if_no_files_found: "ignore"
           artifacts_retention_days: ${{ inputs.retention_days }}
 
-  # ============================================================================
-  # SECURITY GATE — FAST SECRETS SCAN
-  # ----------------------------------------------------------------------------
-  # Purpose:
-  #   Perform rapid PR-scoped secret detection.
-  #
-  # Blocking:
-  #   Yes
-  # ============================================================================
-  secrets-scan:
-    name: Secrets scan (fast)
-    runs-on: ${{ inputs.runner }}
-    needs: [validate-ci]
-    timeout-minutes: 10
-    permissions:
-      contents: read
-    steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
-        with:
-          fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "1"
-          tools_bundle: "security"
 
-      - name: Secrets scan (PR)
-        uses: ./.github/actions/ps-task/secret-scan-pr
-
-      - name: Job teardown (PS)
-        if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
-        with:
-          summary_workflow: pr-gates
-          summary_output_path: reports/summary/pr-gates-secrets.json
-          summary_results: secrets=${{ job.status }}
-          artifacts_name: pr-gates-secrets
-          artifacts_paths: |
-            ${{ inputs.artifact_paths }}
-          artifacts_if_no_files_found: "ignore"
-          artifacts_retention_days: ${{ inputs.retention_days }}
-
-  # ============================================================================
-  # SECURITY GATE — DEPENDENCY REVIEW
-  # ----------------------------------------------------------------------------
-  # Purpose:
-  #   Detect newly introduced vulnerable or disallowed dependencies.
-  #
-  # Blocking:
-  #   Yes (when enabled)
-  # ============================================================================
-  dependency-review:
-    name: Dependency review
-    runs-on: ${{ inputs.runner }}
-    needs: [validate-ci]
-    if: ${{ inputs.pr_number != '' && inputs.pr_base_ref != '' && inputs.pr_head_ref != '' }}
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      pull-requests: read
-    steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
-        with:
-          fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "true"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Dependency review (PS)
-        uses: ./.github/actions/ps-task/dependency-review
-        with:
-          base_ref: ${{ inputs.pr_base_ref }}
-          head_ref: ${{ inputs.pr_head_ref }}
-      - name: Job teardown (PS)
-        if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
-        with:
-          summary_workflow: pr-gates
-          summary_output_path: reports/summary/pr-gates-dependency-review.json
-          summary_results: dependency-review=${{ job.status }}
-          artifacts_name: pr-gates-dependency-review
-          artifacts_paths: |
-            reports/**
-          artifacts_if_no_files_found: "ignore"
-          artifacts_retention_days: ${{ inputs.retention_days }}
 
   # ============================================================================
   # QUALITY SIGNAL — SONARCLOUD (BASELINE, NON-BLOCKING)
@@ -824,7 +725,7 @@ jobs:
     name: PR failure comment
     runs-on: ${{ inputs.runner }}
     needs:
-      [validate-ci, lint, typecheck, test, jscpd, build, secrets-scan, dependency-review, sonar]
+      [validate-ci, lint, typecheck, test, jscpd, build, sonar]
     if: >-
       ${{ failure() &&
       inputs.pr_number != '' &&
@@ -868,8 +769,6 @@ jobs:
             - Tests: ${{ needs.test.result }}
             - JSCPD: ${{ needs.jscpd.result }}
             - Build: ${{ needs.build.result }}
-            - Secrets: ${{ needs.secrets-scan.result }}
-            - Dependency review: ${{ needs.dependency-review.result }}
             - Sonar (baseline): ${{ needs.sonar.result }}
 
             Check the workflow run for detailed logs and artifacts.
@@ -906,8 +805,6 @@ jobs:
       - test
       - jscpd
       - build
-      - secrets-scan
-      - dependency-review
       - sonar
       - notify
     if: ${{ always() }}
@@ -943,12 +840,12 @@ jobs:
             test=${{ needs.test.result }}
             jscpd=${{ needs.jscpd.result }}
             build=${{ needs.build.result }}
-            secrets=${{ needs.secrets-scan.result }}
-            dependency-review=${{ needs.dependency-review.result }}
             sonar=${{ needs.sonar.result }}
             notify=${{ needs.notify.result }}
           artifacts_name: pr-gates-summary
           artifacts_paths: |
+            reports/**
+            logs/**
             reports/summary/pr-gates.json
           artifacts_if_no_files_found: "ignore"
           artifacts_retention_days: ${{ inputs.retention_days }}

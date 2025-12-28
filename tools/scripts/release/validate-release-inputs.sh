@@ -18,4 +18,10 @@ if [[ ! "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([\-+][0-9A-Za-z\.-]+)?$ ]]; then
   exit 1
 fi
 
+release_ref="${PS_RELEASE_REF:-}"
+if [[ -z "${release_ref}" ]]; then
+  echo "ERROR: release_ref is required" >&2
+  exit 1
+fi
+
 echo "PS.RELEASE_VALIDATE: OK"

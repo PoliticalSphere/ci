@@ -3,7 +3,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-export function getActionsRoot(repoRoot) {
+function getActionsRoot(repoRoot) {
   return path.join(repoRoot, '.github', 'actions');
 }
 

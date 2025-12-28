@@ -18,13 +18,28 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # Gate helpers provide the run_lint_step + formatted summary
 # shellcheck source=tools/scripts/gates/gate-common.sh
 . "${script_dir}/../gates/gate-common.sh"
+# shellcheck source=tools/scripts/lint/formatted-common.sh
+. "${script_dir}/formatted-common.sh"
 
 GATE_NAME="Lint"
 export GATE_NAME
 
-# Always wait for completion before printing the final summary block.
-PS_LINT_PRINT_MODE="final"
+# Print the lint table during the run and update it inline.
+PS_LINT_PRINT_MODE="inline"
 export PS_LINT_PRINT_MODE
+PS_LINT_INLINE=1
+export PS_LINT_INLINE
+PS_LINT_SECTION_HEADERS=0
+export PS_LINT_SECTION_HEADERS
+PS_LINT_STEP_LINES=0
+export PS_LINT_STEP_LINES
+
+# Keep local output clean; write structured logs to file unless overridden.
+if [[ "${CI:-0}" == "0" ]]; then
+  export PS_LOG_MODE="${PS_LOG_MODE:-file}"
+  export PS_LOG_PATH="${PS_LOG_PATH:-${LINT_DIR}/ps.log}"
+fi
+export PS_LOG_MODE="human"
 
 # Ensure full-scan behaviour
 export PS_FULL_SCAN=1
@@ -49,45 +64,10 @@ if [[ ! -f "${typecheck_script}" ]]; then
   typecheck_script="${script_dir}/../actions/ps-typecheck/typecheck.sh"
 fi
 
-print_lint_intro() {
-  local note="${1:-}"
-  local icon="${PS_FMT_ICON:-▶}"
-  local rule="${PS_FMT_RULE:-────────────────────────────────────────}"
-
-  if type -t ps_supports_color >/dev/null 2>&1 && ps_supports_color; then
-    local c_reset=$'\033[0m'
-    local c_bold=$'\033[1m'
-    local c_dim=$'\033[90m'
-    local c_cyan=$'\033[36m'
-    local c_green=$'\033[32m'
-
-    printf "%b%s%b %b%s%b\n" "${c_green}" "${icon}" "${c_reset}" "${c_bold}${c_cyan}" "LINT & TYPE CHECK" "${c_reset}"
-    printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
-  else
-    printf '%s %s\n' "${icon}" "LINT & TYPE CHECK"
-    printf '%s\n' "${rule}"
-  fi
-
-  if [[ -n "${note}" ]]; then
-    printf '%s\n' "${note}"
-  fi
-}
-
-lint_pool_wait_for_slot() {
-  local max_workers="${1:?max workers required}"
-  local active
-  while :; do
-    active="$(lint_active_count)"
-    if [[ "${active}" -lt "${max_workers}" ]]; then
-      return 0
-    fi
-    lint_wait_one || return 0
-  done
-}
-
 # Banner
-bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
-print_lint_intro "Note: To debug specific issues locally, you can run linters individually using commands like npm run lint:biome."
+PS_BANNER_RULE=0 bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
+ps_cli_header "LINT CHECK" "npm run lint"
+gate_log_start
 
 set +e
 
@@ -135,8 +115,6 @@ run_lint_step_async "lint.cspell" "CSPELL" "Spelling checks" \
 lint_wait_all
 set -e
 
-# If configured to print only at the end, do it here (and only here).
-lint_print_final || true
 lint_print_tally || true
 
 # If any lint/typecheck failed, print failed section and exit non-zero
@@ -145,6 +123,7 @@ if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
     "gate.failed" \
     "${GATE_NAME} failed" \
     "One or more lint/typecheck checks failed (see logs/lint/*.log)"
+  gate_log_finish "FAIL" 1
   exit 1
 fi
 

@@ -8,7 +8,6 @@ set -euo pipefail
 #   Run a repository script with standardized logging.
 # ==============================================================================
 
-
 workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
 : "${PS_PLATFORM_ROOT:?PS_PLATFORM_ROOT must be set by the workflow (path to checked-out platform repo)}"
 platform_root="${PS_PLATFORM_ROOT}"
@@ -17,6 +16,13 @@ if [[ ! -d "${platform_root}" ]]; then
   printf 'ERROR: PS_PLATFORM_ROOT directory not found: %s\n' "${platform_root}" >&2
   exit 1
 fi
+
+readonly MAX_ENV_KV_ENTRIES=100
+readonly MAX_ENV_KV_VALUE_BYTES=65536
+readonly MAX_ENV_KV_TOTAL_BYTES=262144
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=tools/scripts/actions/cross-cutting/env.sh
+. "${script_dir}/../cross-cutting/env.sh"
 
 # Resolve print-section.sh (prefer platform, allow workspace fallback for dev/bootstrap).
 section_script=""
@@ -90,25 +96,6 @@ if [[ -z "${PS_TITLE:-}" ]]; then
   exit 1
 fi
 
-emit_env() {
-  local key="$1"
-  local val="$2"
-  local sanitized delimiter attempts
-  sanitized="${val//$'\r'/}"
-  delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-  attempts=0
-  while [[ "${sanitized}" == *"${delimiter}"* ]]; do
-    attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 6 ]]; then
-      printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
-      exit 1
-    fi
-    delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-  done
-  printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
-  return 0
-}
-
 emit_env "PS_RUN_ID" "${PS_ID}"
 emit_env "PS_RUN_TITLE" "${PS_TITLE}"
 emit_env "PS_RUN_DESCRIPTION" "${PS_DESCRIPTION}"
@@ -121,7 +108,15 @@ log_security_event() {
   msg="$(printf '%s' "${msg}" | tr -d '\r\n' | tr -c '[:print:]\t' ' ')
 "
   local ts
-  ts="$(date -u +%FT%T%z 2>/dev/null || date -u +%FT%T)"
+  if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
+    if date -u -r "${SOURCE_DATE_EPOCH}" +%FT%T%z >/dev/null 2>&1; then
+      ts="$(date -u -r "${SOURCE_DATE_EPOCH}" +%FT%T%z)"
+    else
+      ts="$(date -u -d "@${SOURCE_DATE_EPOCH}" +%FT%T%z)"
+    fi
+  else
+    ts="$(date -u +%FT%T%z 2>/dev/null || date -u +%FT%T)"
+  fi
   if [[ -n "${log_abs:-}" ]]; then
     printf '%s %s %s\n' "${ts}" "${level}" "${msg}" >> "${log_abs}"
   else
@@ -142,7 +137,7 @@ env_kv="${PS_ENV_KV:-}"
 if [[ -n "${env_kv}" ]]; then
   env_kv_count=$(printf '%s\n' "${env_kv}" | sed '/^[[:space:]]*$/d' | wc -l | tr -d ' ')
   # enforce limits in helper when invoked standalone
-  if (( env_kv_count > 100 )); then
+  if (( env_kv_count > MAX_ENV_KV_ENTRIES )); then
     printf 'ERROR: env_kv has too many entries (%s)\n' "${env_kv_count}" >&2
     exit 1
   fi
@@ -158,12 +153,12 @@ if [[ -n "${env_kv}" ]]; then
       exit 1
     fi
     val_len=${#value}
-    if (( val_len > 65536 )); then
+    if (( val_len > MAX_ENV_KV_VALUE_BYTES )); then
       printf 'ERROR: env_kv value too large (entry: %s)\n' "${entry%%=*}" >&2
       exit 1
     fi
     total_bytes=$((total_bytes + val_len))
-    if (( total_bytes > 262144 )); then
+    if (( total_bytes > MAX_ENV_KV_TOTAL_BYTES )); then
       printf 'ERROR: env_kv total size too large\n' >&2
       exit 1
     fi

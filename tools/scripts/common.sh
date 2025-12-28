@@ -26,6 +26,10 @@ repo_root=""
 # shellcheck disable=SC2034
 has_git=0
 format_loaded=0
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+
+# shellcheck source=tools/scripts/common/retry.sh
+. "${script_dir}/common/retry.sh"
 
 _ps_realpath_dir() {
   local d="$1"
@@ -149,25 +153,4 @@ require_cmd() {
     die "${cmd} is required but was not found on PATH."
   fi
   return 0
-}
-
-# ----------------------------
-# retry_cmd <retries> <sleep_seconds> <command...>
-# ----------------------------
-retry_cmd() {
-  local retries="$1"
-  local sleep_s="$2"
-  shift 2
-
-  local attempt=1
-  while true; do
-    if "$@"; then
-      return 0
-    fi
-    if [[ "${attempt}" -ge "${retries}" ]]; then
-      return 1
-    fi
-    sleep "${sleep_s}"
-    attempt=$((attempt + 1))
-  done
 }

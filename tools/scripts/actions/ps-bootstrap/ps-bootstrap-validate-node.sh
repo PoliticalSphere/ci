@@ -8,38 +8,29 @@ set -euo pipefail
 #   Validate Node.js inputs for bootstrap.
 # ==============================================================================
 
-
-scripts_root="${PS_SCRIPTS_ROOT:?PS_SCRIPTS_ROOT not set}"
-workspace_root="${PS_WORKSPACE_ROOT:?PS_WORKSPACE_ROOT not set}"
-
-validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
-if [[ ! -f "${validate_sh}" ]]; then
-  printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
-  echo "HINT: ensure PS_PLATFORM_ROOT points at the platform checkout, or vendor scripts into the repo." >&2
-  exit 1
-fi
-# shellcheck source=/dev/null
-. "${validate_sh}"
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=tools/scripts/actions/cross-cutting/resolve-validate-inputs.sh
+. "${script_dir}/../cross-cutting/resolve-validate-inputs.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/env.sh
+. "${script_dir}/../cross-cutting/env.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/path.sh
+. "${script_dir}/../cross-cutting/path.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+. "${script_dir}/../cross-cutting/validate.sh"
+resolve_scripts_root
 
 # Validate inputs early
-if ! require_number "inputs.node_version" "${PS_NODE_VERSION_INPUT}"; then
-  printf "ERROR: inputs.node_version must be a number (major version). Got '%s'.\n" "${PS_NODE_VERSION_INPUT}" >&2
-  exit 1
-fi
-require_enum "inputs.cache" "${PS_CACHE_INPUT}" "1" "0" || exit 1
-require_enum "inputs.install_dependencies" "${PS_INSTALL_DEP_INPUT}" "1" "0" || exit 1
+node_version="$(require_int_nonneg "inputs.node_version" "${PS_NODE_VERSION_INPUT}")"
+require_enum "inputs.cache" "${PS_CACHE_INPUT}" "1" "0" >/dev/null
+require_enum "inputs.install_dependencies" "${PS_INSTALL_DEP_INPUT}" "1" "0" >/dev/null
 
 # Validate working_directory (repo-relative)
 wd="${PS_WORKING_DIR_INPUT:-}"
 if [[ -z "${wd}" ]]; then
   wd='.'
 fi
-if [[ "${wd}" == /* ]]; then
-  printf 'ERROR: inputs.working_directory must be repo-relative (must not start with /)\n' >&2
-  exit 1
-fi
-if [[ "${wd}" == *".."* ]]; then
-  printf 'ERROR: inputs.working_directory must not contain .. path traversal\n' >&2
+if ! safe_relpath_no_dotdot "${wd}"; then
+  printf 'ERROR: inputs.working_directory must be a repo-relative safe path\n' >&2
   exit 1
 fi
 
@@ -58,29 +49,9 @@ if [[ "${PS_INSTALL_DEP_INPUT}" == "1" ]]; then
 fi
 
 # Persist validated node version and working dir for downstream steps
-emit_env() {
-  local key="$1"
-  local val="$2"
-  local sanitized delimiter attempts
-  sanitized="${val//$'\r'/}"
-  delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-  attempts=0
-  while [[ "${sanitized}" == *"${delimiter}"* ]]; do
-    attempts=$((attempts + 1))
-    if [[ "${attempts}" -gt 6 ]]; then
-      printf 'ERROR: env value for %s contains an unsafe heredoc delimiter\n' "${key}" >&2
-      exit 1
-    fi
-    delimiter="__PS_ENV_${RANDOM}_${RANDOM}__"
-  done
-  printf '%s<<%s\n%s\n%s\n' "${key}" "${delimiter}" "${sanitized}" "${delimiter}" >> "${GITHUB_ENV}"
-  # Explicit success return for clarity
-  return 0
-}
-
-emit_env "PS_NODE_VERSION_VALIDATED" "${PS_NODE_VERSION_INPUT}"
+emit_env "PS_NODE_VERSION_VALIDATED" "${node_version}"
 emit_env "PS_WORKING_DIRECTORY" "${wd}"
 
-printf 'PS.NODE_SETUP: node_version=%q\n' "${PS_NODE_VERSION_INPUT}"
+printf 'PS.NODE_SETUP: node_version=%q\n' "${node_version}"
 printf 'PS.NODE_SETUP: cache=%q\n' "${PS_CACHE_INPUT}"
 printf 'PS.NODE_SETUP: install_dependencies=%q\n' "${PS_INSTALL_DEP_INPUT}"

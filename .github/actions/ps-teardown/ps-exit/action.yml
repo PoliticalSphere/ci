@@ -1,8 +1,121 @@
 # ==============================================================================
-# Political Sphere — Composite Action: PS Teardown (Switchboard)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Canonical teardown switchboard for end-of-job reporting and cleanup.
+# Political Sphere — Composite Action: PS Teardown
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-teardown/ps-exit/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Teardown composite action to Canonical job teardown
+#     switchboard: summary, artifacts, optional PR comment.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [summary_workflow, summary_output_path, summary_results, artifacts_name,
+#     artifacts_paths, artifacts_retention_days, artifacts_if_no_files_found,
+#     artifacts_compression_level, pr_number, github_token, pr_comment_body,
+#     pr_comment_body_path, pr_comment_body_prefix, pr_comment_body_suffix,
+#     expected_base_sha, expected_head_sha]
+#   outputs: [none]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-teardown/ps-exit
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/cross-cutting/output.sh,
+#     tools/scripts/actions/cross-cutting/string.sh]
+#   external: [bash]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [github_token]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - tools/scripts/actions/cross-cutting/output.sh
+#     - tools/scripts/actions/cross-cutting/string.sh
+#
 # ==============================================================================
 
 name: "PS Teardown"
@@ -110,32 +223,11 @@ runs:
       run: |
         set -euo pipefail
 
-        trim() {
-          local s="$1"
-          s="${s#"${s%%[![:space:]]*}"}"
-          s="${s%"${s##*[![:space:]]}"}"
-          printf '%s' "${s}"
-        }
+        # shellcheck source=tools/scripts/actions/cross-cutting/string.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/string.sh"
 
-        emit_output() {
-          local key="$1"
-          local val="$2"
-          local sanitized delimiter attempts
-          sanitized="${val//$'\r'/}"
-          delimiter="__PS_OUT_${RANDOM}_${RANDOM}__"
-          attempts=0
-          while [[ "${sanitized}" == *"${delimiter}"* ]]; do
-            attempts=$((attempts + 1))
-            if [[ "${attempts}" -gt 6 ]]; then
-              echo "ERROR: output value for ${key} contains an unsafe heredoc delimiter" >&2
-              exit 1
-            fi
-            delimiter="__PS_OUT_${RANDOM}_${RANDOM}__"
-          done
-          printf '%s<<%s\n%s\n%s\n' \
-            "${key}" "${delimiter}" "${sanitized}" "${delimiter}" \
-            >> "${GITHUB_OUTPUT}"
-        }
+        # shellcheck source=tools/scripts/actions/cross-cutting/output.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/output.sh"
 
         summary_workflow="$(trim "${PS_SUMMARY_WORKFLOW}")"
         summary_output_path="$(trim "${PS_SUMMARY_OUTPUT_PATH}")"
