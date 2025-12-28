@@ -128,9 +128,8 @@ require_enum() {
 require_regex() {
   local name="$1"
   local value="$2"
-  local pattern="$3"
   local hint="${4:-}"
-  if [[ ! "${value}" =~ ${pattern} ]]; then
+  if [[ ! "${value}" =~ ${3} ]]; then
     v_error "${name} has invalid format"
     if [[ -n "${hint}" ]]; then
       v_detail "${hint}"
