@@ -321,7 +321,6 @@ async function main() {
   // ---------------------------------------------------------------------------
   // 9) Status mappings: 401, 403, 429, 500 => specific errors.
   // ---------------------------------------------------------------------------
-  {
     const mk = async ({ status, expectedError, headers = {} }) => {
       const lookupUrl = commitUrl('actions/checkout', sha);
       const fetch = makeFetchStub({
@@ -353,12 +352,10 @@ async function main() {
     await mk({ status: 500, expectedError: 'unexpected_status' });
 
     info('OK: status mappings (401/403/429/500)');
-  }
 
   // ---------------------------------------------------------------------------
   // 10) Action normalization: `@sha` and subpath actions resolve to owner/repo.
   // ---------------------------------------------------------------------------
-  {
     const commitCheckout = commitUrl('actions/checkout', sha);
     const commitCodeql = commitUrl('github/codeql-action', sha);
 
@@ -390,7 +387,6 @@ async function main() {
     );
 
     info('OK: action normalization (@sha + subpath)');
-  }
 
   // ---------------------------------------------------------------------------
   // 11) Caching: same repo@sha should only fetch commit lookup once.
