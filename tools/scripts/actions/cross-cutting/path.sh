@@ -93,5 +93,7 @@ validate_repo_relpath_strict() {
       printf 'ERROR: %s is a reserved system directory\n' "${input_path}" >&2
       exit 1
       ;;
-  esac
-}
+      *)
+        ;; # default: nothing to do
+    esac
+    return 0
