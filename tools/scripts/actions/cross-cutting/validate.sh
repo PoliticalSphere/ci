@@ -51,6 +51,7 @@ require_bool() {
     exit 1
   fi
   printf '%s' "${normalized}"
+  return 0
 }
 
 require_nonempty() {
@@ -73,6 +74,7 @@ require_true_false() {
       exit 1
       ;;
   esac
+  return 0
 }
 
 require_number() {
@@ -93,6 +95,7 @@ require_int_nonneg() {
     exit 1
   fi
   printf '%s' "${raw}"
+  return 0
 }
 
 require_positive_number() {
@@ -154,4 +157,5 @@ require_owner_repo() {
     exit 1
   fi
   printf '%s' "${raw}"
+  return 0
 }
