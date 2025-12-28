@@ -149,6 +149,13 @@ runs:
         PS_SCRIPT_RELPATH: ${{ inputs.script_relpath }}
       run: |
         set -euo pipefail
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
 
         # Resolve platform root: prefer explicit input, else env.
         platform_root="${PS_PLATFORM_ROOT_INPUT:-}"
@@ -157,36 +164,30 @@ runs:
         fi
 
         if [[ -z "${platform_root}" ]]; then
-          printf 'ERROR: CI Validate requires platform root.\n' >&2
-          printf 'Set inputs.platform_root or env.PS_PLATFORM_ROOT (e.g. %s/.ps-platform).\n' \
-            "${GITHUB_WORKSPACE}" >&2
-          exit 1
+          v_detail "Set inputs.platform_root or env.PS_PLATFORM_ROOT (e.g. ${GITHUB_WORKSPACE}/.ps-platform)."
+          fail "CI Validate requires platform root."
         fi
 
         # Require an absolute path (prevents ambiguity + path traversal).
         if [[ "${platform_root}" != /* ]]; then
-          printf 'ERROR: platform_root must be an absolute path (got %q)\n' "${platform_root}" >&2
-          exit 1
+          fail "platform_root must be an absolute path (got ${platform_root})"
         fi
 
         if [[ ! -d "${platform_root}" ]]; then
-          printf 'ERROR: platform_root directory not found: %q\n' "${platform_root}" >&2
-          exit 1
+          fail "platform_root directory not found: ${platform_root}"
         fi
 
         script_rel="${PS_SCRIPT_RELPATH:-tools/scripts/ci/validate-ci-action.sh}"
         if [[ -z "${script_rel}" ]]; then
-          printf 'ERROR: inputs.script_relpath must not be empty\n' >&2
-          exit 1
+          fail "inputs.script_relpath must not be empty"
         fi
 
         # Script is expected to live in the *repo*, not the platform repo.
         # That keeps Validate-CI runnable regardless of platform structure.
         script_abs="${GITHUB_WORKSPACE}/${script_rel}"
         if [[ ! -f "${script_abs}" ]]; then
-          printf 'ERROR: Validate-CI script not found at %q\n' "${script_abs}" >&2
-          printf 'Expected relative path: %q\n' "${script_rel}" >&2
-          exit 1
+          v_detail "Expected relative path: ${script_rel}"
+          fail "Validate-CI script not found at ${script_abs}"
         fi
 
         printf 'PS.CI_VALIDATE: platform_root=%s\n' "${platform_root}"

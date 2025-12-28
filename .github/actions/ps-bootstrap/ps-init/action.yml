@@ -330,9 +330,13 @@ runs:
           fi
         fi
 
-        if ! command -v python3 >/dev/null 2>&1; then
-          printf 'ERROR: python3 is required for ps-init path validation\n' >&2
+        fail() {
+          v_error "$*"
           exit 1
+        }
+
+        if ! command -v python3 >/dev/null 2>&1; then
+          fail "python3 is required for ps-init path validation"
         fi
 
         require_full="$(require_bool "require_full_history" "${PS_REQUIRE_FULL_HISTORY_INPUT}")"
@@ -346,9 +350,7 @@ runs:
 
         depth="$(require_int_nonneg "fetch_depth" "${PS_FETCH_DEPTH_INPUT:-1}")"
         if [[ "${require_full}" == "1" && "${depth}" != "0" ]]; then
-          printf 'ERROR: require_full_history enabled but fetch_depth=%s (expected 0)\n' \
-            "${depth}" >&2
-          exit 1
+          fail "require_full_history enabled but fetch_depth=${depth} (expected 0)"
         fi
 
         home_rel="${PS_HOME_DIR_INPUT:-.home}"
@@ -362,16 +364,11 @@ runs:
 
         if [[ "${skip_platform}" == "0" ]]; then
           if [[ -z "${prepo}" ]]; then
-            printf 'ERROR: platform_repo must not be empty when platform checkout is enabled\n' >&2
-            exit 1
+            fail "platform_repo must not be empty when platform checkout is enabled"
           fi
-          if ! [[ "${prepo}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
-            printf 'ERROR: platform_repo must be OWNER/REPO (got %q)\n' "${prepo}" >&2
-            exit 1
-          fi
+          prepo="$(require_owner_repo "platform_repo" "${prepo}")"
           if [[ -z "${pref}" ]]; then
-            printf 'ERROR: platform_ref must not be empty\n' >&2
-            exit 1
+            fail "platform_ref must not be empty"
           fi
           validate_repo_relpath_strict "${ppath}"
         fi

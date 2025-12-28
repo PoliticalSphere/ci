@@ -194,6 +194,20 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
         scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
         bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh"
 
@@ -281,8 +295,7 @@ runs:
           tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
           [[ -z "${tool_trim}" ]] && continue
           if ! printf '%s' "${tool_trim}" | grep -Eq '^[a-z0-9-]+$'; then
-            echo "ERROR: invalid tool id in resolved tools: ${tool_trim}" >&2
-            exit 1
+            fail "invalid tool id in resolved tools: ${tool_trim}"
           fi
         done <<< "${PS_RESOLVED_TOOLS}"
 
@@ -372,19 +385,16 @@ runs:
           [[ -z "${tool_trim}" ]] && continue
           tool_path="${install_dir_abs}/${tool_trim}"
           if [[ ! -e "${tool_path}" ]]; then
-            echo "ERROR: tool not found after install/cache restore: ${tool_trim}" >&2
-            exit 1
+            fail "tool not found after install/cache restore: ${tool_trim}"
           fi
           if [[ -L "${tool_path}" && ! -e "${tool_path}" ]]; then
-            echo "ERROR: broken symlink for tool: ${tool_trim}" >&2
-            exit 1
+            fail "broken symlink for tool: ${tool_trim}"
           fi
           if [[ -L "${tool_path}" ]]; then
             py_realpath_cmd=$'import os, sys\nprint(os.path.realpath(sys.argv[1]))'
             link_target="$(python3 -c "${py_realpath_cmd}" "${tool_path}")"
             if [[ "${link_target}" != "${install_dir_abs}/"* ]]; then
-              echo "ERROR: tool symlink escapes install_dir: ${tool_trim}" >&2
-              exit 1
+              fail "tool symlink escapes install_dir: ${tool_trim}"
             fi
           fi
           chmod +x "${tool_path}" || true

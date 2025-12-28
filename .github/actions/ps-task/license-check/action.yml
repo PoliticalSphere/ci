@@ -161,11 +161,17 @@ runs:
         PS_LOG_DIR_INPUT: ${{ inputs.log_dir }}
       run: |
         set -euo pipefail
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
         for d in "${PS_REPORT_DIR_INPUT}" "${PS_LOG_DIR_INPUT}"; do
-          [[ -n "${d}" ]] || { echo "ERROR: output dir empty" >&2; exit 1; }
+          [[ -n "${d}" ]] || { fail "output dir empty"; }
           if [[ "${d}" == /* || "${d}" == *".."* ]]; then
-            echo "ERROR: unsafe dir path: ${d}" >&2
-            exit 1
+            fail "unsafe dir path: ${d}"
           fi
           mkdir -p "${GITHUB_WORKSPACE}/${d}"
         done

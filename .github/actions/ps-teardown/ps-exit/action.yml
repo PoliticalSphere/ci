@@ -228,6 +228,13 @@ runs:
 
         # shellcheck source=tools/scripts/actions/cross-cutting/output.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/output.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
 
         summary_workflow="$(trim "${PS_SUMMARY_WORKFLOW}")"
         summary_output_path="$(trim "${PS_SUMMARY_OUTPUT_PATH}")"
@@ -248,10 +255,7 @@ runs:
           if [[ -z "${summary_workflow}" || \
             -z "${summary_output_path}" || \
             -z "${summary_results}" ]]; then
-            err_msg="ERROR: summary_workflow, summary_output_path, and summary_results"
-            err_msg="${err_msg} must be provided together."
-            echo "${err_msg}" >&2
-            exit 1
+            fail "summary_workflow, summary_output_path, and summary_results must be provided together."
           fi
           run_summary="1"
         fi
@@ -259,8 +263,7 @@ runs:
         run_artifacts="0"
         if [[ -n "${artifacts_name}" || -n "${artifacts_paths}" ]]; then
           if [[ -z "${artifacts_name}" || -z "${artifacts_paths}" ]]; then
-            echo "ERROR: artifacts_name and artifacts_paths must be provided together." >&2
-            exit 1
+            fail "artifacts_name and artifacts_paths must be provided together."
           fi
           run_artifacts="1"
         fi
@@ -268,21 +271,18 @@ runs:
         run_pr_comment="0"
         if [[ -n "${pr_number}" || -n "${github_token}" || -n "${pr_body}" ]]; then
           if [[ -z "${pr_number}" || -z "${github_token}" ]]; then
-            echo "ERROR: pr_number and github_token are required to post a PR comment." >&2
-            exit 1
+            fail "pr_number and github_token are required to post a PR comment."
           fi
           run_pr_comment="1"
         fi
 
         if [[ -z "${pr_body}" && -n "${pr_body_path}" ]]; then
           if [[ "${pr_body_path}" == /* || "${pr_body_path}" == *".."* ]]; then
-            echo "ERROR: pr_comment_body_path must be repo-relative and must not include '..'." >&2
-            exit 1
+            fail "pr_comment_body_path must be repo-relative and must not include '..'."
           fi
           body_file="${GITHUB_WORKSPACE}/${pr_body_path}"
           if [[ ! -f "${body_file}" ]]; then
-            echo "ERROR: pr_comment_body_path not found: ${body_file}" >&2
-            exit 1
+            fail "pr_comment_body_path not found: ${body_file}"
           fi
           pr_body="${pr_body_prefix}$(cat "${body_file}")${pr_body_suffix}"
         fi
