@@ -18,15 +18,16 @@ resolve_scripts_root() {
   else
     scripts_root="${workspace_root}"
   fi
+  return 0
 }
 
 resolve_validate_inputs() {
   local hint="${1:-}"
   resolve_scripts_root
 
-  validate_sh="${scripts_root}/tools/scripts/branding/validate-inputs.sh"
+  validate_sh="${scripts_root}/tools/scripts/actions/cross-cutting/validate.sh"
   if [[ ! -f "${validate_sh}" ]]; then
-    printf 'ERROR: validate-inputs.sh not found at %s\n' "${validate_sh}" >&2
+    printf 'ERROR: validate.sh not found at %s\n' "${validate_sh}" >&2
     if [[ -n "${hint}" ]]; then
       printf '%s\n' "${hint}" >&2
     fi
