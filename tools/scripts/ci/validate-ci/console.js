@@ -45,7 +45,7 @@ function escapeLogValue(value) {
   const raw = String(value ?? '').replaceAll(/[\r\n\t]+/g, ' ').trimEnd();
   if (raw === '') return '""';
   if (/[=\s"\\]/.test(raw)) {
-    return `"${raw.replaceAll('\\', '\\\\').replaceAll('"', '\\"')}"`;
+    return `"${raw.replaceAll(String.raw`\\`, String.raw`\\\\`).replaceAll('"', String.raw`\"`)}"`;
   }
   return raw;
 }
