@@ -299,28 +299,24 @@ async function main() {
   // ---------------------------------------------------------------------------
   // 7) Successful lookup: network probe 200, commit lookup 200 => ok:true error:null.
   // ---------------------------------------------------------------------------
-  {
-    await runLookupCase({
-      label: 'success lookup',
-      status: 200,
-      expectedError: null,
-      expectOk: true,
-    });
-    info('OK: verified SHA found (200)');
-  }
+  await runLookupCase({
+    label: 'success lookup',
+    status: 200,
+    expectedError: null,
+    expectOk: true,
+  });
+  info('OK: verified SHA found (200)');
 
   // ---------------------------------------------------------------------------
   // 8) Missing SHA: network probe 200, commit lookup 404 => ok:false ref_not_found.
   // ---------------------------------------------------------------------------
-  {
-    await runLookupCase({
-      label: 'missing SHA',
-      status: 404,
-      expectedError: 'ref_not_found',
-      expectOk: false,
-    });
-    info('OK: missing SHA returns ref_not_found (404)');
-  }
+  await runLookupCase({
+    label: 'missing SHA',
+    status: 404,
+    expectedError: 'ref_not_found',
+    expectOk: false,
+  });
+  info('OK: missing SHA returns ref_not_found (404)');
 
   // ---------------------------------------------------------------------------
   // 9) Status mappings: 401, 403, 429, 500 => specific errors.
@@ -400,18 +396,16 @@ async function main() {
   // 11) Caching: same repo@sha should only fetch commit lookup once.
   //     (network probe is also cached across calls)
   // ---------------------------------------------------------------------------
-  {
-    await runLookupCase({
-      label: 'cache',
-      status: 200,
-      expectedError: null,
-      expectOk: true,
-      repeat: 2,
-      expectedLookupCount: 1,
-    });
+  await runLookupCase({
+    label: 'cache',
+    status: 200,
+    expectedError: null,
+    expectOk: true,
+    repeat: 2,
+    expectedLookupCount: 1,
+  });
 
-    info('OK: caching prevents duplicate lookups');
-  }
+  info('OK: caching prevents duplicate lookups');
 
   section('result', 'validateRemoteAction helpers passed');
   info('All remote verifier tests passed ✅');
