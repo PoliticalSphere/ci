@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // ============================================================================
-// Validate-CI — E2E tests (Outstanding)
+// Validate-CI — E2E tests
 // ---------------------------------------------------------------------------
 // Runs the full validate-ci script against isolated minimal workspaces to verify
 // end-to-end behavior, exit codes, and key policy checks.
@@ -28,7 +28,9 @@ const consoleHelpers = path.join(
   'console.js',
 );
 
-const { detail, section, fatal } = await import(consoleHelpers);
+import { SAFE_PATH } from './test-utils.js';
+
+const { detail, fatal, section } = await import(consoleHelpers);
 
 function fail(msg, stdout = '', stderr = '') {
   fatal(msg);
@@ -43,10 +45,14 @@ function writeFile(p, content) {
 }
 
 function mkWorkspace(prefix) {
-  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
-  fs.mkdirSync(path.join(tmp, '.github', 'workflows'), { recursive: true });
-  fs.mkdirSync(path.join(tmp, '.github', 'actions'), { recursive: true });
-  return tmp;
+  const workspaceRoot = fs.mkdtempSync(path.join(os.tmpdir(), `${prefix}-`));
+  fs.mkdirSync(path.join(workspaceRoot, '.github', 'workflows'), {
+    recursive: true,
+  });
+  fs.mkdirSync(path.join(workspaceRoot, '.github', 'actions'), {
+    recursive: true,
+  });
+  return workspaceRoot;
 }
 
 const validateScript = path.join(
@@ -65,7 +71,10 @@ function runValidateCi({ cwd, label, extraEnv = {} }) {
       cwd,
       env: {
         ...process.env,
+        PATH: SAFE_PATH,
         CI: '1',
+        PS_REPO_ROOT: cwd,
+        GITHUB_WORKSPACE: cwd,
         PS_PLATFORM_ROOT: repoRoot,
         PS_VALIDATE_CI_VERIFY_REMOTE: '0',
         PS_VALIDATE_CI_QUIET: '1',
@@ -98,8 +107,8 @@ section('e2e', 'validate-ci end-to-end tests');
 // 1) FAIL CASE
 //
 {
-  const tmp = mkWorkspace('vcie2e-fail');
-  const wfdir = path.join(tmp, '.github', 'workflows');
+  const workspaceRoot = mkWorkspace('vcie2e-fail');
+  const workflowsDir = path.join(workspaceRoot, '.github', 'workflows');
 
   // Intentionally broken:
   // - no top-level permissions
@@ -107,7 +116,7 @@ section('e2e', 'validate-ci end-to-end tests');
   // - first step is NOT hardened runner
   // - uses non-SHA pinned action (tag)
   writeFile(
-    path.join(wfdir, 'fail.yml'),
+    path.join(workflowsDir, 'fail.yml'),
     [
       'name: e2e-fail',
       'on: workflow_dispatch',
@@ -120,10 +129,10 @@ section('e2e', 'validate-ci end-to-end tests');
     ].join('\n'),
   );
 
-  section('e2e', 'Fail workspace prepared', tmp);
+  section('e2e', 'Fail workspace prepared', workspaceRoot);
 
   const { status, stdout, stderr } = runValidateCi({
-    cwd: tmp,
+    cwd: workspaceRoot,
     label: 'expect-fail',
   });
 
@@ -174,12 +183,18 @@ section('e2e', 'validate-ci end-to-end tests');
 // 2) PASS CASE
 //
 {
-  const tmp = mkWorkspace('vcie2e-pass');
-  const wfdir = path.join(tmp, '.github', 'workflows');
+  const workspaceRoot = mkWorkspace('vcie2e-pass');
+  const workflowsDir = path.join(workspaceRoot, '.github', 'workflows');
 
   // Stub local harden-runner action so local action validation passes.
   writeFile(
-    path.join(tmp, '.github', 'actions', 'ps-harden-runner', 'action.yml'),
+    path.join(
+      workspaceRoot,
+      '.github',
+      'actions',
+      'ps-harden-runner',
+      'action.yml',
+    ),
     [
       'name: "PS Harden Runner"',
       'description: "Stub harden-runner for validate-ci E2E"',
@@ -194,7 +209,7 @@ section('e2e', 'validate-ci end-to-end tests');
 
   // Minimal local composite action.
   writeFile(
-    path.join(tmp, '.github', 'actions', 'local-ok', 'action.yml'),
+    path.join(workspaceRoot, '.github', 'actions', 'local-ok', 'action.yml'),
     [
       'name: "Local OK"',
       'description: "Local action for validate-ci E2E pass case"',
@@ -209,7 +224,7 @@ section('e2e', 'validate-ci end-to-end tests');
 
   // Pass: explicit permissions, job permissions, local actions only, hardened runner first.
   writeFile(
-    path.join(wfdir, 'pass.yml'),
+    path.join(workflowsDir, 'pass.yml'),
     [
       'name: e2e-pass',
       'on: workflow_dispatch',
@@ -227,10 +242,10 @@ section('e2e', 'validate-ci end-to-end tests');
     ].join('\n'),
   );
 
-  section('e2e', 'Pass workspace prepared', tmp);
+  section('e2e', 'Pass workspace prepared', workspaceRoot);
 
   const { status, stdout, stderr } = runValidateCi({
-    cwd: tmp,
+    cwd: workspaceRoot,
     label: 'expect-pass',
   });
 

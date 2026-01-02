@@ -1,46 +1,41 @@
 # ==============================================================================
-# Political Sphere — PR Checks (caller for PR Gates)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Trigger the reusable PR Gates workflow for pull requests in this repository so
-#   the full gate (lint / typecheck / tests / duplication / build) runs.
+# Political Sphere — PR Checks (Caller)
+# ==============================================================================
+# Wrapper workflow that binds pull_request events to the reusable PR Checks.
 # ==============================================================================
 
 name: PR Checks
 
+# ==============================================================================
+# TRIGGER
+# ------------------------------------------------------------------------------
+# Run on key PR lifecycle events that affect code or CI signal.
+# - opened/reopened: initial gate execution
+# - synchronize: new commits pushed to the PR branch
+# ==============================================================================
 on:
   pull_request:
-    types: [opened, synchronize, reopened, edited]
+    types: [opened, reopened, synchronize]
 
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
 permissions:
   contents: read
-  pull-requests: read
-  issues: write  # required by nested jobs in pr-gates.yml (dependency-review, notify)
 
 jobs:
-  pr-gates:
-    uses: ./.github/workflows/pr-gates.yml
-    with:
-      pr_number: ${{ github.event.pull_request.number }}
-      pr_is_fork: ${{ github.event.pull_request.head.repo.fork && 'true' || 'false' }}
-      pr_base_ref: ${{ github.event.pull_request.base.sha }}
-      pr_head_ref: ${{ github.event.pull_request.head.sha }}
-      # default node version can be overridden by callers
-      node_version: '22'
-      allow_pr_comments: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
+  call:
+    name: PR Checks
+    uses: ./.github/workflows/_reusable-pr-checks.yml
     permissions:
       contents: read
-      pull-requests: read
-      issues: write
-
-  license-compliance:
-    uses: ./.github/workflows/license-compliance.yml
-    needs: [pr-gates]
-    if: ${{ always() }}
-    permissions:
-      contents: read
+      pull-requests: write
     with:
       runner: ubuntu-22.04
-      node_version: '22'
-      fetch_depth: '1'
-      platform_ref: 'main'
+      node_version: "22"
+      fetch_depth: 1
+      pr_number: ${{ github.event.pull_request.number }}
+      pr_is_fork: ${{ github.event.pull_request.head.repo.fork && 'true' || 'false' }}
+      allow_pr_comments: ${{ github.event.pull_request.head.repo.fork && '0' || '1' }}
+      pr_base_ref: ${{ github.event.pull_request.base.sha }}
+      pr_head_ref: ${{ github.event.pull_request.head.sha }}

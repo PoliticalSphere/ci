@@ -1,190 +1,133 @@
 # ==============================================================================
-# Political Sphere — Reusable Workflow: Release (Optional)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Create a Git tag and GitHub Release for the platform repository.
-#
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: run Validate-CI, create tag, publish GitHub Release.
-#   - Does NOT: run builds/tests or publish packages/containers.
-#
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Least privilege with explicit permissions
-#   - SHA-pinned actions only
-#   - Validate-CI gate runs first
-#
-# Dependencies:
-#   - ./.github/workflows/validate-ci.yml
-#   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-run
-#   - ./.github/actions/ps-upload-artifacts
-#   - ./.github/actions/ps-write-summary
-#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-#   - tools/scripts/branding/print-section.sh
-#
-# Dependents:
-#   - External callers via workflow_call
-#
-# Execution Model:
-#   - Trigger: workflow_call
-#   - Reusable workflow (internal platform building block)
-#
-# Security & Policy Notes:
-#   - Secrets: uses GH_TOKEN (GitHub-provided) for release creation
-#   - Permissions: contents: write only in the release job
-#   - Constraints: no deployments or package publishing
-#
-# Operational Notes:
-#   - Timeouts: defined per job in this workflow
-#   - Artifacts: uploads reports/** and logs/** with 7-day retention
-#   - CI vs local: not designed for local execution
+# Political Sphere — Release (Caller)
+# ==============================================================================
+# Wrapper workflow that delegates to the reusable job definition.
 # ==============================================================================
 
 name: Release
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
         required: false
         default: "ubuntu-22.04"
         type: string
+
       node_version:
         description: "Node.js major version"
         required: false
         default: "22"
         type: string
+
+      fetch_depth:
+        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        required: false
+        default: 0
+        type: number
+
+      retention_days:
+        description: "Artifact retention in days for release evidence"
+        required: false
+        default: 7
+        type: number
+
+      # ==========================================================================
+      # RELEASE MODE
+      # ==========================================================================
+      dry_run:
+        description: "If true, validate + plan only (no tag/release mutation)"
+        required: false
+        default: false
+        type: boolean
+
+      # ==========================================================================
+      # RELEASE CONFIGURATION
+      # ==========================================================================
       release_version:
         description: "Release version (SemVer, without leading v)"
         required: true
         type: string
+
       release_ref:
-        description: "Git ref to release from (branch or SHA)"
-        required: false
-        default: "main"
+        description: "Git ref to release from (branch name or full SHA)"
+        required: true
         type: string
+
+      # ==========================================================================
+      # RELEASE NOTES
+      # --------------------------------------------------------------------------
+      # Precedence:
+      #   1) release_notes (inline)
+      #   2) release_notes_path (file in repo at release_ref)
+      #   3) generate_notes=true (GitHub auto-generation)
+      #   4) else: empty body
+      # ==========================================================================
       generate_notes:
-        description: "If true, auto-generate GitHub release notes"
+        description: "Auto-generate GitHub release notes (if no custom notes provided)"
         required: false
         default: true
         type: boolean
-      fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+
+      release_title:
+        description: "Optional release title (defaults to v<release_version>)"
         required: false
-        default: "0"
+        default: ""
         type: string
 
-permissions:
-  contents: read
+      release_notes:
+        description: "Optional inline release notes (overrides generate_notes)"
+        required: false
+        default: ""
+        type: string
 
-concurrency:
-  group: release-${{ github.workflow }}-${{ inputs.release_version }}
-  cancel-in-progress: false
+      release_notes_path:
+        description: "Optional repo-relative path to release notes file (overrides generate_notes)"
+        required: false
+        default: ""
+        type: string
 
-defaults:
-  run:
-    shell: bash
+      # ==========================================================================
+      # PLATFORM CONFIGURATION
+      # ==========================================================================
+      platform_ref:
+        description: "Platform repo ref to checkout for shared scripts/configs"
+        type: string
+        required: false
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
 
-env:
-  CI: "1"
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
 
 jobs:
-  validate-ci:
-    uses: ./.github/workflows/validate-ci.yml
+  call:
+    name: Release
+    uses: ./.github/workflows/_reusable-release.yml
     permissions:
-      contents: read
+      contents: write
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}
-      checkout_ref: ${{ inputs.release_ref }}
-      artifact_name: release-validate-ci
-      retention_days: 7
-
-  release:
-    name: Publish release
-    runs-on: ${{ inputs.runner }}
-    needs: [validate-ci]
-    permissions:
-      contents: write  # justification: release publishing requires tag + release creation
-    timeout-minutes: 15
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-          ref: ${{ inputs.release_ref }}
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
-
-      - name: Publish release (PS)
-        uses: ./.github/actions/ps-run
-        env:
-          GH_TOKEN: ${{ github.token }}
-          PS_RELEASE_VERSION: ${{ inputs.release_version }}
-          PS_GENERATE_NOTES: ${{ inputs.generate_notes }}
-        with:
-          id: "release.publish"
-          title: "Publish release"
-          description: "Tag and create GitHub Release"
-          script: "tools/scripts/release/release.sh"
-
-      - name: Upload artifacts
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: release-artifacts
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: "7"
-
-      - name: Release complete
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash tools/scripts/branding/print-section.sh "release" "Release complete"
-          echo "PS.RELEASE: OK"
-
-  summary:
-    name: Release summary
-    runs-on: ${{ inputs.runner }}
-    needs: [validate-ci, release]
-    if: ${{ always() }}
-    permissions:
-      contents: read
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-
-      - name: Harden runner (PS)
-        uses: ./.github/actions/ps-harden-runner
-
-      - name: Write summary (PS)
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: "release"
-          output_path: "reports/summary/release.json"
-          results: |
-            validate-ci=${{ needs.validate-ci.result }}
-            release=${{ needs.release.result }}
-
-      - name: Upload summary
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: release-summary
-          path: |
-            reports/summary/release.json
-          if_no_files_found: "warn"
-          retention_days: "7"
+      fetch_depth: ${{ inputs.fetch_depth }}
+      retention_days: ${{ inputs.retention_days }}
+      dry_run: ${{ inputs.dry_run }}
+      release_version: ${{ inputs.release_version }}
+      release_ref: ${{ inputs.release_ref }}
+      generate_notes: ${{ inputs.generate_notes }}
+      release_title: ${{ inputs.release_title }}
+      release_notes: ${{ inputs.release_notes }}
+      release_notes_path: ${{ inputs.release_notes_path }}
+      platform_ref: ${{ inputs.platform_ref }}
+      platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}

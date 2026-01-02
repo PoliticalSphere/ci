@@ -4,15 +4,13 @@ import path from 'node:path';
 import YAML from 'yaml';
 
 // Reuse console helpers from Validate-CI to avoid duplication across the repo.
-import {
+export {
   detail,
   getRepoRoot,
   info,
   isCI,
   section,
 } from '../scripts/ci/validate-ci/console.js';
-
-export { section, info, detail, getRepoRoot, isCI };
 
 export function fail(message) {
   console.error(`ERROR: ${message}`);
@@ -38,5 +36,65 @@ export function isObject(v) {
 export function assertContains(text, needle, rel, hint) {
   if (!text.includes(needle)) {
     fail(`${rel}: missing required content: ${needle}\nHINT: ${hint}`);
+  }
+}
+
+import { execFileSync } from 'node:child_process';
+import { getRepoRoot } from '../scripts/ci/validate-ci/console.js';
+import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+
+export const SAFE_PATH = getSafePathEnv();
+
+export function buildSafeEnv(overrides = {}) {
+  let safePath = '';
+  try {
+    safePath = getSafePathEnv();
+  } catch (err) {
+    fail(`Safe PATH validation failed: ${err?.message || err}`);
+  }
+  return {
+    PATH: safePath,
+    HOME: process.env.HOME,
+    USER: process.env.USER,
+    TERM: process.env.TERM || 'dumb',
+    ...overrides,
+  };
+}
+
+export function runLintSummary(envOverrides = {}) {
+  const repoRoot = getRepoRoot();
+  const env = buildSafeEnv({ TERM: 'dumb', ...envOverrides });
+  const commandString = `source "${repoRoot}/tools/scripts/gates/gate-common.sh"; lint_init || true; print_lint_summary; print_lint_summary`;
+  let out = '';
+  try {
+    out = execFileSync('bash', ['-lc', commandString], {
+      encoding: 'utf8',
+      cwd: repoRoot,
+      env,
+      timeout: 30_000,
+    });
+  } catch (err) {
+    out = (err.stdout || '') + (err.stderr || '');
+  }
+  return out;
+}
+
+export function assertLintSummaryOnce(out, rel = 'lint summary') {
+  const filtered = String(out)
+    .split('\n')
+    .filter((line) => !line.startsWith('PS.LOG '))
+    .join('\n');
+  const headerCount = (filtered.match(/LINT & TYPE CHECK/g) || []).length;
+  if (headerCount !== 1) {
+    fail(
+      `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${filtered}`,
+    );
+  }
+
+  const biomeCount = (filtered.match(/BIOME/g) || []).length;
+  if (biomeCount !== 1) {
+    fail(
+      `${rel}: Unexpected BIOME row count: expected 1, found ${biomeCount}\nOutput:\n${filtered}`,
+    );
   }
 }

@@ -21,6 +21,7 @@ Scripts in this directory exist to:
 - Ensure local behaviour mirrors CI behaviour as closely as practical
 - Provide predictable, structured outputs for humans and AI
 - Enforce platform policy through code, not convention
+- See `docs/terminal-output-standard.md` for the structured record format.
 
 ---
 
@@ -28,6 +29,9 @@ Scripts in this directory exist to:
 
 - `/tools/scripts/branding`
   - Output helpers (banner + section headers).
+
+- `/tools/scripts/actions`
+  - Composite action helper scripts (validation + orchestration).
 
 - `/tools/scripts/gates`
   - Lefthook gate entrypoints and shared gate helpers.
@@ -94,6 +98,7 @@ All scripts **must** adhere to the following rules:
   - Political Sphere ASCII banner printed once per execution
   - Clear, consistent section headers
   - Actionable error messages (no raw stack dumps without context)
+  - Structured `PS.LOG` records emitted for machine readers
 
 ---
 

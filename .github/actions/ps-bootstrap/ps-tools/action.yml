@@ -1,0 +1,471 @@
+# ==============================================================================
+# Political Sphere — Composite Action: PS Tools
+# License: Proprietary
+# ==============================================================================
+# ps_header_v: 6
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# IDENTITY
+# ─────────────────────────────────────────────────────────────────────────────
+# meta:
+#   file_id: .github/actions/ps-bootstrap/ps-tools/action.yml
+#   file_type: action
+#   language: yaml
+#   version: 1.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# LIFECYCLE & CHANGE CONTROL
+# ─────────────────────────────────────────────────────────────────────────────
+#   lifecycle:
+#     created: 2025-12-28
+#     last_updated: 2025-12-28
+#     last_updated_mode: manual
+#     review_cycle: 6 months
+#     change_control: lightweight
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# CONTEXT
+# ─────────────────────────────────────────────────────────────────────────────
+# context:
+#   parent_system: CI/CD Platform
+#   initiative: Hardened CI
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# GOVERNANCE
+# ─────────────────────────────────────────────────────────────────────────────
+# governance:
+#   intent: Provide the PS Tools composite action to Install pinned CLI tools using
+#     the PS installer.
+#   guarantees:
+#     - Defines inputs and outputs for consistent downstream usage.
+#     - Executes the composite steps declared in this action.
+#     - Uses pinned external actions when referenced.
+#   prohibitions:
+#     - Does not grant permissions beyond the invoking workflow.
+#     - Does not assume network access beyond runner policy.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# INTERFACES
+# ─────────────────────────────────────────────────────────────────────────────
+# interfaces:
+#   inputs: [install_dir, bundle, extra_tools, tools, run_security_scans, cache_tools]
+#   outputs: [resolved_tools, install_dir_abs]
+#   exit_codes: [0=success, 1=failure]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# EXECUTION
+# ─────────────────────────────────────────────────────────────────────────────
+# execution:
+#   invocation: Used as a composite action step in GitHub Actions workflows.
+#   example_invocation: >-
+#     uses: ./.github/actions/ps-bootstrap/ps-tools
+#   model: deterministic
+#   idempotency: not guaranteed
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# DEPENDENCIES
+# ─────────────────────────────────────────────────────────────────────────────
+# dependencies:
+#   internal: [tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh,
+#     tools/scripts/actions/cross-cutting/normalize.sh,
+#     tools/scripts/actions/cross-cutting/env.sh,
+#     tools/scripts/actions/cross-cutting/validate.sh,
+#     tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh,
+#     tools/scripts/actions/ps-tools/ps-tools-assemble.sh,
+#     tools/scripts/actions/ps-tools/ps-tools-install.sh,
+#     tools/scripts/ci/install-tools.sh, configs/security,
+#     tools/scripts/security/secret-scan-pr.sh]
+#   external: [bash, actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# SECURITY & POLICY
+# ─────────────────────────────────────────────────────────────────────────────
+# security:
+#   permissions: [none]
+#   secrets: [none]
+#   network: restricted; depends on runner policy
+#   policy_enforcement: [configs/ci/policies/allowed-actions.yml,
+#     configs/ci/policies/action-pinning.yml,
+#     configs/ci/policies/inline-bash.yml,
+#     configs/ci/policies/section-headers.yml]
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# OPERATIONS
+# ─────────────────────────────────────────────────────────────────────────────
+# ops:
+#   failure_modes: Step failures or validation errors surface as non-zero exits.
+#   observability: Step logs are emitted in the GitHub Actions job output.
+#   performance: Seconds to minutes depending on repo size and workload.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RISKS
+# ─────────────────────────────────────────────────────────────────────────────
+# risks:
+#   assumptions:
+#     - Inputs are provided as documented.
+#     - Runner has required tooling for declared steps.
+#   known_risks:
+#     - Network or platform outages can interrupt execution.
+#
+# ─────────────────────────────────────────────────────────────────────────────
+# RELATED
+# ─────────────────────────────────────────────────────────────────────────────
+# related:
+#   references:
+#     - .github/actions/ps-bootstrap/ps-tools/README.md
+#     - tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh
+#     - tools/scripts/actions/cross-cutting/normalize.sh
+#     - tools/scripts/actions/cross-cutting/env.sh
+#     - tools/scripts/actions/cross-cutting/validate.sh
+#     - tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh
+#     - tools/scripts/actions/ps-tools/ps-tools-assemble.sh
+#
+# ==============================================================================
+
+name: "PS Tools"
+description: "Install pinned CLI tools using the PS installer"
+
+inputs:
+  # ============================================================================
+  # INSTALL TARGET
+  # ============================================================================
+  install_dir:
+    description: "Repo-relative directory for CLI tools (e.g., .tooling/bin)"
+    required: false
+    default: ".tooling/bin"
+
+  # ============================================================================
+  # TOOL SELECTION
+  # ============================================================================
+  # Examples:
+  #   bundle: "lint"
+  #   bundle: "security"
+  bundle:
+    description: "Predefined tools bundle to install (lint|security)"
+    required: false
+    default: "none"
+
+  extra_tools:
+    description: "Optional newline-separated list of extra tool ids (one per line)"
+    required: false
+    default: ""
+
+  tools:
+    description: >-
+      Optional explicit newline-separated tool list (one id per line). Takes
+      precedence over bundle/extra_tools.
+    required: false
+    default: ""
+
+  # ============================================================================
+  # OPTIONAL POST-INSTALL TASKS
+  # ============================================================================
+  run_security_scans:
+    description: "Run fast PR-oriented security scans after installing tools (1 = run, 0 = skip)"
+    required: false
+    default: "0"
+
+  cache_tools:
+    description: "Enable caching for installed tools (0/1/true/false)"
+    required: false
+    default: "false"
+
+outputs:
+  resolved_tools:
+    description: "Final newline-separated tool ids selected for install (post validation/assembly)"
+    value: ${{ steps.ps_tools_outputs.outputs.resolved_tools }}
+
+  install_dir_abs:
+    description: "Absolute path to the install directory"
+    value: ${{ steps.ps_tools_outputs.outputs.install_dir_abs }}
+
+runs:
+  using: "composite"
+  steps:
+    # ==========================================================================
+    # 0) ROOT RESOLUTION (STANDARD CONTRACT)
+    # ==========================================================================
+    - name: Resolve platform/workspace roots (PS)
+      id: ps_tools_resolve_root
+      shell: bash
+      run: |
+        set -euo pipefail
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        fail() {
+          v_error "$*"
+          exit 1
+        }
+        scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh"
+
+    # ==========================================================================
+    # 1) INPUT VALIDATION (DEFENSIVE)
+    # ==========================================================================
+    - name: Validate inputs (PS)
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+        PS_BUNDLE_INPUT: ${{ inputs.bundle }}
+        PS_EXTRA_INPUT: ${{ inputs.extra_tools }}
+        PS_TOOLS_INPUT: ${{ inputs.tools }}
+        PS_RUN_SECURITY_SCANS_INPUT: ${{ inputs.run_security_scans }}
+        PS_CACHE_TOOLS_INPUT: ${{ inputs.cache_tools }}
+      run: |
+        set -euo pipefail
+        # shellcheck source=tools/scripts/actions/cross-cutting/normalize.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/normalize.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+
+        # --- basic toggle validation (GitHub-specific sanitization) ---
+        run_scans="$(require_bool "inputs.run_security_scans" "${PS_RUN_SECURITY_SCANS_INPUT}")"
+        cache_tools="$(require_bool "inputs.cache_tools" "${PS_CACHE_TOOLS_INPUT}")"
+
+        # Delegate canonical validation + normalisation to scripts
+        scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh"
+
+        emit_env "PS_RUN_SECURITY_SCANS_VALIDATED" "${run_scans}"
+        emit_env "PS_CACHE_TOOLS_VALIDATED" "${cache_tools}"
+
+        printf 'PS.TOOLS: inputs validated\n'
+
+    # ==========================================================================
+    # 2) TOOL LIST ASSEMBLY (PRECEDENCE + DEDUP)
+    # ==========================================================================
+    - name: Assemble tool list (PS)
+      id: ps_tools_assemble
+      shell: bash
+      env:
+        PS_BUNDLE_INPUT: ${{ inputs.tools != '' && '' || inputs.bundle }}
+        PS_EXTRA_INPUT: ${{ inputs.tools != '' && '' || inputs.extra_tools }}
+        PS_TOOLS_INPUT: ${{ inputs.tools }}
+        PS_TOOLS_OUTPUT_NAME: tools
+      run: |
+        set -euo pipefail
+        scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-assemble.sh"
+
+    - name: Prepare tools bin path (PS)
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+      run: |
+        set -euo pipefail
+        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
+
+        install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+        emit_env "PS_TOOLS_BIN" "${install_dir_abs}"
+        printf '%s\n' "${install_dir_abs}" >> "${GITHUB_PATH}"
+
+    - name: Compute cache key (PS)
+      id: ps_tools_cache
+      if: ${{ env.PS_CACHE_TOOLS_VALIDATED == '1' }}
+      shell: bash
+      env:
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+      run: |
+        set -euo pipefail
+
+        if [[ -z "${PS_RESOLVED_TOOLS}" ]]; then
+          echo "PS.TOOLS: no tools resolved, skipping cache key"
+          echo "cache_key=" >> "${GITHUB_OUTPUT}"
+          echo "cache_path=" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+
+        while IFS= read -r tool || [[ -n "${tool}" ]]; do
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          [[ -z "${tool_trim}" ]] && continue
+          if ! printf '%s' "${tool_trim}" | grep -Eq '^[a-z0-9-]+$'; then
+            fail "invalid tool id in resolved tools: ${tool_trim}"
+          fi
+        done <<< "${PS_RESOLVED_TOOLS}"
+
+        py_tools_hash_cmd="import hashlib, os"
+        py_tools_hash_cmd+=$'\nprint(hashlib.sha256('
+        py_tools_hash_cmd+=$'os.environ.get("PS_RESOLVED_TOOLS","").encode("utf-8")).hexdigest())'
+        tools_hash="$(python3 -c "${py_tools_hash_cmd}")"
+        export PS_SCRIPTS_ROOT="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        py_installer_hash_cmd="import hashlib, os"
+        py_installer_hash_cmd+=$'\nroot = os.environ.get("PS_SCRIPTS_ROOT") or '
+        py_installer_hash_cmd+=$'os.environ.get("GITHUB_WORKSPACE","")'
+        py_installer_hash_cmd+=$'\npath = os.path.join(root, '
+        py_installer_hash_cmd+=$'"tools/scripts/actions/ps-tools/ps-tools-install.sh")'
+        py_installer_hash_cmd+=$'\nif os.path.exists(path):'
+        py_installer_hash_cmd+=$'\n    data = open(path, "rb").read()'
+        py_installer_hash_cmd+=$'\n    print(hashlib.sha256(data).hexdigest())'
+        py_installer_hash_cmd+=$'\nelse:'
+        py_installer_hash_cmd+=$'\n    print("default-version")'
+        installer_hash="$(python3 -c "${py_installer_hash_cmd}")"
+        py_helper_hash_cmd="import glob,hashlib,os"
+        py_helper_hash_cmd+=$'\nroot=os.environ.get("PS_SCRIPTS_ROOT") or '
+        py_helper_hash_cmd+=$'os.environ.get("GITHUB_WORKSPACE","")'
+        py_helper_hash_cmd+=$'\npaths=[os.path.join(root,"tools/scripts/ci/install-tools.sh")]'
+        py_helper_hash_cmd+=$'\npaths+=glob.glob(os.path.join(root,"configs/security","*.env"))'
+        py_helper_hash_cmd+=$'\npaths=sorted(set(paths))'
+        py_helper_hash_cmd+=$'\nh=hashlib.sha256()'
+        py_helper_hash_cmd+=$'\nfound=False'
+        py_helper_hash_cmd+=$'\nfor p in paths:'
+        py_helper_hash_cmd+=$'\n    if os.path.exists(p):'
+        py_helper_hash_cmd+=$'\n        with open(p,"rb") as f: h.update(f.read()); found=True'
+        py_helper_hash_cmd+=$'\nprint(h.hexdigest() if found else "default-version")'
+        helper_hash="$(python3 -c "${py_helper_hash_cmd}")"
+        cache_key="ps-tools-${RUNNER_OS}-${installer_hash}-${helper_hash}-${tools_hash}"
+        cache_path="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+
+        echo "cache_key=${cache_key}" >> "${GITHUB_OUTPUT}"
+        echo "cache_path=${cache_path}" >> "${GITHUB_OUTPUT}"
+
+    - name: Restore tools cache (PS)
+      if: ${{ env.PS_CACHE_TOOLS_VALIDATED == '1' && steps.ps_tools_cache.outputs.cache_key != '' }}
+      id: restore_tools_cache
+      uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830
+      with:
+        path: ${{ steps.ps_tools_cache.outputs.cache_path }}
+        key: ${{ steps.ps_tools_cache.outputs.cache_key }}
+
+    # ==========================================================================
+    # 3) INSTALL (PINNED INSTALLER)
+    # ==========================================================================
+    - name: Install tools (PS)
+      if: >-
+        ${{ env.PS_CACHE_TOOLS_VALIDATED != '1' ||
+        steps.restore_tools_cache.outputs.cache-hit != 'true' }}
+      shell: bash
+      env:
+        PS_SCRIPTS_ROOT: ${{ env.PS_SCRIPTS_ROOT }}
+        PS_INSTALL_DIR: ${{ inputs.install_dir }}
+        PS_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+      run: |
+        set -euo pipefail
+
+        # Ensure install directory exists (repo-relative)
+        mkdir -p "${GITHUB_WORKSPACE}/${PS_INSTALL_DIR}"
+
+        scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
+        bash "${scripts_root}/tools/scripts/actions/ps-tools/ps-tools-install.sh"
+
+        printf 'PS.TOOLS: install complete\n'
+
+    - name: Verify tools install (PS)
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+      run: |
+        set -euo pipefail
+
+        install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+
+        if [[ -z "${PS_RESOLVED_TOOLS}" ]]; then
+          echo "PS.TOOLS: no tools resolved for verification"
+          exit 0
+        fi
+
+        while IFS= read -r tool || [[ -n "${tool}" ]]; do
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          [[ -z "${tool_trim}" ]] && continue
+          tool_path="${install_dir_abs}/${tool_trim}"
+          if [[ ! -e "${tool_path}" ]]; then
+            fail "tool not found after install/cache restore: ${tool_trim}"
+          fi
+          if [[ -L "${tool_path}" && ! -e "${tool_path}" ]]; then
+            fail "broken symlink for tool: ${tool_trim}"
+          fi
+          if [[ -L "${tool_path}" ]]; then
+            py_realpath_cmd=$'import os, sys\nprint(os.path.realpath(sys.argv[1]))'
+            link_target="$(python3 -c "${py_realpath_cmd}" "${tool_path}")"
+            if [[ "${link_target}" != "${install_dir_abs}/"* ]]; then
+              fail "tool symlink escapes install_dir: ${tool_trim}"
+            fi
+          fi
+          chmod +x "${tool_path}" || true
+        done <<< "${PS_RESOLVED_TOOLS}"
+
+    - name: Write summary (PS)
+      shell: bash
+      env:
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+        PS_CACHE_ENABLED: ${{ env.PS_CACHE_TOOLS_VALIDATED }}
+        PS_CACHE_HIT: ${{ steps.restore_tools_cache.outputs.cache-hit }}
+      run: |
+        set -euo pipefail
+
+        echo "### PS Tools Summary" >> "${GITHUB_STEP_SUMMARY}"
+
+        status="installed"
+        if [[ "${PS_CACHE_ENABLED}" == "1" && "${PS_CACHE_HIT}" == "true" ]]; then
+          status="restored"
+        fi
+
+        if [[ -z "${PS_RESOLVED_TOOLS}" ]]; then
+          echo "- Tools: none" >> "${GITHUB_STEP_SUMMARY}"
+          echo "- Status: skipped" >> "${GITHUB_STEP_SUMMARY}"
+          exit 0
+        fi
+
+        echo "- Status: ${status}" >> "${GITHUB_STEP_SUMMARY}"
+        echo "- Tools:" >> "${GITHUB_STEP_SUMMARY}"
+        while IFS= read -r tool || [[ -n "${tool}" ]]; do
+          tool_trim="$(printf '%s' "${tool}" | sed 's/^\s*//; s/\s*$//')"
+          [[ -z "${tool_trim}" ]] && continue
+          echo "  - ${tool_trim}" >> "${GITHUB_STEP_SUMMARY}"
+        done <<< "${PS_RESOLVED_TOOLS}"
+
+    # ==========================================================================
+    # 4) OPTIONAL: FAST SECURITY TASKS
+    # ==========================================================================
+    - name: Run secrets scan (fast) (PS)
+      if: ${{ env.PS_RUN_SECURITY_SCANS_VALIDATED == '1' }}
+      uses: ./.github/actions/ps-task/ps-run
+      with:
+        id: "secrets.fast"
+        title: "Secrets scan (fast)"
+        description: "Fast PR secret detection"
+        script: "tools/scripts/security/secret-scan-pr.sh"
+        require_files: |
+          tools/scripts/security/secret-scan-pr.sh
+      env:
+        PS_TOOLS_BIN: ${{ env.PS_TOOLS_BIN }}
+
+    # ==========================================================================
+    # 5) OUTPUTS (STABLE CONTRACT)
+    # ==========================================================================
+    - name: Emit outputs (PS)
+      id: ps_tools_outputs
+      shell: bash
+      env:
+        PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
+        PS_RESOLVED_TOOLS: ${{ steps.ps_tools_assemble.outputs.tools }}
+      run: |
+        set -euo pipefail
+
+        install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
+        printf 'install_dir_abs=%s\n' "${install_dir_abs}" >> "${GITHUB_OUTPUT}"
+
+        # PS_RESOLVED_TOOLS is expected to be newline-separated (may be empty)
+        {
+          echo "resolved_tools<<'EOF'"
+          printf '%s\n' "${PS_RESOLVED_TOOLS:-}"
+          echo "EOF"
+        } >> "${GITHUB_OUTPUT}"
+
+        printf 'PS.TOOLS: OK\n'

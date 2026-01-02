@@ -1,55 +1,17 @@
 # ==============================================================================
-# Political Sphere - Reusable Workflow: License Compliance
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Enforce OSS license compliance using the platform policy and lockfile data.
-#
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: validate dependency licenses and publish reports/logs artifacts.
-#   - Does NOT: deploy, release, or modify repository state.
-#
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Least privilege with explicit permissions
-#   - SHA-pinned actions only
-#   - Validate-CI gate runs first
-#
-# Dependencies:
-#   - ./.github/workflows/validate-ci.yml
-#   - ./.github/actions/ps-harden-runner
-#   - ./.github/actions/ps-node-bootstrap
-#   - ./.github/actions/license-check
-#   - ./.github/actions/ps-upload-artifacts
-#   - ./.github/actions/ps-write-summary
-#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-#
-# Dependents:
-#   - Downstream PS application repositories
-#
-# Execution Model:
-#   - Trigger: workflow_call (consumer-facing)
-#   - Reusable workflow (consumer-facing)
-#
-# Security & Policy Notes:
-#   - Secrets: optional NODE_AUTH_TOKEN for private registry access
-#   - Permissions: contents: read
-#   - Constraints: no deployments; no token writes
-#
-# Operational Notes:
-#   - Timeouts: defined per job in this workflow
-#   - Artifacts: reports/** and logs/** uploaded per policy
-#   - CI vs local: script uses lockfile data, no network calls
-#   - Node runtime: setup-node only; npm ci is intentionally skipped
+# Political Sphere — License Compliance (Caller)
+# ==============================================================================
+# Wrapper workflow that delegates to the reusable job definition.
 # ==============================================================================
 
 name: License Compliance
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # --------------------------------------------------------------------------
     inputs:
       runner:
         description: "Runner label"
@@ -64,22 +26,47 @@ on:
         default: "22"
 
       fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
-        type: string
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
         required: false
-        default: "1"
+        default: 1
 
       cache:
         description: "Enable Node dependency caching (1 = on, 0 = off)"
         type: string
         required: false
         default: "1"
+
       install_dependencies:
         description: "Install npm dependencies (1 = on, 0 = off)"
         type: string
         required: false
         default: "1"
 
+      license_timeout_minutes:
+        description: "Timeout for license compliance job in minutes"
+        type: number
+        required: false
+        default: 15
+
+      # ==========================================================================
+      # PLATFORM & SHARED TOOLING
+      # --------------------------------------------------------------------------
+      platform_ref:
+        description: "Platform repo ref to checkout for shared scripts/configs"
+        type: string
+        required: false
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+      # ==========================================================================
+      # LICENSE INPUTS
+      # --------------------------------------------------------------------------
       policy_path:
         description: "License policy path (repo-relative)"
         type: string
@@ -104,112 +91,49 @@ on:
         required: false
         default: "logs/security"
 
+      # ==========================================================================
+      # ARTIFACT COLLECTION & RETENTION
+      # --------------------------------------------------------------------------
       retention_days:
         description: "Artifact retention in days"
         type: number
         required: false
         default: 7
-      platform_ref:
-        description: "Platform repo ref to checkout for shared scripts/configs"
-        type: string
+
+    # ==========================================================================
+    # SECRETS (OPTIONAL, LEAST-PRIVILEGE)
+    # --------------------------------------------------------------------------
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
         required: false
-        default: "main"
 
   pull_request:
     types: [opened, reopened, synchronize]
 
-concurrency:
-  group: license-compliance-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-permissions:
-  contents: read
-
-env:
-  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
-  FORCE_COLOR: "1"
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
 
 jobs:
-  validate-ci:
-    name: Validate CI (policy gate)
-    uses: ./.github/workflows/validate-ci.yml
+  call:
+    name: License Compliance
+    uses: ./.github/workflows/_reusable-license-compliance.yml
     permissions:
       contents: read
     with:
-      runner: ${{ inputs.runner }}
-      node_version: ${{ inputs.node_version }}
-      artifact_name: license-compliance-validate-ci
-      retention_days: ${{ inputs.retention_days }}
+      runner: ${{ inputs.runner || 'ubuntu-22.04' }}
+      node_version: ${{ inputs.node_version || '22' }}
+      fetch_depth: ${{ inputs.fetch_depth || 1 }}
+      cache: ${{ inputs.cache || '1' }}
+      install_dependencies: ${{ inputs.install_dependencies || '1' }}
+      license_timeout_minutes: ${{ inputs.license_timeout_minutes || 15 }}
+      platform_ref: ${{ inputs.platform_ref || 'f6eac5049f626a672c84f3899f0572a87af07ca1' }}
+      platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref || 'true' }}
+      policy_path: ${{ inputs.policy_path || 'configs/security/license-policy.yml' }}
+      lock_path: ${{ inputs.lock_path || 'package-lock.json' }}
+      report_dir: ${{ inputs.report_dir || 'reports/security' }}
+      log_dir: ${{ inputs.log_dir || 'logs/security' }}
+      retention_days: ${{ inputs.retention_days || 7 }}
     secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
-  license:
-    name: License compliance
-    runs-on: ${{ inputs.runner }}
-    needs: [validate-ci]
-    permissions:
-      contents: read
-    timeout-minutes: 15
-    steps:
-      - name: Harden runner (PS)
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
-        env:
-          HOME: ${{ runner.temp }}
-        with:
-          egress-policy: audit
-
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          fetch-depth: ${{ inputs.fetch_depth }}
-
-      - name: Checkout platform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          repository: PoliticalSphere/ci
-          ref: ${{ inputs.platform_ref }}
-          path: .ps-platform
-          fetch-depth: 1
-
-      - name: Node runtime (PS)
-        uses: ./.github/actions/ps-node-bootstrap
-        with:
-          node_version: ${{ inputs.node_version }}
-          cache: ${{ inputs.cache }}
-          install_dependencies: ${{ inputs.install_dependencies }}
-
-      - name: License compliance
-        uses: ./.github/actions/license-check
-        with:
-          policy_path: ${{ inputs.policy_path }}
-          lock_path: ${{ inputs.lock_path }}
-          report_dir: ${{ inputs.report_dir }}
-          log_dir: ${{ inputs.log_dir }}
-
-      - name: Write summary
-        if: always()
-        uses: ./.github/actions/ps-write-summary
-        with:
-          workflow: "license-compliance"
-          output_path: "reports/summary/license-compliance.json"
-          results: |
-            license=${{ job.status == 'success' && 'success' || 'failure' }}
-      - name: Upload report artifacts
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: license-compliance-report
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
-      - name: Upload summary artifact
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: license-compliance-summary
-          path: reports/summary/license-compliance.json
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}

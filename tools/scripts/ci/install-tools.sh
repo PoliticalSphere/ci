@@ -6,6 +6,7 @@ set -euo pipefail
 # ------------------------------------------------------------------------------
 # Purpose:
 #   Install pinned CLI tools for CI gates (lint/security) using tooling.env.
+#   Tools must be installed as real binaries inside install_dir (no external symlinks).
 #
 # Usage:
 #   install-tools.sh <tool> [<tool> ...]
@@ -17,6 +18,11 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ -z "${repo_root}" ]]; then
   repo_root="${GITHUB_WORKSPACE:-$(pwd)}"
+fi
+if [[ -f "${repo_root}/tools/scripts/egress.sh" ]]; then
+  # shellcheck source=tools/scripts/egress.sh
+  . "${repo_root}/tools/scripts/egress.sh"
+  load_egress_allowlist || { error "egress allowlist load failed"; exit 1; }
 fi
 format_sh="${repo_root}/tools/scripts/branding/format.sh"
 if [[ -f "${format_sh}" ]]; then
@@ -30,6 +36,7 @@ detail() {
   else
     echo "$*"
   fi
+  return 0
 }
 
 error() {
@@ -38,6 +45,7 @@ error() {
   else
     echo "ERROR: $*" >&2
   fi
+  return 0
 }
 
 tooling_env="${repo_root}/configs/security/tooling.env"
@@ -51,6 +59,22 @@ if [[ "${RUNNER_OS:-}" != "Linux" ]]; then
   exit 1
 fi
 
+detect_arch() {
+  case "$(uname -m)" in
+    x86_64|amd64) echo "amd64" ;;
+    aarch64|arm64) echo "arm64" ;;
+    *) return 1 ;;
+  esac
+}
+
+ARCH="$(detect_arch)" || { error "unsupported architecture: $(uname -m)"; exit 1; }
+
+ACTIONLINT_ARCH="${ARCH}"
+SHELLCHECK_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "x86_64" || echo "aarch64")"
+HADOLINT_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "x86_64" || echo "arm64")"
+GITLEAKS_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "x64" || echo "arm64")"
+TRIVY_ARCH="$([[ "${ARCH}" == "amd64" ]] && echo "64bit" || echo "ARM64")"
+
 if [[ "${#}" -eq 0 ]]; then
   error "install-tools requires at least one tool name."
   exit 1
@@ -62,6 +86,26 @@ require_cmd() {
     error "${cmd} is required but not found on PATH"
     exit 1
   fi
+
+  return 0
+} 
+
+curl_secure() {
+  local url="$1"
+  shift
+  if [[ -z "${url}" ]]; then
+    error "curl_secure requires a URL"
+    exit 1
+  fi
+  if [[ "${url}" != https://* ]]; then
+    error "refusing non-HTTPS URL: ${url}"
+    exit 1
+  fi
+  if declare -F assert_egress_allowed_url >/dev/null 2>&1; then
+    assert_egress_allowed_url "${url}"
+  fi
+  curl --proto '=https' --tlsv1.2 -fsSL "${url}" "$@"
+  return 0
 }
 
 require_var() {
@@ -71,7 +115,9 @@ require_var() {
     error "${name} is required in tooling.env"
     exit 1
   fi
-}
+
+  return 0
+} 
 
 set -a
 # shellcheck source=/dev/null
@@ -82,16 +128,18 @@ install_dir="${PS_INSTALL_DIR:-${GITHUB_WORKSPACE:-$(pwd)}/.tooling/bin}"
 mkdir -p "${install_dir}"
 
 if [[ -n "${GITHUB_PATH:-}" ]]; then
-  echo "${install_dir}" >> "${GITHUB_PATH}"
+  printf '%s\n' "${install_dir}" >> "${GITHUB_PATH}"
   # For pip --user installs (yamllint)
-  echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
+  printf '%s\n' "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 else
   export PATH="${install_dir}:${HOME}/.local/bin:${PATH}"
 fi
 
 # Shared temp directory
 _tmpdir="$(mktemp -d)"
-cleanup() { rm -rf "${_tmpdir}"; }
+cleanup() { rm -rf "${_tmpdir}"; 
+  return 0
+}
 trap cleanup EXIT
 
 install_actionlint() {
@@ -99,38 +147,65 @@ install_actionlint() {
   require_cmd curl
   require_cmd sha256sum
   require_var ACTIONLINT_VERSION
-  require_var ACTIONLINT_SHA256
-  curl -fsSL -o "${_tmpdir}/actionlint.tar.gz" \
-    "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
-  echo "${ACTIONLINT_SHA256}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
+  local actionlint_sha=""
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var ACTIONLINT_SHA256_ARM64
+    actionlint_sha="${ACTIONLINT_SHA256_ARM64}"
+  else
+    require_var ACTIONLINT_SHA256
+    actionlint_sha="${ACTIONLINT_SHA256}"
+  fi
+  curl_secure "https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/actionlint_${ACTIONLINT_VERSION}_linux_${ACTIONLINT_ARCH}.tar.gz" \
+    -o "${_tmpdir}/actionlint.tar.gz"
+  printf '%s\n' "${actionlint_sha}  ${_tmpdir}/actionlint.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/actionlint.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/actionlint" "${install_dir}/actionlint"
-}
+
+  return 0
+} 
 
 install_shellcheck() {
   detail "PS.INSTALL: shellcheck=${SHELLCHECK_VERSION}"
   require_cmd curl
   require_cmd sha256sum
   require_var SHELLCHECK_VERSION
-  require_var SHELLCHECK_SHA256
-  curl -fsSL -o "${_tmpdir}/shellcheck.tar.xz" \
-    "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.x86_64.tar.xz"
-  echo "${SHELLCHECK_SHA256}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
+  local shellcheck_sha=""
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var SHELLCHECK_SHA256_ARM64
+    shellcheck_sha="${SHELLCHECK_SHA256_ARM64}"
+  else
+    require_var SHELLCHECK_SHA256
+    shellcheck_sha="${SHELLCHECK_SHA256}"
+  fi
+  curl_secure "https://github.com/koalaman/shellcheck/releases/download/v${SHELLCHECK_VERSION}/shellcheck-v${SHELLCHECK_VERSION}.linux.${SHELLCHECK_ARCH}.tar.xz" \
+    -o "${_tmpdir}/shellcheck.tar.xz"
+  printf '%s\n' "${shellcheck_sha}  ${_tmpdir}/shellcheck.tar.xz" | sha256sum -c -
   tar -xJf "${_tmpdir}/shellcheck.tar.xz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/shellcheck-v${SHELLCHECK_VERSION}/shellcheck" "${install_dir}/shellcheck"
-}
+
+  return 0
+} 
 
 install_hadolint() {
   detail "PS.INSTALL: hadolint=${HADOLINT_VERSION}"
   require_cmd curl
   require_cmd sha256sum
   require_var HADOLINT_VERSION
-  require_var HADOLINT_SHA256
-  curl -fsSL -o "${_tmpdir}/hadolint" \
-    "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-x86_64"
-  echo "${HADOLINT_SHA256}  ${_tmpdir}/hadolint" | sha256sum -c -
+  local hadolint_sha=""
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var HADOLINT_SHA256_ARM64
+    hadolint_sha="${HADOLINT_SHA256_ARM64}"
+  else
+    require_var HADOLINT_SHA256
+    hadolint_sha="${HADOLINT_SHA256}"
+  fi
+  curl_secure "https://github.com/hadolint/hadolint/releases/download/v${HADOLINT_VERSION}/hadolint-Linux-${HADOLINT_ARCH}" \
+    -o "${_tmpdir}/hadolint"
+  printf '%s\n' "${hadolint_sha}  ${_tmpdir}/hadolint" | sha256sum -c -
   install -m 0755 "${_tmpdir}/hadolint" "${install_dir}/hadolint"
-}
+
+  return 0
+} 
 
 install_yamllint() {
   detail "PS.INSTALL: yamllint=${YAMLLINT_VERSION}"
@@ -143,22 +218,25 @@ install_yamllint() {
     exit 1
   fi
 
+  local wheel_url=""
   wheel_url="$(
-    curl -fsSL "https://pypi.org/pypi/yamllint/${YAMLLINT_VERSION}/json" | \
-      python3 -c "import json,sys; data=json.load(sys.stdin); urls=data['urls']; wheel=next(u for u in urls if u['packagetype']=='bdist_wheel' and u['filename'].endswith('py3-none-any.whl')); print(wheel['url'])" || true
+    curl_secure "https://pypi.org/pypi/yamllint/${YAMLLINT_VERSION}/json" | \
+      python3 -c "import json,sys; response_doc=json.load(sys.stdin); urls=response_doc['urls']; wheel=next(u for u in urls if u['packagetype']=='bdist_wheel' and u['filename'].endswith('py3-none-any.whl')); print(wheel['url'])" || true
   )"
   if [[ -z "${wheel_url}" ]]; then
     error "failed to resolve yamllint wheel URL (check network/PyPI availability)."
     exit 1
   fi
+  local wheel_name=""
+  local wheel_path=""
   wheel_name="$(basename "${wheel_url}")"
   wheel_path="${_tmpdir}/${wheel_name}"
 
-  if ! curl -fsSL -o "${wheel_path}" "${wheel_url}"; then
+  if ! curl_secure "${wheel_url}" -o "${wheel_path}"; then
     error "failed to download yamllint wheel from PyPI."
     exit 1
   fi
-  echo "${YAMLLINT_SHA256}  ${wheel_path}" | sha256sum -c -
+  printf '%s\n' "${YAMLLINT_SHA256}  ${wheel_path}" | sha256sum -c -
 
   python3 -m pip install \
     --disable-pip-version-check \
@@ -167,6 +245,8 @@ install_yamllint() {
     --user \
     --no-deps \
     "${wheel_path}"
+
+  return 0
 }
 
 install_gitleaks() {
@@ -174,26 +254,44 @@ install_gitleaks() {
   require_cmd curl
   require_cmd sha256sum
   require_var GITLEAKS_VERSION
-  require_var GITLEAKS_SHA256
-  curl -fsSL -o "${_tmpdir}/gitleaks.tar.gz" \
-    "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
-  echo "${GITLEAKS_SHA256}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
+  local gitleaks_sha=""
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var GITLEAKS_SHA256_ARM64
+    gitleaks_sha="${GITLEAKS_SHA256_ARM64}"
+  else
+    require_var GITLEAKS_SHA256
+    gitleaks_sha="${GITLEAKS_SHA256}"
+  fi
+  curl_secure "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_${GITLEAKS_ARCH}.tar.gz" \
+    -o "${_tmpdir}/gitleaks.tar.gz"
+  printf '%s\n' "${gitleaks_sha}  ${_tmpdir}/gitleaks.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/gitleaks.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/gitleaks" "${install_dir}/gitleaks"
-}
+
+  return 0
+} 
 
 install_trivy() {
   detail "PS.INSTALL: trivy=${TRIVY_VERSION}"
   require_cmd curl
   require_cmd sha256sum
   require_var TRIVY_VERSION
-  require_var TRIVY_SHA256
-  curl -fsSL -o "${_tmpdir}/trivy.tar.gz" \
-    "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-64bit.tar.gz"
-  echo "${TRIVY_SHA256}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
+  local trivy_sha=""
+  if [[ "${ARCH}" == "arm64" ]]; then
+    require_var TRIVY_SHA256_ARM64
+    trivy_sha="${TRIVY_SHA256_ARM64}"
+  else
+    require_var TRIVY_SHA256
+    trivy_sha="${TRIVY_SHA256}"
+  fi
+  curl_secure "https://github.com/aquasecurity/trivy/releases/download/v${TRIVY_VERSION}/trivy_${TRIVY_VERSION}_Linux-${TRIVY_ARCH}.tar.gz" \
+    -o "${_tmpdir}/trivy.tar.gz"
+  printf '%s\n' "${trivy_sha}  ${_tmpdir}/trivy.tar.gz" | sha256sum -c -
   tar -xzf "${_tmpdir}/trivy.tar.gz" -C "${_tmpdir}"
   install -m 0755 "${_tmpdir}/trivy" "${install_dir}/trivy"
-}
+
+  return 0
+} 
 
 for tool in "$@"; do
   case "${tool}" in

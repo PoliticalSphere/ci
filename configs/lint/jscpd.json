@@ -1,18 +1,31 @@
 {
   "threshold": 0,
   "absolute": true,
+
   "minLines": 10,
   "minTokens": 50,
-  "reporters": ["json", "html"],
-  "output": "reports/jscpd",
+
+  "formats": ["javascript", "typescript", "json", "bash"],
+
+  "reporters": ["console", "json", "html"],
+
+  "output": "logs/jscpd",
+
   "ignore": [
     "**/*.min.*",
     "**/*.snap",
+
     "**/node_modules/**",
     "**/dist/**",
     "**/build/**",
     "**/coverage/**",
+    "**/logs/**",
     "**/reports/**",
+
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/yarn.lock",
+
     ".github/workflows/**",
     "**/.github/workflows/**"
   ]

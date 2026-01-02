@@ -32,15 +32,44 @@ mkdir -p "${report_dir}"
 export TRIVY_CACHE_DIR="${repo_root}/.cache/trivy"
 mkdir -p "${TRIVY_CACHE_DIR}"
 
+db_args=()
+if [[ -d "${TRIVY_CACHE_DIR}/db" ]]; then
+  db_args=(--skip-db-update)
+  detail "Trivy scan: using cached DB (skip update)."
+fi
+
 trivy fs \
   --config "${config_path}" \
+  --scanners vuln,misconfig \
   --format sarif \
   --output "${report_path}" \
+  "${db_args[@]}" \
   "${repo_root}"
 
 if [[ ! -f "${report_path}" ]]; then
   error "trivy did not produce SARIF at ${report_path}"
   exit 1
+fi
+
+if command -v python3 >/dev/null 2>&1 && [[ -f "${report_path}" ]]; then
+  python3 - <<'PY' "${report_path}"
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as f:
+    report_doc = json.load(f)
+
+results = []
+for run in report_doc.get("runs", []):
+    results.extend(run.get("results", []))
+
+severities = {}
+for res in results:
+    sev = res.get("properties", {}).get("security-severity", "0")
+    severities[sev] = severities.get(sev, 0) + 1
+
+print(f"PS.TRIVY: vulnerabilities={len(results)} by_severity={severities}")
+PY
 fi
 
 detail "Trivy scan: OK"

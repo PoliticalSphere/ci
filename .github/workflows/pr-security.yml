@@ -1,0 +1,111 @@
+# ==============================================================================
+# Political Sphere — PR Security (Caller)
+# ==============================================================================
+# Wrapper workflow that delegates to the reusable job definition.
+# ==============================================================================
+
+name: PR Security
+
+on:
+  workflow_call:
+    inputs:
+      runner:
+        description: "Runner label"
+        type: string
+        required: false
+        default: "ubuntu-22.04"
+
+      fetch_depth:
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
+        required: false
+        default: 1
+
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
+      platform_ref:
+        description: "Platform repository ref for shared scripts/configs"
+        type: string
+        required: false
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
+        type: string
+        required: false
+        default: "true"
+
+      artifact_paths:
+        description: "Artifact paths to upload"
+        type: string
+        required: false
+        default: |
+          reports/**
+          logs/**
+
+      retention_days:
+        description: "Artifact retention in days"
+        type: number
+        required: false
+        default: 7
+
+      pr_number:
+        description: "Pull request number (enables dependency review + PR comments)"
+        type: string
+        required: false
+        default: ""
+
+      pr_is_fork:
+        description: "Whether the PR originates from a fork (true/false)"
+        type: string
+        required: false
+        default: "false"
+
+      allow_pr_comments:
+        description: "Allow PR failure comments (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "0"
+
+      pr_base_ref:
+        description: "PR base SHA (diff-based checks, dependency review)"
+        type: string
+        required: false
+        default: ""
+
+      pr_head_ref:
+        description: "PR head SHA (diff-based checks, dependency review)"
+        type: string
+        required: false
+        default: ""
+
+    secrets:
+      NODE_AUTH_TOKEN:
+        description: "Optional token for private registry installs"
+        required: false
+
+
+jobs:
+  call:
+    name: PR Security
+    uses: ./.github/workflows/_reusable-pr-security.yml
+    permissions:
+      contents: read
+      pull-requests: write
+    with:
+      runner: ${{ inputs.runner }}
+      fetch_depth: ${{ inputs.fetch_depth }}
+      cache: ${{ inputs.cache }}
+      platform_ref: ${{ inputs.platform_ref }}
+      platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+      artifact_paths: ${{ inputs.artifact_paths }}
+      retention_days: ${{ inputs.retention_days }}
+      pr_number: ${{ inputs.pr_number }}
+      pr_is_fork: ${{ inputs.pr_is_fork }}
+      allow_pr_comments: ${{ inputs.allow_pr_comments }}
+      pr_base_ref: ${{ inputs.pr_base_ref }}
+      pr_head_ref: ${{ inputs.pr_head_ref }}

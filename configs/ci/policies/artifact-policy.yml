@@ -30,12 +30,25 @@ allowlist:
     - name: pr-gates-test-results
     - name: pr-gates-jscpd
     - name: pr-gates-build
-    - name: pr-gates-secrets
     - name: pr-gates-summary
+    - name: pr-gates-sonar
+    - name: pr-gates-notify
+  pr-security:
+    - name: pr-security-validate-ci
+    - name: pr-security-secrets
+    - name: pr-security-dependency-review
+    - name: pr-security-scorecard
+    - name: pr-security-trivy
+    - name: pr-security-trufflehog
+    - name: pr-security-summary
+    - name: pr-security-notify
   build-artifacts:
     - name: build-artifacts
     - name: build-artifacts-validate-ci
     - name: build-artifacts-summary
+    - name: platform-snapshot
+    - name: ${{ env.PS_ARTIFACT_PREFIX }}
+    - name: ${{ env.PS_ARTIFACT_PREFIX }}-summary
   security-scheduled:
     - name: security-scheduled-validate-ci
     - name: security-secrets
@@ -57,3 +70,4 @@ allowlist:
     - name: release-validate-ci
     - name: release-artifacts
     - name: release-summary
+    - name: release-dry-run

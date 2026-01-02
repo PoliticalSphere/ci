@@ -11,7 +11,7 @@ Quick local setup
 
 Running checks locally
 
-- Lint: `npm run lint`
+- Lint: `npm run lint` (or `npm run lint:affected` for PRs)
 - Typecheck: `npm run typecheck`
 - Tests: `npm run test` (or `npm run preflight` for full gates)
 - Duplication: `npm run jscpd`

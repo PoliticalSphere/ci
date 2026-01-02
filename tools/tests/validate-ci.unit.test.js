@@ -7,7 +7,7 @@
 //
 // Goals:
 //   - No network calls (remote verifier stubbed)
-//   - Real YAML files written to a temp workspace (exercise parser + checks)
+//   - Real YAML files written to a scratch workspace (exercise parser + checks)
 //   - Assert key violations *and* some metadata (path/weight/line)
 //   - Avoid brittleness by controlling baselines + allowed-first-steps
 // ============================================================================
@@ -39,7 +39,7 @@ function assertViolationMeta(v, { relPath, minWeight }) {
   assert(v, 'expected violation to exist');
   if (relPath) {
     assert(
-      String(v.path).replace(/\\/g, '/') === relPath,
+      String(v.path).replaceAll('\\', '/') === relPath,
       `expected violation path '${relPath}', got '${v.path}'`,
     );
   }
@@ -57,13 +57,13 @@ function assertViolationMeta(v, { relPath, minWeight }) {
 
 const alwaysOkVerifier = async () => ({ ok: true, error: null });
 
-async function main() {
+try {
   // ----------------------------------------------------------------------------
-  // Setup temp workspace
+  // Setup scratch workspace
   // ----------------------------------------------------------------------------
-  const tmp = mktemp();
-  const workflowsDir = path.join(tmp, '.github', 'workflows');
-  const actionsDir = path.join(tmp, '.github', 'actions');
+  const workspaceRoot = mktemp();
+  const workflowsDir = path.join(workspaceRoot, '.github', 'workflows');
+  const actionsDir = path.join(workspaceRoot, '.github', 'actions');
   fs.mkdirSync(workflowsDir, { recursive: true });
   fs.mkdirSync(actionsDir, { recursive: true });
 
@@ -109,9 +109,9 @@ async function main() {
 
   fs.writeFileSync(wfPath, wf, 'utf8');
 
-  const violations = await scanWorkflows({
+  const { violations } = await scanWorkflows({
     workflows: [wfPath],
-    workspaceRoot: tmp,
+    workspaceRoot,
 
     // Supply-chain policy: nothing allowlisted
     allowedActions: new Set([]),
@@ -203,7 +203,7 @@ async function main() {
 
   const actionViolations = await scanActions({
     actions: [actionYml],
-    platformRoot: tmp,
+    platformRoot: workspaceRoot,
     allowedActions: new Set([]),
     validateRemoteAction: alwaysOkVerifier,
     quiet: true,
@@ -235,8 +235,6 @@ async function main() {
 
   section('result', 'Validate-CI unit tests passed');
   process.exit(0);
-}
-
-main().catch((err) => {
+} catch (err) {
   fail(err?.stack || err?.message || String(err));
-});
+}

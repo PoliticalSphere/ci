@@ -1,50 +1,8 @@
 # ==============================================================================
-# Political Sphere — Reusable Workflow: Validate CI
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Run the Validate-CI policy gate and publish evidence artifacts.
-#
-# Metadata:
-#   - Created: 2025-12-20
-#   - Last updated: 2025-12-20
-#
-# Scope & Responsibilities:
-#   - Does: enforce CI policy rules and upload validation logs.
-#   - Does NOT: run linting, tests, builds, or deep security scans.
-#
-# Design Principles:
-#   - Deterministic and non-interactive execution
-#   - Least privilege with explicit permissions
-#   - SHA-pinned actions only
-#   - Hardened runner as the first step
-#
-# Dependencies:
-#   - ./.github/actions/ps-setup
-#   - ./.github/actions/ci-validate
-#   - ./.github/actions/ps-upload-artifacts
-#   - actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8
-#   - tools/scripts/branding/print-section.sh
-#
-# Dependents:
-#   - ./.github/workflows/pr-gates.yml
-#   - ./.github/workflows/build-artifacts.yml
-#   - ./.github/workflows/security-scheduled.yml
-#   - ./.github/workflows/release.yml
-#
-# Execution Model:
-#   - Trigger: workflow_call
-#   - Reusable workflow (internal platform building block)
-#
-# Security & Policy Notes:
-#   - Secrets: optional NODE_AUTH_TOKEN for npm installs only
-#   - Permissions: contents: read (workflow + job)
-#   - Constraints: must run before any other jobs in calling workflows
-#
-# Operational Notes:
-#   - Timeouts: defined here (reusable callers cannot set them)
-#   - Artifacts: reports/** and logs/** uploaded by ps-upload-artifacts
-#   - CI vs local: Validate-CI script handles bootstrap mode locally
+# Political Sphere — Validate CI (Caller)
 # ==============================================================================
+# Wrapper workflow that delegates to the reusable job definition.
+# ============================================================================== 
 
 name: Validate CI
 
@@ -53,186 +11,109 @@ on:
     inputs:
       runner:
         description: "Runner label"
+        type: string
         required: false
         default: "ubuntu-22.04"
-        type: string
       node_version:
         description: "Node.js major version"
+        type: string
         required: false
         default: "22"
-        type: string
       fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
         required: false
-        default: "1"
-        type: string
+        default: 1
       cache:
         description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
         required: false
         default: "1"
-        type: string
-      install_dependencies:
-        description: "Install dependencies in the target repo (1 = on, 0 = off)"
+      validate_timeout_minutes:
+        description: "Timeout for Validate-CI job in minutes"
+        type: number
         required: false
-        default: "0"
-        type: string
+        default: 10
       checkout_ref:
-        description: "Optional git ref to validate"
+        description: "Optional git ref to validate (branch, tag, or SHA)"
+        type: string
         required: false
         default: ""
-        type: string
       platform_ref:
         description: "Platform repo ref to checkout for shared scripts/configs"
-        required: false
-        default: "main"
         type: string
-      install_platform_dependencies:
-        description: "Install dependencies in the platform repo (1 = on, 0 = off)"
         required: false
-        default: "1"
+        default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+      platform_require_pinned_ref:
+        description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
         type: string
-      verify_remote_shas:
-        description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
         required: false
-        default: "1"
+        default: "true"
+      install_dependencies:
+        description: "Install dependencies in the target repo (1 = on, 0 = off)"
         type: string
-      pr_only:
-        description: "Validate only workflows/actions changed in the PR (1 = on, 0 = off)"
         required: false
         default: "0"
+      install_platform_dependencies:
+        description: "Install dependencies in the platform repo (1 = on, 0 = off)"
         type: string
+        required: false
+        default: "1"
+      verify_remote_shas:
+        description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+      pr_only:
+        description: "Validate only workflows/actions changed in the PR (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "0"
       pr_base_ref:
         description: "PR base SHA for diff-based validation"
+        type: string
         required: false
         default: ""
-        type: string
       pr_head_ref:
         description: "PR head SHA for diff-based validation"
+        type: string
         required: false
         default: ""
-        type: string
       artifact_name:
         description: "Artifact name for validate-ci outputs"
+        type: string
         required: false
         default: "validate-ci"
-        type: string
       retention_days:
         description: "Artifact retention in days"
+        type: number
         required: false
         default: 7
-        type: number
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
         required: false
 
-permissions:
-  contents: read
-
-concurrency:
-  group: validate-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
-defaults:
-  run:
-    shell: bash
-
-env:
-  CI: "1"
-  PS_PLATFORM_ROOT: ${{ github.workspace }}/.ps-platform
-
 jobs:
-  validate-ci:
-    name: Validate CI policy
-    runs-on: ${{ inputs.runner }}
-    permissions:
-      contents: read
-    # Ensure HOME points to a writable directory for actions that rely on it.
-    env:
+  call:
+    name: Validate CI
+    uses: ./.github/workflows/_reusable-validate-ci.yml
+    with:
+      runner: ${{ inputs.runner }}
+      node_version: ${{ inputs.node_version }}
+      fetch_depth: ${{ inputs.fetch_depth }}
+      cache: ${{ inputs.cache }}
+      validate_timeout_minutes: ${{ inputs.validate_timeout_minutes }}
+      checkout_ref: ${{ inputs.checkout_ref }}
+      platform_ref: ${{ inputs.platform_ref }}
+      platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+      install_dependencies: ${{ inputs.install_dependencies }}
+      install_platform_dependencies: ${{ inputs.install_platform_dependencies }}
+      verify_remote_shas: ${{ inputs.verify_remote_shas }}
+      pr_only: ${{ inputs.pr_only }}
+      pr_base_ref: ${{ inputs.pr_base_ref }}
+      pr_head_ref: ${{ inputs.pr_head_ref }}
+      artifact_name: ${{ inputs.artifact_name }}
+      retention_days: ${{ inputs.retention_days }}
+    secrets:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-      PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
-      PS_VALIDATE_CI_PR_ONLY: ${{ inputs.pr_only }}
-      PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
-      PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
-    timeout-minutes: 10
-    steps:
-      - name: Harden runner (PS)
-        uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76  # v2.1.4
-        env:
-          HOME: ${{ runner.temp }}
-        with:
-          egress-policy: audit
-
-      - name: Checkout repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          ref: ${{ inputs.checkout_ref }}
-          fetch-depth: ${{ inputs.fetch_depth }}
-
-
-      - name: Checkout platform repository
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8  # v6.0.1
-        with:
-          repository: PoliticalSphere/ci
-          ref: ${{ inputs.platform_ref }}
-          path: .ps-platform
-          fetch-depth: 1
-
-      - name: Point HOME at workspace temp
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "runner.home" "Prepare HOME directory"
-          mkdir -p "${GITHUB_WORKSPACE}/.home"
-          echo "HOME=${GITHUB_WORKSPACE}/.home" >> "$GITHUB_ENV"
-
-      - name: Prepare runner (PS)
-        uses: ./.github/actions/ps-setup
-        with:
-          node_version: ${{ inputs.node_version }}
-          ref: ${{ inputs.checkout_ref }}
-          fetch_depth: ${{ inputs.fetch_depth }}
-          cache: ${{ inputs.cache }}
-          install_dependencies: ${{ inputs.install_dependencies }}
-          skip_checkout: "1"
-          skip_harden: "1"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
-      - name: Install platform dependencies
-        if: ${{ inputs.install_platform_dependencies == '1' }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "ci.platform" "Install platform dependencies"
-          if [[ ! -d "${PS_PLATFORM_ROOT}" ]]; then
-            echo "ERROR: PS_PLATFORM_ROOT not found at ${PS_PLATFORM_ROOT}" >&2
-            exit 1
-          fi
-          cd "${PS_PLATFORM_ROOT}"
-          npm ci --no-audit --no-fund
-
-      - name: Validate CI
-        uses: ./.github/actions/ci-validate
-
-      - name: Upload artifacts
-        if: always()
-        uses: ./.github/actions/ps-upload-artifacts
-        with:
-          name: ${{ inputs.artifact_name }}
-          path: |
-            reports/**
-            logs/**
-          if_no_files_found: "warn"
-          retention_days: ${{ inputs.retention_days }}
-
-      - name: Validate CI complete
-        if: always()
-        shell: bash
-        run: |
-          set -euo pipefail
-          bash "${PS_PLATFORM_ROOT}/tools/scripts/branding/print-section.sh" \
-            "ci.validate" "Validate-CI complete"
-          echo "PS.VALIDATE_CI: OK"
