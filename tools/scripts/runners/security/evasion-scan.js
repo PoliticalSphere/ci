@@ -21,8 +21,8 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { getRepoRoot } from '../core/cli.js';
-import { safeCompileRegex } from '../core/regex.js';
+import { getRepoRoot } from '../../core/cli.js';
+import { safeCompileRegex } from '../../core/regex.js';
 
 const repoRoot = getRepoRoot();
 

@@ -13,11 +13,11 @@ set -euo pipefail
 #   bash tools/scripts/runners/lint/formatted-affected.sh [--fix]
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+_formatted_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/gates/gate-common.sh
-. "${script_dir}/../gates/gate-common.sh"
+. "${_formatted_script_dir}/../../gates/gate-common.sh"
 # shellcheck source=tools/scripts/runners/lint/formatted-common.sh
-. "${script_dir}/formatted-common.sh"
+. "${_formatted_script_dir}/formatted-common.sh"
 
 GATE_NAME="Lint (affected)"
 export GATE_NAME

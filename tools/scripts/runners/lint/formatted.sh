@@ -14,12 +14,12 @@ set -euo pipefail
 #   bash tools/scripts/runners/lint/formatted.sh [--fix]
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+_formatted_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # Gate helpers provide the run_lint_step + formatted summary
 # shellcheck source=tools/scripts/gates/gate-common.sh
-. "${script_dir}/../gates/gate-common.sh"
+. "${_formatted_script_dir}/../../gates/gate-common.sh"
 # shellcheck source=tools/scripts/runners/lint/formatted-common.sh
-. "${script_dir}/formatted-common.sh"
+. "${_formatted_script_dir}/formatted-common.sh"
 
 GATE_NAME="Lint"
 export GATE_NAME
@@ -61,7 +61,7 @@ fi
 
 typecheck_script="${PS_TASKS_SCRIPTS}/typecheck.sh"
 if [[ ! -f "${typecheck_script}" ]]; then
-  typecheck_script="${script_dir}/../actions/ps-typecheck/typecheck.sh"
+  typecheck_script="${_formatted_script_dir}/../actions/ps-typecheck/typecheck.sh"
 fi
 
 # Banner

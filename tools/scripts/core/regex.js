@@ -53,12 +53,21 @@ function skipCharClass(str, idx) {
   return idx;
 }
 
-function hasLookaround(pat) {
+/**
+ * Scans a regex pattern, calling visitor for each significant character.
+ * Handles escape sequences and character classes automatically.
+ * @param {string} pat - The pattern to scan
+ * @param {function} visitor - Called with (char, index, pattern). Return true to stop.
+ * @returns {*} The return value from visitor if it stopped, otherwise false.
+ */
+function scanPattern(pat, visitor) {
   const len = pat.length;
   let i = 0;
   while (i < len) {
     const ch = pat[i];
     if (ch === '\\') {
+      const result = visitor(ch, i, pat, true);
+      if (result !== undefined && result !== false) return result;
       i += 2;
       continue;
     }
@@ -66,37 +75,34 @@ function hasLookaround(pat) {
       i = skipCharClass(pat, i);
       continue;
     }
-    if (ch === '(' && pat[i + 1] === '?') {
-      const next = pat[i + 2];
-      if (next === '=' || next === '!') return true;
-      if (next === '<' && (pat[i + 3] === '=' || pat[i + 3] === '!'))
-        return true;
-    }
+    const result = visitor(ch, i, pat, false);
+    if (result !== undefined && result !== false) return result;
     i++;
   }
   return false;
 }
 
+function hasLookaround(pat) {
+  return scanPattern(pat, (ch, i, p, isEscape) => {
+    if (isEscape) return false;
+    if (ch === '(' && p[i + 1] === '?') {
+      const next = p[i + 2];
+      if (next === '=' || next === '!') return true;
+      if (next === '<' && (p[i + 3] === '=' || p[i + 3] === '!')) return true;
+    }
+    return false;
+  });
+}
+
 function hasBackreference(pat) {
-  const len = pat.length;
-  let i = 0;
-  while (i < len) {
-    const ch = pat[i];
-    if (ch === '\\') {
-      const next = pat[i + 1];
+  return scanPattern(pat, (ch, i, p, isEscape) => {
+    if (isEscape) {
+      const next = p[i + 1];
       if (next >= '1' && next <= '9') return true;
-      if (next === 'k' && (pat[i + 2] === '<' || pat[i + 2] === "'"))
-        return true;
-      i += 2;
-      continue;
+      if (next === 'k' && (p[i + 2] === '<' || p[i + 2] === "'")) return true;
     }
-    if (ch === '[') {
-      i = skipCharClass(pat, i);
-      continue;
-    }
-    i++;
-  }
-  return false;
+    return false;
+  });
 }
 
 function isUnboundedQuantifierAt(str, idx) {
@@ -110,22 +116,7 @@ function isUnboundedQuantifierAt(str, idx) {
 }
 
 function hasUnboundedQuantifierIn(str) {
-  let i = 0;
-  const len = str.length;
-  while (i < len) {
-    const ch = str[i];
-    if (ch === '\\') {
-      i += 2;
-      continue;
-    }
-    if (ch === '[') {
-      i = skipCharClass(str, i);
-      continue;
-    }
-    if (isUnboundedQuantifierAt(str, i)) return true;
-    i++;
-  }
-  return false;
+  return scanPattern(str, (ch, i) => isUnboundedQuantifierAt(str, i));
 }
 
 function findGroupEnd(pat, idx) {

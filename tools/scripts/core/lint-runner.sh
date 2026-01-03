@@ -190,6 +190,50 @@ lint_handle_log_fallback() {
 }
 
 # ----------------------------
+# Logging helpers (internal - reduce duplication)
+# ----------------------------
+
+# _lint_log_step_start <id> <title> <description> <log_file> [async]
+_lint_log_step_start() {
+  local id="$1" title="$2" description="$3" log_file="$4" async="${5:-0}"
+  if command -v ps_log >/dev/null 2>&1; then
+    if [[ "${async}" -eq 1 ]]; then
+      ps_log info lint.step.start \
+        "id=${id}" "title=${title}" "detail=${description}" \
+        "log_path=${log_file}" "async=1"
+    else
+      ps_log info lint.step.start \
+        "id=${id}" "title=${title}" "detail=${description}" \
+        "log_path=${log_file}"
+    fi
+  fi
+}
+
+# _lint_log_step_finish <id> <title> <status> <rc> <log_file> <start_ms>
+_lint_log_step_finish() {
+  local id="$1" title="$2" status="$3" rc="$4" log_file="$5" start_ms="$6"
+  if command -v ps_log >/dev/null 2>&1; then
+    local end_ms="" duration_ms=""
+    if command -v ps_epoch_ms >/dev/null 2>&1; then
+      end_ms="$(ps_epoch_ms)"
+    fi
+    if [[ -n "${start_ms}" && -n "${end_ms}" ]]; then
+      duration_ms=$((end_ms - start_ms))
+    fi
+    local level="info"
+    case "${status}" in
+      FAIL|ERROR) level="error" ;;
+      SKIPPED) level="warn" ;;
+      *) level="info" ;;
+    esac
+    ps_log "${level}" lint.step.finish \
+      "id=${id}" "title=${title}" "status=${status}" \
+      "exit_code=${rc}" "log_path=${log_file}" \
+      ${duration_ms:+"duration_ms=${duration_ms}"}
+  fi
+}
+
+# ----------------------------
 # Index management
 # ----------------------------
 
@@ -244,32 +288,7 @@ lint_finalize_step_by_index() {
   LINT_START_MS[idx]=""
 
   lint_emit_step_line "${title}" "${status}"
-
-  if command -v ps_log >/dev/null 2>&1; then
-    local end_ms=""
-    local duration_ms=""
-    if command -v ps_epoch_ms >/dev/null 2>&1; then
-      end_ms="$(ps_epoch_ms)"
-    fi
-    if [[ -n "${start_ms}" && -n "${end_ms}" ]]; then
-      duration_ms=$((end_ms - start_ms))
-    fi
-
-    local level="info"
-    case "${status}" in
-      FAIL|ERROR) level="error" ;;
-      SKIPPED) level="warn" ;;
-      *) level="info" ;;
-    esac
-
-    ps_log "${level}" lint.step.finish \
-      "id=${id}" \
-      "title=${title}" \
-      "status=${status}" \
-      "exit_code=${rc}" \
-      "log_path=${log_file}" \
-      ${duration_ms:+"duration_ms=${duration_ms}"}
-  fi
+  _lint_log_step_finish "${id}" "${title}" "${status}" "${rc}" "${log_file}" "${start_ms}"
 
   print_lint_summary
   return 0
@@ -324,13 +343,7 @@ run_lint_step() {
     start_ms="$(ps_epoch_ms)"
   fi
   LINT_START_MS[idx]="${start_ms}"
-  if command -v ps_log >/dev/null 2>&1; then
-    ps_log info lint.step.start \
-      "id=${id}" \
-      "title=${title}" \
-      "detail=${description}" \
-      "log_path=${log_file}"
-  fi
+  _lint_log_step_start "${id}" "${title}" "${description}" "${log_file}" 0
 
   set +e
   "$@" >"${log_file}" 2>&1
@@ -345,32 +358,7 @@ run_lint_step() {
   LINT_LOGS[idx]="${log_file}"
 
   lint_emit_step_line "${title}" "${status}"
-
-  if command -v ps_log >/dev/null 2>&1; then
-    local end_ms=""
-    local duration_ms=""
-    if command -v ps_epoch_ms >/dev/null 2>&1; then
-      end_ms="$(ps_epoch_ms)"
-    fi
-    if [[ -n "${start_ms}" && -n "${end_ms}" ]]; then
-      duration_ms=$((end_ms - start_ms))
-    fi
-
-    local level="info"
-    case "${status}" in
-      FAIL|ERROR) level="error" ;;
-      SKIPPED) level="warn" ;;
-      *) level="info" ;;
-    esac
-
-    ps_log "${level}" lint.step.finish \
-      "id=${id}" \
-      "title=${title}" \
-      "status=${status}" \
-      "exit_code=${rc}" \
-      "log_path=${log_file}" \
-      ${duration_ms:+"duration_ms=${duration_ms}"}
-  fi
+  _lint_log_step_finish "${id}" "${title}" "${status}" "${rc}" "${log_file}" "${start_ms}"
 
   print_lint_summary
 
@@ -412,14 +400,7 @@ run_lint_step_async() {
     start_ms="$(ps_epoch_ms)"
   fi
   LINT_START_MS[idx]="${start_ms}"
-  if command -v ps_log >/dev/null 2>&1; then
-    ps_log info lint.step.start \
-      "id=${id}" \
-      "title=${title}" \
-      "detail=${description}" \
-      "log_path=${log_file}" \
-      "async=1"
-  fi
+  _lint_log_step_start "${id}" "${title}" "${description}" "${log_file}" 1
 
   set +e
   "$@" >"${log_file}" 2>&1 &

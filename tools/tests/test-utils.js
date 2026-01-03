@@ -17,7 +17,7 @@ export {
   info,
   isCI,
   section,
-} from '../scripts/ci/validate-ci/console.js';
+} from '../scripts/workflows/ci/validate-ci/console.js';
 
 export function fail(message) {
   console.error(`ERROR: ${message}`);
@@ -47,8 +47,8 @@ export function assertContains(text, needle, rel, hint) {
 }
 
 import { execFileSync } from 'node:child_process';
-import { getRepoRoot } from '../scripts/ci/validate-ci/console.js';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { getRepoRoot } from '../scripts/workflows/ci/validate-ci/console.js';
+import { getSafePathEnv } from '../scripts/workflows/ci/validate-ci/safe-path.js';
 
 export const SAFE_PATH = getSafePathEnv();
 

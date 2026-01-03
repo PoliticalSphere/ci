@@ -11,7 +11,7 @@ import assert from 'node:assert/strict';
 import {
   mapStatusToInfo,
   normalizeActionToRepo,
-} from '../../../tools/scripts/ci/validate-ci/remote-verify.js';
+} from '../../scripts/workflows/ci/validate-ci/remote-verify.js';
 
 // Tests for normalizeActionToRepo
 assert.equal(normalizeActionToRepo('actions/checkout@v2'), 'actions/checkout');

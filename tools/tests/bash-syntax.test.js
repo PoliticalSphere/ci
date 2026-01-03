@@ -10,7 +10,7 @@
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { getSafePathEnv } from '../scripts/workflows/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot, section } from './test-utils.js';
 
 const repoRoot = getRepoRoot();

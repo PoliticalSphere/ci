@@ -81,6 +81,25 @@ policy:
 }
 
 /**
+ * Create a minimal lockfile with a single package.
+ * @param {string} pkgName - Package name
+ * @param {string|undefined} license - Package license (omit for unlicensed)
+ * @returns {object} Lockfile object
+ */
+function createSinglePkgLockfile(pkgName, license) {
+  const pkg = { name: pkgName, version: '1.0.0' };
+  if (license !== undefined) pkg.license = license;
+  return {
+    name: 'test',
+    lockfileVersion: 3,
+    packages: {
+      '': { name: 'test', version: '1.0.0' },
+      [`node_modules/${pkgName}`]: pkg,
+    },
+  };
+}
+
+/**
  * Run license-check.js with custom environment.
  * @param {object} options - Options
  * @returns {{ stdout: string, stderr: string, status: number, report: object | null }}
@@ -180,18 +199,7 @@ describe('license-check.js', () => {
 
     it('fails when package has denied license', () => {
       const result = runLicenseCheck({
-        lockfile: {
-          name: 'test',
-          lockfileVersion: 3,
-          packages: {
-            '': { name: 'test', version: '1.0.0' },
-            'node_modules/gpl-pkg': {
-              name: 'gpl-pkg',
-              version: '1.0.0',
-              license: 'GPL-3.0',
-            },
-          },
-        },
+        lockfile: createSinglePkgLockfile('gpl-pkg', 'GPL-3.0'),
       });
 
       assert.equal(result.status, 1, 'Should fail with denied license');
@@ -203,18 +211,7 @@ describe('license-check.js', () => {
 
     it('fails when package has unlisted license', () => {
       const result = runLicenseCheck({
-        lockfile: {
-          name: 'test',
-          lockfileVersion: 3,
-          packages: {
-            '': { name: 'test', version: '1.0.0' },
-            'node_modules/weird-pkg': {
-              name: 'weird-pkg',
-              version: '1.0.0',
-              license: 'WTFPL',
-            },
-          },
-        },
+        lockfile: createSinglePkgLockfile('weird-pkg', 'WTFPL'),
       });
 
       assert.equal(result.status, 1, 'Should fail with unknown license');
@@ -311,18 +308,7 @@ policy:
     it('fails when package has denied license', () => {
       const result = runLicenseCheck({
         policy: denylistPolicy,
-        lockfile: {
-          name: 'test',
-          lockfileVersion: 3,
-          packages: {
-            '': { name: 'test', version: '1.0.0' },
-            'node_modules/gpl-pkg': {
-              name: 'gpl-pkg',
-              version: '1.0.0',
-              license: 'GPL-3.0',
-            },
-          },
-        },
+        lockfile: createSinglePkgLockfile('gpl-pkg', 'GPL-3.0'),
       });
 
       assert.equal(result.status, 1, 'Should fail with denied license');
@@ -333,17 +319,7 @@ policy:
   describe('unlicensed packages', () => {
     it('fails on missing license when fail_on_unlicensed is true', () => {
       const result = runLicenseCheck({
-        lockfile: {
-          name: 'test',
-          lockfileVersion: 3,
-          packages: {
-            '': { name: 'test', version: '1.0.0' },
-            'node_modules/no-license': {
-              name: 'no-license',
-              version: '1.0.0',
-            },
-          },
-        },
+        lockfile: createSinglePkgLockfile('no-license'),
       });
 
       assert.equal(result.status, 1, 'Should fail with missing license');

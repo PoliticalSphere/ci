@@ -19,7 +19,7 @@ import {
   info,
   isCI,
   section,
-} from '../ci/validate-ci/console.js';
+} from '../workflows/ci/validate-ci/console.js';
 import { safeCompileRegex } from '../core/regex.js';
 
 const repoRoot = getRepoRoot();

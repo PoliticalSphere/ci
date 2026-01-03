@@ -18,7 +18,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
-import { getRepoRoot } from '../core/cli.js';
+import { getRepoRoot } from '../../core/cli.js';
 
 const repoRoot = getRepoRoot();
 

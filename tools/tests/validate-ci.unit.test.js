@@ -15,7 +15,7 @@ import path from 'node:path';
 import {
   scanActions,
   scanWorkflows,
-} from '../scripts/ci/validate-ci/checks.js';
+} from '../scripts/workflows/ci/validate-ci/checks.js';
 import { fail, info, mktemp, section } from './test-utils.js';
 
 function assert(condition, message) {

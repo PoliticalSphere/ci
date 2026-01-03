@@ -17,7 +17,7 @@ import {
   getRepoRoot,
   section,
 } from '../ci/validate-ci/console.js';
-import { parseArgs, readText, resolvePath, writeOutputs } from '../core/cli.js';
+import { parseArgs, readText, resolvePath, writeOutputs } from '../../core/cli.js';
 
 async function parseConfig(filePath, label) {
   if (!fs.existsSync(filePath)) {

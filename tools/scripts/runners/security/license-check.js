@@ -19,9 +19,9 @@ import {
   fatal,
   getRepoRoot,
   section,
-} from '../ci/validate-ci/console.js';
-import { parseArgs, readText, resolvePath, writeOutputs } from '../core/cli.js';
-import { safeCompileRegex } from '../core/regex.js';
+} from '../../workflows/ci/validate-ci/console.js';
+import { parseArgs, readText, resolvePath, writeOutputs } from '../../core/cli.js';
+import { safeCompileRegex } from '../../core/regex.js';
 
 function normalizeLicense(raw) {
   if (!raw) return '';

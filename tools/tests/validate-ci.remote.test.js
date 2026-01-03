@@ -17,7 +17,7 @@
 //   - We then treat commit lookup as GET /repos/{owner}/{repo}/commits/{sha}.
 // =============================================================================
 
-import { createRemoteVerifier } from '../scripts/ci/validate-ci/remote-verify.js';
+import { createRemoteVerifier } from '../scripts/workflows/ci/validate-ci/remote-verify.js';
 import { fail, info, section } from './test-utils.js';
 
 section('remote', 'createRemoteVerifier — deterministic behavior');
