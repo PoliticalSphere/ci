@@ -15,8 +15,8 @@ if [[ ! -d "${scripts_root}" ]]; then
   exit 1
 fi
 
-# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-. "${scripts_root}/tools/scripts/actions/cross-cutting/validate.sh"
+# shellcheck source=tools/scripts/core/validation.sh
+. "${scripts_root}/tools/scripts/core/validation.sh"
 
 name="${PS_NAME:-}"
 retention="${PS_RETENTION:-}"

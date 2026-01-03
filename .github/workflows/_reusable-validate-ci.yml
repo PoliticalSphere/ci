@@ -2,18 +2,34 @@
 # Political Sphere — Reusable Workflow: Validate CI
 # ==============================================================================
 #
+# METADATA
+# ------------------------------------------------------------------------------
+# id: _reusable-validate-ci
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-20
+# last_updated: 2025-12-24
+#
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - configs/ci/policies/
+#   - docs/ci-policy-governance.md
+# actions:
+#   - ./.github/actions/ps-bootstrap/ps-setup-standard
+#   - ./.github/actions/ps-ci-validate
+#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Policy validation failure blocks all downstream jobs
+# - Remote SHA verification requires network access
+#
 # PURPOSE
 # ------------------------------------------------------------------------------
 # Enforce CI policy compliance (Validate-CI) and publish evidence artifacts.
 # This workflow is designed to run FIRST in calling workflows as a policy gate.
-#
-#
-# METADATA
-# ------------------------------------------------------------------------------
-# Owner:        political-sphere
-# Created:      2025-12-20
-# Last updated: 2025-12-24
-# Classification: internal
 #
 #
 # SCOPE & RESPONSIBILITIES
@@ -42,7 +58,7 @@
 #
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
-# - ./.github/actions/ps-bootstrap/ps-init
+# - ./.github/actions/ps-bootstrap/ps-setup-standard
 # - ./.github/actions/ps-ci-validate
 # - ./.github/actions/ps-upload-artifacts
 # - tools/scripts/branding/print-section.sh (platform)
@@ -232,7 +248,7 @@ jobs:
     runs-on: ${{ inputs.runner }}
     timeout-minutes: ${{ inputs.validate_timeout_minutes }}
     permissions:
-      contents: read
+      contents: read  # Justification: checkout workflows and actions for validation
     env:
       NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
       PS_VALIDATE_CI_VERIFY_REMOTE: ${{ inputs.verify_remote_shas }}
@@ -241,37 +257,16 @@ jobs:
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
 
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
-          # checkout & platform
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ inputs.checkout_ref }}
-          platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "0"
-
-          # HOME and harden
-          home_dir: ".home"
-          egress_policy: audit
-
-          install_tools: "0"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Install platform dependencies
         if: ${{ inputs.install_platform_dependencies == '1' }}
@@ -279,14 +274,14 @@ jobs:
         with:
           id: install-platform-deps
           title: Install platform dependencies
-          script: tools/scripts/ci/install-platform-deps.sh
+          script: tools/scripts/workflows/ci/install-platform-deps.sh
 
       - name: Validate CI (policy)
         uses: ./.github/actions/ps-ci-validate
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: validate-ci
           summary_output_path: reports/summary/validate-ci.json

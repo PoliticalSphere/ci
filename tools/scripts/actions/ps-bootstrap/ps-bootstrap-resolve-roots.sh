@@ -9,16 +9,15 @@ set -euo pipefail
 # ==============================================================================
 
 
-platform_root="${PS_PLATFORM_ROOT:-}"
-workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
+# Reuse centralized resolver
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${GITHUB_WORKSPACE:-$(pwd)}/tools/scripts/actions/cross-cutting/gha-helpers.sh" || true
 
-if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
-  scripts_root="${platform_root}"
-  printf 'PS.NODE_SETUP: scripts_root=PS_PLATFORM_ROOT (%s)\n' "${scripts_root}"
-else
-  scripts_root="${workspace_root}"
-  printf 'PS.NODE_SETUP: scripts_root=GITHUB_WORKSPACE (%s)\n' "${scripts_root}"
+if ! resolve_scripts_root; then
+  printf 'ERROR: failed to resolve scripts root\n' >&2
+  exit 1
 fi
 
-printf 'PS_SCRIPTS_ROOT=%s\n' "${scripts_root}" >> "${GITHUB_ENV}"
+# Preserve PS_WORKSPACE_ROOT compatibility
+workspace_root="${PS_WORKSPACE_ROOT:-${GITHUB_WORKSPACE:-$(pwd)}}"
 printf 'PS_WORKSPACE_ROOT=%s\n' "${workspace_root}" >> "${GITHUB_ENV}"

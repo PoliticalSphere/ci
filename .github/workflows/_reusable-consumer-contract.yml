@@ -4,13 +4,26 @@
 #
 # METADATA
 # ------------------------------------------------------------------------------
-# id: consumer-contract
+# id: _reusable-consumer-contract
 # version: 1.0.0
 # owner: political-sphere
 # classification: internal
 # created: 2025-12-20
-# last_updated: 2025-12-20
+# last_updated: 2025-12-24
 #
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - docs/integration-guide.md
+#   - configs/consumer/contract.json
+# actions:
+#   - ./.github/actions/ps-bootstrap/ps-setup-standard
+#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Contract validation depends on correct manifest paths
+# - Breaking changes in contract require coordinated deployment
 #
 # PURPOSE
 # ------------------------------------------------------------------------------
@@ -42,10 +55,10 @@
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
 # - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-init
+# - ./.github/actions/ps-bootstrap/ps-setup-standard
 # - ./.github/actions/ps-task/consumer-contract
-# - ./.github/actions/ps-teardown/ps-exit
-# - tools/scripts/consumer/contract-check.sh
+# - ./.github/actions/ps-teardown/ps-finalize-workflow
+# - tools/scripts/workflows/consumer/contract-check.sh
 #
 #
 # EXECUTION MODEL
@@ -73,9 +86,6 @@
 
 name: Consumer Contract
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ==============================================================================
 on:
   workflow_call:
 
@@ -213,6 +223,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # Ensures a single consumer-contract run per ref.
@@ -221,13 +238,6 @@ permissions:
 concurrency:
   group: consumer-contract-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
 
 # ==============================================================================
 # GLOBAL PLATFORM ENVIRONMENT
@@ -280,20 +290,14 @@ jobs:
       contents: read
 
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          # Prefer the exact PR head SHA when available to avoid ref spoofing.
           checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          platform_repo: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: ${{ inputs.platform_repository }}
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          egress_policy: audit
-          install_tools: "0"
+          skip_node: "1"
 
       - name: Contract check
         uses: ./.github/actions/ps-task/consumer-contract
@@ -306,7 +310,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: consumer-contract
           summary_output_path: reports/summary/consumer-contract.json

@@ -1,17 +1,53 @@
 # ==============================================================================
 # Political Sphere — License Compliance (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: license-compliance
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-license-compliance.yml for
+# dependency license policy checks.
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-license-compliance.yml with caller inputs
+#   - Pass through license policy configuration
+#
+# DOES NOT:
+#   - Perform license checks directly
+#   - Deploy or publish artifacts externally
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-license-compliance.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-license-compliance.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: License Compliance
 
 on:
   workflow_call:
-
-    # ==========================================================================
-    # RUNTIME & ENVIRONMENT CONFIGURATION
-    # --------------------------------------------------------------------------
     inputs:
       runner:
         description: "Runner label"
@@ -114,6 +150,8 @@ on:
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
+permissions:
+  contents: read  # Justification: required for lockfile checkout and dependency scanning
 
 jobs:
   call:

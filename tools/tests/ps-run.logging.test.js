@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — PS Run Logging Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test ps-run script logging and output behavior.
+// ==============================================================================
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import {

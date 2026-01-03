@@ -9,7 +9,7 @@
 #   - step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76
 #
 # Dependents:
-#   - ./.github/actions/ps-bootstrap/ps-init
+#   - ./.github/actions/ps-bootstrap/ps-initialize-environment
 # ==============================================================================
 -->
 

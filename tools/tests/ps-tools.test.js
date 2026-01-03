@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+
+// ==============================================================================
+// Political Sphere — PS Tools Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test ps-tools script functionality and output.
+// ==============================================================================
+
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';

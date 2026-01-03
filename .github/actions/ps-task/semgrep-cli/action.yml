@@ -71,11 +71,11 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/security/semgrep-cli.sh,
-#     tools/scripts/security/semgrep-validate-inputs.sh,
-#     tools/scripts/security/semgrep-install.sh,
-#     tools/scripts/security/semgrep-scan.sh,
-#     tools/scripts/security/semgrep-enforce.sh]
+#   internal: [tools/scripts/runners/security/semgrep-cli.sh,
+#     tools/scripts/runners/security/semgrep-validate-inputs.sh,
+#     tools/scripts/runners/security/semgrep-install.sh,
+#     tools/scripts/runners/security/semgrep-scan.sh,
+#     tools/scripts/runners/security/semgrep-enforce.sh]
 #   external: [none]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -114,11 +114,11 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/semgrep-cli/README.md
-#     - tools/scripts/security/semgrep-cli.sh
-#     - tools/scripts/security/semgrep-validate-inputs.sh
-#     - tools/scripts/security/semgrep-install.sh
-#     - tools/scripts/security/semgrep-scan.sh
-#     - tools/scripts/security/semgrep-enforce.sh
+#     - tools/scripts/runners/security/semgrep-cli.sh
+#     - tools/scripts/runners/security/semgrep-validate-inputs.sh
+#     - tools/scripts/runners/security/semgrep-install.sh
+#     - tools/scripts/runners/security/semgrep-scan.sh
+#     - tools/scripts/runners/security/semgrep-enforce.sh
 #
 # ==============================================================================
 
@@ -169,13 +169,13 @@ runs:
         id: "security.semgrep"
         title: "Semgrep CLI"
         description: "Run Semgrep and upload SARIF"
-        script: "tools/scripts/security/semgrep-cli.sh"
+        script: "tools/scripts/runners/security/semgrep-cli.sh"
         require_files: |
-          tools/scripts/security/semgrep-cli.sh
-          tools/scripts/security/semgrep-validate-inputs.sh
-          tools/scripts/security/semgrep-install.sh
-          tools/scripts/security/semgrep-scan.sh
-          tools/scripts/security/semgrep-enforce.sh
+          tools/scripts/runners/security/semgrep-cli.sh
+          tools/scripts/runners/security/semgrep-validate-inputs.sh
+          tools/scripts/runners/security/semgrep-install.sh
+          tools/scripts/runners/security/semgrep-scan.sh
+          tools/scripts/runners/security/semgrep-enforce.sh
         artifact_paths: |
           ${{ inputs.output }}
         env_kv: |

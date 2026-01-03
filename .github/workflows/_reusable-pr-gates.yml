@@ -4,13 +4,27 @@
 #
 # METADATA
 # ------------------------------------------------------------------------------
-# id: pr-gates
+# id: _reusable-pr-gates
 # version: 1.0.0
 # owner: political-sphere
 # classification: internal
 # created: 2025-12-20
 # last_updated: 2025-12-24
 #
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - docs/testing-strategy.md
+#   - docs/risk-decisions.md#rd-pr-comments
+# actions:
+#   - ./.github/actions/ps-bootstrap/ps-setup-standard
+#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+#   - ./.github/actions/ps-task/*
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Fork PRs have comments disabled for security
+# - Sonar baseline is non-blocking and may fail silently
 #
 # PURPOSE
 # ------------------------------------------------------------------------------
@@ -45,6 +59,15 @@
 # - Artifacts and summary are produced best-effort, even on failure
 #
 #
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/validate-ci.yml
+# - ./.github/workflows/pr-security.yml
+# - ./.github/actions/ps-bootstrap/ps-setup-standard
+# - ./.github/actions/ps-teardown/ps-finalize-workflow
+# - ./.github/actions/ps-task/*
+#
+#
 # EXECUTION MODEL
 # ------------------------------------------------------------------------------
 # - Triggered via workflow_call
@@ -71,11 +94,6 @@
 
 name: PR Gates
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ------------------------------------------------------------------------------
-# Reusable workflow invoked via workflow_call
-# ==============================================================================
 on:
   workflow_call:
 
@@ -297,36 +315,23 @@ jobs:
     timeout-minutes: 15
     permissions:
       contents: read
-      issues: write  # Justification: post lint failure comment via ps-exit
+      pull-requests: write  # Justification: post lint failure comment via ps-exit
     env:
       PS_FULL_SCAN: "0"
       PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
       PS_SKIP_SECRETS_SCAN: "1"
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "1"
-          tools_bundle: "lint"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+          install_tools: "1"
+          tools_bundle: "lint"
 
       - name: Lint (PS)
         uses: ./.github/actions/ps-task/lint
@@ -337,7 +342,7 @@ jobs:
           inputs.pr_number != '' &&
           inputs.pr_is_fork != 'true' &&
           inputs.allow_pr_comments == '1' }}
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           pr_number: ${{ inputs.pr_number }}
           github_token: ${{ github.token }}
@@ -355,7 +360,7 @@ jobs:
             Check logs/lint/*.log in artifacts for full details.
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-lint.json
@@ -383,36 +388,21 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Typecheck (PS)
         uses: ./.github/actions/ps-task/typecheck
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-typecheck.json
@@ -440,36 +430,21 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Tests (PS)
         uses: ./.github/actions/ps-task/test
 
       - name: Upload coverage artifacts (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           artifacts_name: pr-gates-coverage
           artifacts_paths: ${{ inputs.coverage_paths }}
@@ -478,7 +453,7 @@ jobs:
 
       - name: Upload test results (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           artifacts_name: pr-gates-test-results
           artifacts_paths: ${{ inputs.test_results_paths }}
@@ -486,7 +461,7 @@ jobs:
           artifacts_retention_days: ${{ inputs.retention_days }}
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-tests.json
@@ -517,36 +492,21 @@ jobs:
       PS_PR_BASE_SHA: ${{ inputs.pr_base_ref }}
       PS_PR_HEAD_SHA: ${{ inputs.pr_head_ref }}
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: JSCPD (PS)
-        uses: ./.github/actions/ps-task/jscpd
+        uses: ./.github/actions/ps-task/code-duplication-check
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-jscpd.json
@@ -554,6 +514,50 @@ jobs:
           artifacts_name: pr-gates-jscpd
           artifacts_paths: |
             ${{ inputs.artifact_paths }}
+          artifacts_if_no_files_found: "ignore"
+          artifacts_retention_days: ${{ inputs.retention_days }}
+
+  # ============================================================================
+  # QUALITY GATE — EVASION SCAN
+  # ----------------------------------------------------------------------------
+  # Purpose:
+  #   Detect lint evasion patterns (@ts-ignore, eslint-disable, etc.)
+  #   and type safety erosion (any types).
+  #
+  # Blocking:
+  #   Yes
+  # ============================================================================
+  evasion-scan:
+    name: Evasion Scan
+    runs-on: ${{ inputs.runner }}
+    needs: [validate-ci]
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
+        with:
+          fetch_depth: ${{ inputs.fetch_depth }}
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
+
+      - name: Evasion Scan (PS)
+        uses: ./.github/actions/ps-task/security-evasion-scan
+
+      - name: Job teardown (PS)
+        if: always()
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
+        with:
+          summary_workflow: pr-gates
+          summary_output_path: reports/summary/pr-gates-evasion.json
+          summary_results: evasion=${{ job.status }}
+          artifacts_name: pr-gates-evasion
+          artifacts_paths: |
+            ${{ inputs.artifact_paths }}
+            reports/evasion/**
           artifacts_if_no_files_found: "ignore"
           artifacts_retention_days: ${{ inputs.retention_days }}
 
@@ -574,36 +578,21 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Build (PS)
         uses: ./.github/actions/ps-task/build
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-build.json
@@ -614,11 +603,9 @@ jobs:
           artifacts_if_no_files_found: "ignore"
           artifacts_retention_days: ${{ inputs.retention_days }}
 
-
-
   # ============================================================================
   # QUALITY SIGNAL — SONARCLOUD (BASELINE, NON-BLOCKING)
-  # ----------------------------------------------------------------------------
+  # ============================================================================
   # Purpose:
   #   Collect static analysis metrics for trend visibility.
   #
@@ -630,24 +617,18 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci, test, typecheck]
     timeout-minutes: 30
+    if: inputs.pr_is_fork != 'true'
     permissions:
       contents: read
     continue-on-error: true
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
-          egress_policy: audit
           fetch_depth: ${{ inputs.fetch_depth }}
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
+          skip_node: "1"
 
       - name: Detect Sonar configuration
         id: sonar_cfg
@@ -655,30 +636,14 @@ jobs:
         with:
           id: detect-sonar
           title: Detect Sonar configuration
-          script: tools/scripts/ci/detect-sonar-config.sh
+          script: tools/scripts/workflows/ci/detect-sonar-config.sh
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
 
-      - name: Job setup (PS)
-        if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: ./.github/actions/ps-bootstrap/ps-init
-        with:
-          fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
       - name: Node setup (PS)
-        if: ${{ steps.sonar_cfg.outputs.enabled == 'true' }}
+        if: steps.sonar_cfg.outputs.enabled == 'true'
         uses: ./.github/actions/ps-bootstrap/ps-node
         with:
           node_version: ${{ inputs.node_version }}
@@ -689,7 +654,7 @@ jobs:
 
       - name: SonarCloud scan (PS)
         if: steps.sonar_cfg.outputs.enabled == 'true'
-        uses: ./.github/actions/ps-task/sonarcloud
+        uses: ./.github/actions/ps-task/code-quality-sonarcloud
         env:
           SONAR_ORGANIZATION: ${{ secrets.SONAR_ORGANIZATION }}
           SONAR_PROJECT_KEY: ${{ secrets.SONAR_PROJECT_KEY }}
@@ -701,7 +666,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-sonar.json
@@ -725,7 +690,7 @@ jobs:
     name: PR failure comment
     runs-on: ${{ inputs.runner }}
     needs:
-      [validate-ci, lint, typecheck, test, jscpd, build, sonar]
+      [validate-ci, lint, typecheck, test, jscpd, evasion-scan, build, sonar]
     if: >-
       ${{ failure() &&
       inputs.pr_number != '' &&
@@ -736,23 +701,17 @@ jobs:
       contents: read
       pull-requests: write  # Justification: post PR failure summary comment
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
 
       - name: Post failure summary (PR)
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         continue-on-error: true
         with:
           pr_number: ${{ inputs.pr_number }}
@@ -775,7 +734,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates-notify.json
@@ -804,6 +763,7 @@ jobs:
       - typecheck
       - test
       - jscpd
+      - evasion-scan
       - build
       - sonar
       - notify
@@ -812,24 +772,18 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
+          node_version: ${{ inputs.node_version }}
+          cache: ${{ inputs.cache }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: pr-gates
           summary_output_path: reports/summary/pr-gates.json

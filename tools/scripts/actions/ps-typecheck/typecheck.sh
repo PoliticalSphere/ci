@@ -16,11 +16,11 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 
 # Optional formatting (best effort; do not hard-fail if absent)
-# shellcheck source=tools/scripts/branding/safe-format.sh
-. "${repo_root}/tools/scripts/branding/safe-format.sh"
-ps_format_try_load "${repo_root}" "" "PS.TYPECHECK" || true
+# shellcheck source=tools/scripts/branding/format.sh
+. "${repo_root}/tools/scripts/branding/format.sh" || true
 
 PS_LOG_COMPONENT="lint.typecheck"
+export PS_LOG_COMPONENT
 typecheck_status_override=""
 typecheck_start_ms=""
 if command -v ps_epoch_ms >/dev/null 2>&1; then

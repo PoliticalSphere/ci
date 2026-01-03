@@ -71,14 +71,14 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/branding/format.sh, tools/scripts/branding/safe-format.sh,
-#     tools/scripts/actions/cross-cutting/env.sh,
-#     tools/scripts/actions/cross-cutting/path.sh,
-#     tools/scripts/actions/cross-cutting/validate.sh,
+#   internal: [tools/scripts/branding/format.sh,
+#     tools/scripts/actions/cross-cutting/gha-helpers.sh,
+#     tools/scripts/core/path-validation.sh,
+#     tools/scripts/core/validation.sh,
 #     tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh,
 #     tools/scripts/branding/print-section.sh,
-#     tools/scripts/actions/cross-cutting/validate.sh,
-#     tools/scripts/ci/validate-ci/index.js, configs/ci/policies/validate-ci.yml]
+#     tools/scripts/core/validation.sh,
+#     tools/scripts/workflows/ci/validate-ci/index.js, configs/ci/policies/validate-ci.yml]
 #   external: [bash, actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -118,13 +118,12 @@
 #   references:
 #     - .github/actions/ps-bootstrap/ps-checkout-platform/README.md
 #     - tools/scripts/branding/format.sh
-#     - tools/scripts/branding/safe-format.sh
-#     - tools/scripts/actions/cross-cutting/path.sh
-#     - tools/scripts/actions/cross-cutting/validate.sh
-#     - tools/scripts/actions/cross-cutting/env.sh
+#     - tools/scripts/core/path-validation.sh
+#     - tools/scripts/core/validation.sh
+#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
 #     - tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh
 #     - tools/scripts/branding/print-section.sh
-#     - tools/scripts/actions/cross-cutting/validate.sh
+#     - tools/scripts/core/validation.sh
 #
 # ==============================================================================
 
@@ -221,16 +220,15 @@ runs:
       run: |
         set -euo pipefail
 
-        # shellcheck source=tools/scripts/branding/safe-format.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/branding/safe-format.sh"
-        ps_format_try_load "${GITHUB_WORKSPACE}" "" "PS.CHECKOUT.PLATFORM" || true
+        # shellcheck source=tools/scripts/branding/format.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh" || true
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/path.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/path.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/path-validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/path-validation.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
@@ -292,17 +290,20 @@ runs:
 
         require_pinned="$(require_true_false "inputs.require_pinned_ref" \
           "${PS_REQUIRE_PINNED_REF_INPUT:-false}")"
-        clean="$(require_true_false "inputs.clean_path" "${PS_CLEAN_PATH_INPUT:-false}")"
+        clean="$(require_true_false "inputs.clean_path" \
+          "${PS_CLEAN_PATH_INPUT:-false}")"
 
+        ws="${GITHUB_WORKSPACE}"
         PS_LOG_PREFIX="PS.CHECKOUT.PLATFORM" \
         PS_ENV_PREFIX="PS_PLATFORM" \
-          bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh"
+          bash "$ws/tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh"
 
         emit_env "PS_PLATFORM_REPO_VALIDATED" "${repo}"
         emit_env "PS_PLATFORM_REF_VALIDATED" "${ref}"
         emit_env "PS_PLATFORM_PATH_VALIDATED" "${path}"
         emit_env "PS_PLATFORM_CLEAN_PATH_VALIDATED" "${clean}"
-        emit_env "PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED" "${require_pinned}"
+        emit_env "PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED" \
+          "${require_pinned}"
 
         log_info "repository=${repo}"
         log_info "ref=${ref}"
@@ -340,8 +341,8 @@ runs:
           ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED }}
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
@@ -362,7 +363,8 @@ runs:
 
         if [[ "${PS_PLATFORM_REQUIRE_PINNED_REF}" == "true" ]]; then
           if [[ ! "${PS_PLATFORM_REF}" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            fail "platform ref must be a full 40-char commit SHA when require_pinned_ref=true (got ${PS_PLATFORM_REF})"
+            fail "platform ref must be a full 40-char commit SHA when" \
+              "require_pinned_ref=true (got ${PS_PLATFORM_REF})"
           fi
         fi
 
@@ -383,8 +385,8 @@ runs:
         for rel in \
           "tools/scripts/branding/format.sh" \
           "tools/scripts/branding/print-section.sh" \
-          "tools/scripts/actions/cross-cutting/validate.sh" \
-          "tools/scripts/ci/validate-ci/index.js" \
+          "tools/scripts/core/validation.sh" \
+          "tools/scripts/workflows/ci/validate-ci/index.js" \
           "configs/ci/policies/validate-ci.yml"; do
           if [[ ! -f "${platform_dir}/${rel}" ]]; then
             v_error "platform missing required file: ${rel}"
@@ -396,7 +398,7 @@ runs:
           exit 1
         fi
 
-        printf 'PS.CHECKOUT.PLATFORM: integrity=ok\n'
+        printf 'PS.BOOTSTRAP.CHECKOUT_PLATFORM: integrity=ok\n'
 
     - name: Emit outputs (PS)
       id: ps_checkout_platform_outputs
@@ -411,4 +413,4 @@ runs:
           echo "platform_path_abs=${platform_path_abs}"
         } >> "${GITHUB_OUTPUT}"
 
-        printf 'PS.CHECKOUT.PLATFORM: OK\n'
+        printf 'PS.BOOTSTRAP.CHECKOUT_PLATFORM: OK\n'

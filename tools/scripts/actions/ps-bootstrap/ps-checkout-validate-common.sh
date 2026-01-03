@@ -9,14 +9,13 @@ set -euo pipefail
 # ==============================================================================
 
 format_root="${GITHUB_WORKSPACE}"
-# shellcheck source=tools/scripts/branding/safe-format.sh
-. "${format_root}/tools/scripts/branding/safe-format.sh"
-ps_format_try_load "${format_root}" "" "PS.CHECKOUT" || true
+# shellcheck source=tools/scripts/branding/format.sh
+. "${format_root}/tools/scripts/branding/format.sh" || true
 
-# shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-. "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
-# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-. "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+# shellcheck source=tools/scripts/core/validation.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
 log_prefix="${PS_LOG_PREFIX:-PS.CHECKOUT}"
 env_prefix="${PS_ENV_PREFIX:-PS}"

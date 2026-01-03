@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Input Validation Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test validate-inputs.sh sourcing and input validation behavior.
+// ==============================================================================
+
 import { spawnSync } from 'node:child_process';
 import { buildSafeEnv, fail, section } from './test-utils.js';
 
@@ -16,7 +23,7 @@ function runShell(cmd) {
 
 // 1) Tools allow-list rejects malicious content
 let r = runShell(
-  "source tools/scripts/branding/validate-inputs.sh; tools_raw='actionlint,rm -rf /'; require_regex 'inputs.tools' \"$tools_raw\" '^[a-z0-9,-]+$' 'hint' || exit 0; echo OK",
+  "source tools/scripts/actions/cross-cutting/validate.sh; tools_raw='actionlint,rm -rf /'; require_regex 'inputs.tools' \"$tools_raw\" '^[a-z0-9,-]+$' 'hint' || exit 0; echo OK",
 );
 if (r.status === 0 && r.stdout.includes('OK')) {
   fail('require_regex allowed malicious tools_raw');
@@ -24,7 +31,7 @@ if (r.status === 0 && r.stdout.includes('OK')) {
 
 // 2) require_nonempty rejects empty
 r = runShell(
-  "source tools/scripts/branding/validate-inputs.sh; require_nonempty 'inputs.script' '' || exit 0; echo OK",
+  "source tools/scripts/actions/cross-cutting/validate.sh; require_nonempty 'inputs.script' '' || exit 0; echo OK",
 );
 if (r.status === 0 && r.stdout.includes('OK')) {
   fail('require_nonempty accepted empty value');
@@ -32,7 +39,7 @@ if (r.status === 0 && r.stdout.includes('OK')) {
 
 // 3) require_number rejects non-number
 r = runShell(
-  "source tools/scripts/branding/validate-inputs.sh; require_number 'inputs.node_version' 'foo' || exit 0; echo OK",
+  "source tools/scripts/actions/cross-cutting/validate.sh; require_number 'inputs.node_version' 'foo' || exit 0; echo OK",
 );
 if (r.status === 0 && r.stdout.includes('OK')) {
   fail('require_number accepted non-number');
@@ -40,7 +47,7 @@ if (r.status === 0 && r.stdout.includes('OK')) {
 
 // 4) explicit tools input must validate tool ids (lowercase letters, digits and hyphen)
 const r2 = runShell(
-  String.raw`source tools/scripts/branding/validate-inputs.sh; tools_raw='badTool!'; tools_trimmed="$(printf '%s' "$tools_raw" | sed 's/^\s*//; s/\s*$//')"; while IFS= read -r t; do t_trim="$(printf '%s' "$t" | sed 's/^\s*//; s/\s*$//')"; if [[ -z "$t_trim" ]]; then continue; fi; if ! printf '%s' "$t_trim" | grep -Eq '^[a-z0-9-]+$'; then v_error "invalid tool id in inputs.tools: $t_trim (allowed: lowercase letters, digits, hyphen)"; exit 1; fi; done <<< "$tools_trimmed"; echo OK`,
+  String.raw`source tools/scripts/actions/cross-cutting/validate.sh; tools_raw='badTool!'; tools_trimmed="$(printf '%s' "$tools_raw" | sed 's/^\s*//; s/\s*$//')"; while IFS= read -r t; do t_trim="$(printf '%s' "$t" | sed 's/^\s*//; s/\s*$//')"; if [[ -z "$t_trim" ]]; then continue; fi; if ! printf '%s' "$t_trim" | grep -Eq '^[a-z0-9-]+$'; then v_error "invalid tool id in inputs.tools: $t_trim (allowed: lowercase letters, digits, hyphen)"; exit 1; fi; done <<< "$tools_trimmed"; echo OK`,
 );
 if (r2.status === 0 && r2.stdout.includes('OK')) {
   fail('explicit inputs.tools allowed invalid tool id');
@@ -48,7 +55,7 @@ if (r2.status === 0 && r2.stdout.includes('OK')) {
 
 // 5) bundle=none + extra_tools empty should error early
 const r3 = runShell(
-  'source tools/scripts/branding/validate-inputs.sh; PS_BUNDLE_INPUT=none; extra_trimmed=\'\'; if [[ "$PS_BUNDLE_INPUT" == "none" && -z "$extra_trimmed" ]]; then v_error "no tools selected (bundle=none and extra_tools empty). If you intended to provide explicit tools, use the \'tools\' input."; exit 1; fi; echo OK',
+  'source tools/scripts/actions/cross-cutting/validate.sh; PS_BUNDLE_INPUT=none; extra_trimmed=\'\'; if [[ "$PS_BUNDLE_INPUT" == "none" && -z "$extra_trimmed" ]]; then v_error "no tools selected (bundle=none and extra_tools empty). If you intended to provide explicit tools, use the \'tools\' input."; exit 1; fi; echo OK',
 );
 if (r3.status === 0 && r3.stdout.includes('OK')) {
   fail('bundle=none + extra_tools empty did not error');

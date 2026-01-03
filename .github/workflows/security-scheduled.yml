@@ -1,7 +1,47 @@
 # ==============================================================================
 # Political Sphere — Security Scheduled (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: security-scheduled
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-security-scheduled.yml for
+# deep security scans (CodeQL, Semgrep, Scorecard, Trivy, history scan).
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-security-scheduled.yml with caller inputs
+#   - Pass through scan configuration
+#
+# DOES NOT:
+#   - Perform scans directly
+#   - Block merges (advisory role only)
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-security-scheduled.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: schedule (weekly default)
+# - Single job: delegates to _reusable-security-scheduled.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: Security Scheduled
@@ -70,8 +110,11 @@ on:
     - cron: "0 3 * * 0"  # Weekly, Sunday 03:00 UTC
 
 # ==============================================================================
-# DEFAULT PERMISSIONS
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
+permissions:
+  contents: read  # Justification: required for repository and workflow checkout
+  actions: read   # Justification: inspect workflow runs for CI validation
 
 jobs:
   call:
@@ -79,6 +122,7 @@ jobs:
     uses: ./.github/workflows/_reusable-security-scheduled.yml
     permissions:
       contents: read
+      actions: read
       security-events: write
     with:
       runner: ${{ inputs.runner || 'ubuntu-22.04' }}
@@ -88,6 +132,8 @@ jobs:
       platform_ref: ${{ inputs.platform_ref || 'f6eac5049f626a672c84f3899f0572a87af07ca1' }}
       platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref || 'true' }}
       semgrep_version: ${{ inputs.semgrep_version || '1.146.0' }}
-      semgrep_sha256: ${{ inputs.semgrep_sha256 || 'a8eaae8191c3dd5b85c7b40cfaeca6db623fe387c85f8938176d112855cca829' }}
+      semgrep_sha256: |-
+        ${{ inputs.semgrep_sha256 ||
+            'a8eaae8191c3dd5b85c7b40cfaeca6db623fe387c85f8938176d112855cca829' }}
       semgrep_allow_unverified: ${{ inputs.semgrep_allow_unverified || 'false' }}
       codeql_languages: ${{ inputs.codeql_languages || 'javascript' }}

@@ -1,7 +1,11 @@
 #!/usr/bin/env node
 
-// Scan all composite actions and ensure no run blocks interpolate inputs directly
-// (i.e., no occurrences of '${{ inputs.* }}' inside run: | blocks)
+// ==============================================================================
+// Political Sphere — Action Run Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Ensure no run blocks interpolate inputs directly via '${{ inputs.* }}'.
+// ==============================================================================
 
 import path from 'node:path';
 import { listActionYmls, scanRunBlocks } from './action-safety-utils.js';

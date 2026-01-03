@@ -67,7 +67,11 @@ function commitUrl(ownerRepo, sha = SHA) {
 
 function makeVerifier(
   fetch,
-  { verifyRemoteShas = true, isCI = true, allowedHosts = ['api.github.com'] } = {},
+  {
+    verifyRemoteShas = true,
+    isCI = true,
+    allowedHosts = ['api.github.com'],
+  } = {},
 ) {
   return createRemoteVerifier({
     verifyRemoteShas,
@@ -175,10 +179,7 @@ async function main() {
     const fetch = makeFetchStub();
     const verifier = makeVerifier(fetch, { isCI: true });
 
-    const res = await verifier(
-      './.github/actions/foo',
-      sha,
-    );
+    const res = await verifier('./.github/actions/foo', sha);
     assertOk(res, 'local_action', 'local action bypass');
     assertEqual(
       fetch.count(),
@@ -193,12 +194,12 @@ async function main() {
   // ---------------------------------------------------------------------------
   {
     const fetch = makeFetchStub();
-    const verifier = makeVerifier(fetch, { verifyRemoteShas: false, isCI: true });
+    const verifier = makeVerifier(fetch, {
+      verifyRemoteShas: false,
+      isCI: true,
+    });
 
-    const res = await verifier(
-      'actions/checkout',
-      sha,
-    );
+    const res = await verifier('actions/checkout', sha);
     assertOk(res, 'verification_disabled', 'verification disabled');
     assertEqual(
       fetch.count(),
@@ -251,10 +252,7 @@ async function main() {
 
     const verifier = makeVerifier(fetch, { isCI: true });
 
-    const res = await verifier(
-      'actions/checkout',
-      sha,
-    );
+    const res = await verifier('actions/checkout', sha);
     assertFail(res, 'api_unreachable', 'CI unreachable network probe');
     assertEqual(
       fetch.count(),
@@ -279,10 +277,7 @@ async function main() {
 
     const verifier = makeVerifier(fetch, { isCI: false });
 
-    const res = await verifier(
-      'actions/checkout',
-      sha,
-    );
+    const res = await verifier('actions/checkout', sha);
     assertOk(
       res,
       'api_unreachable_local_skip',
@@ -321,72 +316,69 @@ async function main() {
   // ---------------------------------------------------------------------------
   // 9) Status mappings: 401, 403, 429, 500 => specific errors.
   // ---------------------------------------------------------------------------
-    const mk = async ({ status, expectedError, headers = {} }) => {
-      const lookupUrl = commitUrl('actions/checkout', sha);
-      const fetch = makeFetchStub({
-        statusByUrl: {
-          [API_ROOT]: 200,
-          [lookupUrl]: status,
-        },
-        headersByUrl: {
-          [lookupUrl]: headers,
-        },
-      });
-
-      const verifier = makeVerifier(fetch, { isCI: false });
-
-      const res = await verifier(
-        'actions/checkout',
-        sha,
-      );
-      assertFail(res, expectedError, `status mapping ${status}`);
-    };
-
-    await mk({ status: 401, expectedError: 'unauthorized' });
-    await mk({ status: 403, expectedError: 'forbidden_or_rate_limited' });
-    await mk({
-      status: 429,
-      expectedError: 'rate_limited',
-      headers: { 'x-ratelimit-remaining': '1' },
-    });
-    await mk({ status: 500, expectedError: 'unexpected_status' });
-
-    info('OK: status mappings (401/403/429/500)');
-
-  // ---------------------------------------------------------------------------
-  // 10) Action normalization: `@sha` and subpath actions resolve to owner/repo.
-  // ---------------------------------------------------------------------------
-    const commitCheckout = commitUrl('actions/checkout', sha);
-    const commitCodeql = commitUrl('github/codeql-action', sha);
-
+  const mk = async ({ status, expectedError, headers = {} }) => {
+    const lookupUrl = commitUrl('actions/checkout', sha);
     const fetch = makeFetchStub({
       statusByUrl: {
         [API_ROOT]: 200,
-        [commitCheckout]: 200,
-        [commitCodeql]: 200,
+        [lookupUrl]: status,
+      },
+      headersByUrl: {
+        [lookupUrl]: headers,
       },
     });
 
     const verifier = makeVerifier(fetch, { isCI: false });
 
-    const resAt = await verifier(`actions/checkout@${sha}`, sha);
-    assertOk(resAt, null, '@sha action normalization');
+    const res = await verifier('actions/checkout', sha);
+    assertFail(res, expectedError, `status mapping ${status}`);
+  };
 
-    const resSubpath = await verifier('github/codeql-action/upload-sarif', sha);
-    assertOk(resSubpath, null, 'subpath action normalization');
+  await mk({ status: 401, expectedError: 'unauthorized' });
+  await mk({ status: 403, expectedError: 'forbidden_or_rate_limited' });
+  await mk({
+    status: 429,
+    expectedError: 'rate_limited',
+    headers: { 'x-ratelimit-remaining': '1' },
+  });
+  await mk({ status: 500, expectedError: 'unexpected_status' });
 
-    assertEqual(
-      fetch.countUrl(commitCheckout),
-      1,
-      '@sha uses actions/checkout repo',
-    );
-    assertEqual(
-      fetch.countUrl(commitCodeql),
-      1,
-      'subpath uses github/codeql-action repo',
-    );
+  info('OK: status mappings (401/403/429/500)');
 
-    info('OK: action normalization (@sha + subpath)');
+  // ---------------------------------------------------------------------------
+  // 10) Action normalization: `@sha` and subpath actions resolve to owner/repo.
+  // ---------------------------------------------------------------------------
+  const commitCheckout = commitUrl('actions/checkout', sha);
+  const commitCodeql = commitUrl('github/codeql-action', sha);
+
+  const fetch = makeFetchStub({
+    statusByUrl: {
+      [API_ROOT]: 200,
+      [commitCheckout]: 200,
+      [commitCodeql]: 200,
+    },
+  });
+
+  const verifier = makeVerifier(fetch, { isCI: false });
+
+  const resAt = await verifier(`actions/checkout@${sha}`, sha);
+  assertOk(resAt, null, '@sha action normalization');
+
+  const resSubpath = await verifier('github/codeql-action/upload-sarif', sha);
+  assertOk(resSubpath, null, 'subpath action normalization');
+
+  assertEqual(
+    fetch.countUrl(commitCheckout),
+    1,
+    '@sha uses actions/checkout repo',
+  );
+  assertEqual(
+    fetch.countUrl(commitCodeql),
+    1,
+    'subpath uses github/codeql-action repo',
+  );
+
+  info('OK: action normalization (@sha + subpath)');
 
   // ---------------------------------------------------------------------------
   // 11) Caching: same repo@sha should only fetch commit lookup once.

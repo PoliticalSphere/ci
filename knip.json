@@ -4,27 +4,15 @@
     "tools/scripts/**/*.js",
     "tools/tests/**/*.test.js"
   ],
-  "project": [
-    "configs/**/*.js",
-    "configs/**/*.mjs",
-    "tools/**/*.js",
-    "examples/**/*.js"
-  ],
+  "project": ["configs/**/*.mjs", "tools/**/*.js"],
+  "ignore": ["logs/**", "reports/**", "dist/**", "build/**"],
   "ignoreDependencies": [
     "@biomejs/biome",
-    "@eslint/js",
     "@typescript-eslint/eslint-plugin",
     "@typescript-eslint/parser",
     "cspell",
-    "eslint",
-    "eslint-plugin-import",
-    "eslint-plugin-security",
-    "eslint-plugin-sonarjs",
-    "eslint-plugin-unicorn",
-    "globals",
     "jscpd",
     "markdownlint-cli2",
-    "re2",
-    "typescript-eslint"
+    "re2"
   ]
 }

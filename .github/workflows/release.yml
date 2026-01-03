@@ -1,17 +1,53 @@
 # ==============================================================================
 # Political Sphere — Release (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: release
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-release.yml for
+# version tagging and GitHub release creation.
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-release.yml with caller inputs
+#   - Pass through release configuration (version, tag, notes)
+#
+# DOES NOT:
+#   - Create releases directly
+#   - Publish packages or deploy artifacts
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-release.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-release.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: Release
 
 on:
   workflow_call:
-
-    # ==========================================================================
-    # RUNTIME & ENVIRONMENT CONFIGURATION
-    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
@@ -110,13 +146,19 @@ on:
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
+permissions:
+  contents: read
 
 jobs:
   call:
     name: Release
     uses: ./.github/workflows/_reusable-release.yml
+    # -------------------------------------------------------------------------
+    # Justification: contents: write required to create tags and GitHub releases.
+    # Risk decision: docs/risk-decisions.md#rd-release-permissions
+    # -------------------------------------------------------------------------
     permissions:
-      contents: write
+      contents: write  # Justification: create tags and releases
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}

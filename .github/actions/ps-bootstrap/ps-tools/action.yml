@@ -72,13 +72,13 @@
 # dependencies:
 #   internal: [tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh,
 #     tools/scripts/actions/cross-cutting/normalize.sh,
-#     tools/scripts/actions/cross-cutting/env.sh,
-#     tools/scripts/actions/cross-cutting/validate.sh,
+#     tools/scripts/actions/cross-cutting/gha-helpers.sh,
+#     tools/scripts/core/validation.sh,
 #     tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh,
 #     tools/scripts/actions/ps-tools/ps-tools-assemble.sh,
 #     tools/scripts/actions/ps-tools/ps-tools-install.sh,
-#     tools/scripts/ci/install-tools.sh, configs/security,
-#     tools/scripts/security/secret-scan-pr.sh]
+#     tools/scripts/workflows/ci/install-tools.sh, configs/security,
+#     tools/scripts/runners/security/secret-scan-pr.sh]
 #   external: [bash, actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -119,8 +119,8 @@
 #     - .github/actions/ps-bootstrap/ps-tools/README.md
 #     - tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh
 #     - tools/scripts/actions/cross-cutting/normalize.sh
-#     - tools/scripts/actions/cross-cutting/env.sh
-#     - tools/scripts/actions/cross-cutting/validate.sh
+#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
+#     - tools/scripts/core/validation.sh
 #     - tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh
 #     - tools/scripts/actions/ps-tools/ps-tools-assemble.sh
 #
@@ -130,17 +130,17 @@ name: "PS Tools"
 description: "Install pinned CLI tools using the PS installer"
 
 inputs:
-  # ============================================================================
-  # INSTALL TARGET
-  # ============================================================================
+  # ---------------------------------------------------------------------------
+  # Install target
+  # ---------------------------------------------------------------------------
   install_dir:
     description: "Repo-relative directory for CLI tools (e.g., .tooling/bin)"
     required: false
     default: ".tooling/bin"
 
-  # ============================================================================
-  # TOOL SELECTION
-  # ============================================================================
+  # ---------------------------------------------------------------------------
+  # Tool selection
+  # ---------------------------------------------------------------------------
   # Examples:
   #   bundle: "lint"
   #   bundle: "security"
@@ -161,9 +161,9 @@ inputs:
     required: false
     default: ""
 
-  # ============================================================================
-  # OPTIONAL POST-INSTALL TASKS
-  # ============================================================================
+  # ---------------------------------------------------------------------------
+  # Optional post-install tasks
+  # ---------------------------------------------------------------------------
   run_security_scans:
     description: "Run fast PR-oriented security scans after installing tools (1 = run, 0 = skip)"
     required: false
@@ -194,15 +194,15 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
           exit 1
         }
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
@@ -227,10 +227,10 @@ runs:
         set -euo pipefail
         # shellcheck source=tools/scripts/actions/cross-cutting/normalize.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/normalize.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         # --- basic toggle validation (GitHub-specific sanitization) ---
         run_scans="$(require_bool "inputs.run_security_scans" "${PS_RUN_SECURITY_SCANS_INPUT}")"
@@ -267,8 +267,8 @@ runs:
         PS_INSTALL_DIR_INPUT: ${{ inputs.install_dir }}
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
 
         install_dir_abs="${GITHUB_WORKSPACE}/${PS_INSTALL_DIR_INPUT}"
         emit_env "PS_TOOLS_BIN" "${install_dir_abs}"
@@ -318,7 +318,7 @@ runs:
         py_helper_hash_cmd="import glob,hashlib,os"
         py_helper_hash_cmd+=$'\nroot=os.environ.get("PS_SCRIPTS_ROOT") or '
         py_helper_hash_cmd+=$'os.environ.get("GITHUB_WORKSPACE","")'
-        py_helper_hash_cmd+=$'\npaths=[os.path.join(root,"tools/scripts/ci/install-tools.sh")]'
+        py_helper_hash_cmd+=$'\npaths=[os.path.join(root,"tools/scripts/workflows/ci/install-tools.sh")]'
         py_helper_hash_cmd+=$'\npaths+=glob.glob(os.path.join(root,"configs/security","*.env"))'
         py_helper_hash_cmd+=$'\npaths=sorted(set(paths))'
         py_helper_hash_cmd+=$'\nh=hashlib.sha256()'
@@ -440,9 +440,9 @@ runs:
         id: "secrets.fast"
         title: "Secrets scan (fast)"
         description: "Fast PR secret detection"
-        script: "tools/scripts/security/secret-scan-pr.sh"
+        script: "tools/scripts/runners/security/secret-scan-pr.sh"
         require_files: |
-          tools/scripts/security/secret-scan-pr.sh
+          tools/scripts/runners/security/secret-scan-pr.sh
       env:
         PS_TOOLS_BIN: ${{ env.PS_TOOLS_BIN }}
 
@@ -462,10 +462,9 @@ runs:
         printf 'install_dir_abs=%s\n' "${install_dir_abs}" >> "${GITHUB_OUTPUT}"
 
         # PS_RESOLVED_TOOLS is expected to be newline-separated (may be empty)
-        {
-          echo "resolved_tools<<'EOF'"
+        {          echo "resolved_tools<<'EOF'"
           printf '%s\n' "${PS_RESOLVED_TOOLS:-}"
           echo "EOF"
         } >> "${GITHUB_OUTPUT}"
 
-        printf 'PS.TOOLS: OK\n'
+        printf 'PS.BOOTSTRAP.TOOLS: OK\n'

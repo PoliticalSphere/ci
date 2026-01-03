@@ -111,7 +111,7 @@ on:
   pull_request:
 jobs:
   pr-gates:
-    uses: PoliticalSphere/ci-cd-platform/.github/workflows/pr-gates.yml@<SHA>
+    uses: PoliticalSphere/ci/.github/workflows/pr-gates.yml@<SHA>
     with:
       node_version: "22"
 ```

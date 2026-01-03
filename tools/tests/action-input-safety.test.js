@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
-// Action input safety checks
-// - Ensure no run block contains raw '${{ ... }}' or echo strings that include
-//   unescaped '${' patterns (prevents interpolating inputs directly into run blocks)
+// ==============================================================================
+// Political Sphere — Action Input Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Ensure no run block contains raw '${{ ... }}' or unescaped '${' patterns.
+// ==============================================================================
 
 import path from 'node:path';
 import { listActionYmls, scanRunBlocks } from './action-safety-utils.js';

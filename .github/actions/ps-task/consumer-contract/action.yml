@@ -71,7 +71,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
 #   internal: [configs/consumer/contract.json, configs/consumer/exceptions.json,
-#     tools/scripts/consumer/contract-check.sh]
+#     tools/scripts/workflows/consumer/contract-check.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@
 #     - .github/actions/ps-task/consumer-contract/README.md
 #     - configs/consumer/contract.json
 #     - configs/consumer/exceptions.json
-#     - tools/scripts/consumer/contract-check.sh
+#     - tools/scripts/workflows/consumer/contract-check.sh
 #
 # ==============================================================================
 
@@ -154,9 +154,9 @@ runs:
         id: "contract.check"
         title: "Consumer contract"
         description: "Validate repo contract vs policy"
-        script: "tools/scripts/consumer/contract-check.sh"
+        script: "tools/scripts/workflows/consumer/contract-check.sh"
         require_files: |
-          tools/scripts/consumer/contract-check.sh
+          tools/scripts/workflows/consumer/contract-check.sh
           ${{ inputs.policy_path }}
         env_kv: |
           PS_CONTRACT_POLICY=${{ inputs.policy_path }}

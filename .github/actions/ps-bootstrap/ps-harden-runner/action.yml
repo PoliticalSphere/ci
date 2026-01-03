@@ -70,7 +70,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/cross-cutting/validate.sh]
+#   internal: [tools/scripts/core/validation.sh]
 #   external: [bash, step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-bootstrap/ps-harden-runner/README.md
-#     - tools/scripts/actions/cross-cutting/validate.sh
+#     - tools/scripts/core/validation.sh
 #
 # ==============================================================================
 
@@ -146,10 +146,10 @@ runs:
       run: |
         set -euo pipefail
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/env.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         policy="$(require_enum "inputs.egress_policy" "${PS_EGRESS_POLICY_INPUT:-audit}" \
           audit block)"
@@ -178,8 +178,8 @@ runs:
           echo "egress_policy=${PS_EGRESS_POLICY_VALIDATED}"
         } >> "${GITHUB_OUTPUT}"
 
-    - name: Harden runner complete (PS)
+    - name: Complete (PS)
       shell: bash
       run: |
         set -euo pipefail
-        printf 'PS.HARDEN: OK\n'
+        printf 'PS.BOOTSTRAP.HARDEN_RUNNER: OK\n'

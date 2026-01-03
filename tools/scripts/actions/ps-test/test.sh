@@ -15,16 +15,23 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/common.sh
-. "${script_dir}/../../common.sh"
+. "${script_dir}/../../core/base-helpers.sh"
+# shellcheck source=tools/scripts/core/time-helpers.sh
+. "${script_dir}/../../core/time-helpers.sh"
 init_repo_context
 
 cd "${repo_root}"
 
 CI="${CI:-0}"
-branding_script="${repo_root}/tools/scripts/branding/print-section.sh"
+format_sh="${repo_root}/tools/scripts/branding/format.sh"
+if [[ -f "${format_sh}" ]]; then
+  # shellcheck source=tools/scripts/branding/format.sh
+  . "${format_sh}"
+fi
 tests_dir="${repo_root}/tools/tests"
 
 PS_LOG_COMPONENT="tests"
+export PS_LOG_COMPONENT
 TEST_LOG_STARTED=0
 TEST_LOG_START_MS=""
 TEST_LOG_STATUS_OVERRIDE=""
@@ -51,14 +58,6 @@ xml_escape() {
   s="${s//\'/&apos;}"
   printf '%s' "${s}"
   return 0
-}
-
-epoch_now() {
-  if [[ -n "${SOURCE_DATE_EPOCH:-}" && "${SOURCE_DATE_EPOCH}" =~ ^[0-9]+$ ]]; then
-    printf '%s' "${SOURCE_DATE_EPOCH}"
-    return 0
-  fi
-  date +%s
 }
 
 write_junit() {
@@ -148,7 +147,6 @@ on_error() {
     error "Tests failed (exit ${rc})"
   fi
   exit "${rc}"
-  return 0
 }
 trap 'on_error $?' ERR
 
@@ -245,16 +243,16 @@ fi
 TEST_LOG_TOTAL="${#test_files[@]}"
 test_log_start
 
-if [[ -x "${branding_script}" ]]; then
-  bash "${branding_script}" "tests" "Running tests" "tools/tests"
+if command -v ps_print_section >/dev/null 2>&1; then
+  ps_print_section "tests" "Running tests" "tools/tests"
 else
   echo "Running tests: tools/tests"
 fi
 
 for f in "${test_files[@]}"; do
   current_test_file="${f}"
-  if [[ -x "${branding_script}" ]]; then
-    bash "${branding_script}" "test" "Running test" "$(basename "${f}")"
+  if command -v ps_print_section >/dev/null 2>&1; then
+    ps_print_section "test" "Running test" "$(basename "${f}")"
   else
     printf 'Running test: %s\n' "$(basename "${f}")"
   fi
@@ -317,8 +315,8 @@ current_test_file=""
 
 write_junit
 
-if [[ -x "${branding_script}" ]]; then
-  bash "${branding_script}" "tests.result" "Tests passed" "${#test_files[@]} test file(s) validated"
+if command -v ps_print_section >/dev/null 2>&1; then
+  ps_print_section "tests.result" "Tests passed" "${#test_files[@]} test file(s) validated"
 else
   printf 'Tests passed: %s test file(s) validated\n' "${#test_files[@]}"
 fi

@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Lint Summary Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Verify lint summary prints once in CI-like, non-TTY context.
+// ==============================================================================
+
 import { assertLintSummaryOnce, runLintSummary } from './test-utils.js';
 
 // Run the lint summary in a CI-like, non-TTY context and assert it prints once.

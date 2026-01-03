@@ -25,7 +25,18 @@ The tools in this directory exist to:
     - Lefthook (pre-commit / pre-push)
     - Reusable CI workflows
   - Scripts are the *only* place where execution logic lives.
-  - Subfolders group scripts by purpose (branding, gates, lint, tasks, naming, ci, security, release).
+  - Subfolders group scripts by purpose:
+    - `actions/` — action input validation and safety checks
+    - `branding/` — ASCII banner generation
+    - `ci/` — CI validation, totem compliance, evasion scanning
+    - `common/` — shared utilities and library functions
+    - `consumer/` — consumer contract validation
+    - `gates/` — pre-commit and pre-push gate orchestration
+    - `lib/` — reusable shell library modules
+    - `lint/` — linting and code quality tools
+    - `naming/` — file naming policy enforcement
+    - `release/` — release automation scripts
+    - `security/` — security scanning and gitleaks integration
 
 - `/tools/tests`
   - Self-tests for:

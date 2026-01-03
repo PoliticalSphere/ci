@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — PS Run Test Utilities
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Shared utilities for testing ps-run script functionality.
+// ==============================================================================
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { mktemp } from './test-utils.js';
@@ -17,8 +24,14 @@ export function createPsRunWorkspace() {
     recursive: true,
   });
   fs.writeFileSync(
-    path.join(workspaceRoot, 'tools', 'scripts', 'branding', 'print-section.sh'),
-    '#!/usr/bin/env bash\necho "SECTION: $1 $2 $3"\n',
+    path.join(
+      workspaceRoot,
+      'tools',
+      'scripts',
+      'branding',
+      'format.sh',
+    ),
+    '#!/usr/bin/env bash\nps_print_section() { echo "SECTION: $1 $2 $3"; }\n',
     { mode: 0o755 },
   );
   return workspaceRoot;

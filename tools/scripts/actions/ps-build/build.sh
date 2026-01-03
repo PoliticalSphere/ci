@@ -36,39 +36,26 @@ set -euo pipefail
 #
 # ==============================================================================
 
-die() {
-  echo "ERROR: $*" >&2
-  # If the script is being sourced, return so the caller can handle the error.
-  # If the script is being executed directly, exit to stop the process.
-  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    return 1
-  else
-    exit 1
-  fi
-}
-warn() { echo "WARN: $*" >&2; return 0; }
-
 # ----------------------------
 # Resolve repo root
 # ----------------------------
 repo_root="$(git rev-parse --show-toplevel 2>/dev/null || true)"
 if [[ -z "${repo_root}" ]]; then
   repo_root="$(pwd)"
-  warn "git repo root not detected; using current directory: ${repo_root}"
 fi
 
-# shellcheck source=tools/scripts/branding/safe-format.sh
-. "${repo_root}/tools/scripts/branding/safe-format.sh"
-if ps_format_try_load "${repo_root}" "" "PS.BUILD"; then
-  die() {
-    ps_error "$*"
-    # When sourced, return so the caller can decide how to proceed; otherwise exit.
-    if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-      return 1
-    else
-      exit 1
-    fi
-  }
+# Load shared fail()/die() helper (auto-uses ps_error when format.sh is loaded)
+# shellcheck source=tools/scripts/core/error-handler.sh
+. "${repo_root}/tools/scripts/core/error-handler.sh"
+
+warn() { echo "WARN: $*" >&2; return 0; }
+
+# ----------------------------
+# Load formatted output if available
+# ----------------------------
+# shellcheck source=tools/scripts/branding/format.sh
+. "${repo_root}/tools/scripts/branding/format.sh"
+if [[ "${PS_FORMAT_LOADED:-0}" == "1" ]]; then
   warn() { ps_warn "$*"; return 0; }
 fi
 

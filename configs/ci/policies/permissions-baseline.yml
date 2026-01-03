@@ -147,6 +147,23 @@ workflows:
     allowed_overrides: []  # none
 
   # ---------------------------------------------------------------------------
+  # pr-security: PR-triggered security scans (secrets, dependency review).
+  # ---------------------------------------------------------------------------
+  pr-security:
+    baseline:
+      contents: read
+      actions: read
+      security-events: write
+      pull-requests: read
+
+    allowed_overrides:
+      # Allow pull-requests:write for PR comments on security findings.
+      - permission: pull-requests
+        value: write
+        requires_inline_justification: true
+        requires_risk_decision: false
+
+  # ---------------------------------------------------------------------------
   # release: publishing a release and/or packages/containers.
   # Prefer job-level elevation; keep baseline narrow but sufficient.
   # ---------------------------------------------------------------------------

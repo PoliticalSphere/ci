@@ -8,21 +8,19 @@ set -euo pipefail
 #   Validate ps-tools inputs.
 # ------------------------------------------------------------------------------
 # Dependencies:
-#   - tools/scripts/actions/cross-cutting/validate.sh
-#   - tools/scripts/actions/cross-cutting/string.sh
-#   - tools/scripts/actions/cross-cutting/path.sh
+#   - tools/scripts/core/validation.sh (includes core/path-validation.sh)
+#   - tools/scripts/core/string.sh
 #   - PS_SCRIPTS_ROOT, PS_INSTALL_DIR_INPUT, PS_BUNDLE_INPUT, PS_EXTRA_INPUT, PS_TOOLS_INPUT
 # Dependents:
 #   - ./.github/actions/ps-bootstrap/ps-tools/action.yml
 # ==============================================================================
 
 scripts_root="${PS_SCRIPTS_ROOT:-${GITHUB_WORKSPACE}}"
-# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-. "${scripts_root}/tools/scripts/actions/cross-cutting/validate.sh"
-# shellcheck source=tools/scripts/actions/cross-cutting/string.sh
-. "${scripts_root}/tools/scripts/actions/cross-cutting/string.sh"
-# shellcheck source=tools/scripts/actions/cross-cutting/path.sh
-. "${scripts_root}/tools/scripts/actions/cross-cutting/path.sh"
+# shellcheck source=tools/scripts/core/validation.sh
+# Note: validation.sh now sources core/path-validation.sh automatically
+. "${scripts_root}/tools/scripts/core/validation.sh"
+# shellcheck source=tools/scripts/core/string.sh
+. "${scripts_root}/tools/scripts/core/string.sh"
 
 # install_dir validation (source of truth)
 install_dir="${PS_INSTALL_DIR_INPUT:-.tooling/bin}"

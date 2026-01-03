@@ -66,7 +66,7 @@ Inline shell is allowed **only** where unavoidable and must be minimal.
 ## Directory Layout
 
 - Each top-level folder is a composite action namespace (e.g. `ps-bootstrap`).
-- Nested folders are sub-actions consumed directly (e.g. `ps-bootstrap/ps-init`).
+- Nested folders are sub-actions consumed directly (e.g. `ps-bootstrap/ps-initialize-environment`).
 - `action.yml` is required at the action root and is the single source of truth.
 
 ---
@@ -106,7 +106,7 @@ Baseline building blocks:
 
 ## Node toolchain
 
-- `ps-bootstrap/ps-init`: canonical job entrypoint that hardens the runner,
+- `ps-bootstrap/ps-initialize-environment`: canonical job entrypoint that hardens the runner,
   checks out the repository and optional platform, prepares HOME isolation,
   sets `PS_PLATFORM_ROOT`, and optionally installs tools.
 - `ps-bootstrap/ps-node`: Node.js setup and optional dependency install
@@ -116,7 +116,7 @@ Example: use `ps-bootstrap` to run lint with installs/tools:
 
 ```yaml
 - name: Job setup (PS)
-  uses: ./.github/actions/ps-bootstrap/ps-init
+  uses: ./.github/actions/ps-bootstrap/ps-initialize-environment
   with:
     fetch_depth: ${{ inputs.fetch_depth }}
     install_tools: "1"

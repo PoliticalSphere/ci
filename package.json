@@ -7,7 +7,7 @@
   "license": "UNLICENSED",
   "repository": {
     "type": "git",
-    "url": "https://github.com/PoliticalSphere/ci-cd-platform"
+    "url": "https://github.com/PoliticalSphere/ci"
   },
   "engines": {
     "node": ">=22.0.0",
@@ -46,6 +46,7 @@
     "lint:cspell:affected": "bash tools/scripts/lint/affected.sh cspell",
     "lint:knip": "bash tools/scripts/lint/knip.sh",
     "lint:knip:affected": "bash tools/scripts/lint/affected.sh knip",
+    "audit": "npm audit --audit-level=moderate",
     "gate:pre-commit": "bash tools/scripts/gates/gate-pre-commit.sh",
     "gate:inline": "PS_LINT_PRINT_MODE=inline npm run gate:pre-commit",
     "gate:final": "PS_LINT_PRINT_MODE=final npm run gate:pre-commit",
@@ -57,7 +58,9 @@
     "license-check": "bash tools/scripts/security/license-check.sh",
     "consumer-contract": "bash tools/scripts/consumer/contract-check.sh",
     "validate-ci": "node tools/scripts/ci/validate-ci/index.js",
-    "preflight": "npm -s run lint && npm -s run typecheck && npm -s run test && npm -s run jscpd",
+    "evasion-scan": "node tools/scripts/security/evasion-scan.js",
+    "totem-check": "node tools/scripts/ci/totem-check.js",
+    "preflight": "npm -s run lint && npm -s run typecheck && npm -s run test && npm -s run jscpd && npm -s run audit",
     "ci": "npm -s run preflight"
   },
   "devDependencies": {

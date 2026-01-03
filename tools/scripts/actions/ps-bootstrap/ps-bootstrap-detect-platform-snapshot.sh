@@ -12,7 +12,7 @@ set -euo pipefail
 path="${PS_PLATFORM_SNAPSHOT_PATH:-.ps-platform}"
 
 # If a platform snapshot (downloaded artifact) is present, export PS_PLATFORM_ROOT
-if [[ -d "${path}" && -f "${path}/tools/scripts/branding/print-section.sh" ]]; then
+if [[ -d "${path}" && -f "${path}/tools/scripts/branding/format.sh" ]]; then
   printf 'PS_PLATFORM_ROOT=%s\n' "${GITHUB_WORKSPACE}/${path}" >> "${GITHUB_ENV}"
   printf 'PS.PLATFORM: detected platform snapshot, PS_PLATFORM_ROOT set to %s/%s\n' "${GITHUB_WORKSPACE}" "${path}"
 else

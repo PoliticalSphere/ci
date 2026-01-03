@@ -42,8 +42,10 @@ Detailed versioning rules live in `docs/versioning.md`.
 
 ### Removed
 
-- Remove legacy composite actions `ps-preflight` and `validate-paths` (logic now lives in scripts and `ps-task`).
-- Remove legacy CI completion scripts `tools/scripts/ci/build-complete.sh` and `tools/scripts/ci/validate-ci-complete.sh` and drop their workflow steps.
+- Remove legacy composite actions `ps-preflight` and `validate-paths` (logic now lives in
+  scripts and `ps-task`).
+- Remove legacy CI completion scripts `tools/scripts/ci/build-complete.sh` and
+  `tools/scripts/ci/validate-ci-complete.sh` and drop their workflow steps.
 
 ### Fixed
 

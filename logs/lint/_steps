@@ -1,7 +1,0 @@
-lint.biome|BIOME
-lint.eslint|ESLINT
-lint.yamllint|YAMLLINT
-lint.actionlint|ACTIONLINT
-lint.hadolint|HADOLINT
-lint.shellcheck|SHELLCHECK
-lint.markdown|MARKDOWN

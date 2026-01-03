@@ -9,15 +9,16 @@ set -euo pipefail
 # ==============================================================================
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/actions/cross-cutting/resolve-validate-inputs.sh
-. "${script_dir}/../cross-cutting/resolve-validate-inputs.sh"
-# shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-. "${script_dir}/../cross-cutting/env.sh"
-# shellcheck source=tools/scripts/actions/cross-cutting/path.sh
-. "${script_dir}/../cross-cutting/path.sh"
-# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-. "${script_dir}/../cross-cutting/validate.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${script_dir}/../cross-cutting/gha-helpers.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${script_dir}/../cross-cutting/gha-helpers.sh"
+# shellcheck source=tools/scripts/core/validation.sh
+# Note: validation.sh now sources core/path-validation.sh automatically
+. "${script_dir}/../../core/validation.sh"
 resolve_scripts_root
+
+workspace_root="${PS_WORKSPACE_ROOT:-${GITHUB_WORKSPACE:-$(pwd)}}"
 
 # Validate inputs early
 node_version="$(require_int_nonneg "inputs.node_version" "${PS_NODE_VERSION_INPUT}")"

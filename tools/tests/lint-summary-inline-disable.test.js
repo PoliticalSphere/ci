@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Lint Summary Inline Disable Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Verify lint summary does not duplicate when in-place updates are disabled.
+// ==============================================================================
+
 import { assertLintSummaryOnce, runLintSummary } from './test-utils.js';
 
 // Run the lint summary twice with PS_LINT_INLINE=0 to ensure the summary

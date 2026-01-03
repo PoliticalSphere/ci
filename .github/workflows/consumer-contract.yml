@@ -1,14 +1,53 @@
 # ==============================================================================
 # Political Sphere — Consumer Contract (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: consumer-contract
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-consumer-contract.yml for
+# validating consumer repositories against the platform contract.
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-consumer-contract.yml with caller inputs
+#   - Pass through contract validation configuration
+#
+# DOES NOT:
+#   - Perform contract validation directly
+#   - Deploy or publish artifacts externally
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-consumer-contract.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-consumer-contract.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: Consumer Contract
 
 on:
   workflow_call:
-
     # ==========================================================================
     # RUNTIME & TOOLING CONFIGURATION
     # ==========================================================================
@@ -139,6 +178,9 @@ on:
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
+permissions:
+  contents: read  # Justification: required for repository checkout
+  actions: read   # Justification: inspect workflow runs for CI validation
 
 jobs:
   call:

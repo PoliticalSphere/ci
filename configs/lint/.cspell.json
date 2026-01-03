@@ -1,7 +1,14 @@
 {
   "version": "0.2",
   "language": "en",
-  "ignorePaths": ["node_modules", "dist", "build", "coverage", "reports"],
+  "ignorePaths": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "reports",
+    "logs"
+  ],
   "words": [
     "relpath",
     "RELPATH",
@@ -116,7 +123,22 @@
     "parseable",
     "unallowlisted",
     "amsgs",
-    "invalidaction"
+    "invalidaction",
+    "dotdot",
+    "nonneg",
+    "pypi",
+    "pythonhosted",
+    "baselining",
+    "stabilised",
+    "logfmt",
+    "Logfmt",
+    "highlightall",
+    "atrule",
+    "clike",
+    "mathml",
+    "ssml",
+    "sonarqube",
+    "bgpg"
   ],
   "ignoreWords": [],
   "ignoreRegExpList": ["[0-9A-Fa-f]{32,}", "^[A-Z0-9_]{2,}$"]

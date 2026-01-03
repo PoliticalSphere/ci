@@ -14,7 +14,7 @@ followed by logfmt-style key/value pairs.
 
 Example:
 
-```
+```logfmt
 PS.LOG schema=ps.log.v1 ts=2025-03-01T14:21:09Z level=info event=lint.step.start component=lint.eslint id=lint.eslint title=ESLINT detail="Specialist linting and TS-aware rules"
 ```
 

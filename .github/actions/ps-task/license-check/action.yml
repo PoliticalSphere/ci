@@ -70,7 +70,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [configs/security/license-policy.yml, tools/scripts/security/license-check.sh]
+#   internal: [configs/security/license-policy.yml, tools/scripts/runners/security/license-check.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@
 #   references:
 #     - .github/actions/ps-task/license-check/README.md
 #     - configs/security/license-policy.yml
-#     - tools/scripts/security/license-check.sh
+#     - tools/scripts/runners/security/license-check.sh
 #
 # ==============================================================================
 
@@ -161,8 +161,8 @@ runs:
         PS_LOG_DIR_INPUT: ${{ inputs.log_dir }}
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
@@ -183,9 +183,9 @@ runs:
         id: "security.license"
         title: "License compliance"
         description: "Policy-driven OSS license validation"
-        script: "tools/scripts/security/license-check.sh"
+        script: "tools/scripts/runners/security/license-check.sh"
         require_files: |
-          tools/scripts/security/license-check.sh
+          tools/scripts/runners/security/license-check.sh
           ${{ inputs.policy_path }}
           ${{ inputs.lock_path }}
         artifact_paths: |

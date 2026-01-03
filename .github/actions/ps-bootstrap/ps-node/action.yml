@@ -194,4 +194,4 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        printf 'PS.NODE: OK\n'
+        printf 'PS.BOOTSTRAP.NODE: OK\n'

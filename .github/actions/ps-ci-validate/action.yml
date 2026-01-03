@@ -70,9 +70,8 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/ci/validate-ci-action.sh, tools/scripts/branding/format.sh,
-#     tools/scripts/branding/safe-format.sh,
-#     tools/scripts/actions/cross-cutting/output.sh]
+#   internal: [tools/scripts/workflows/ci/validate-ci-action.sh, tools/scripts/branding/format.sh,
+#     tools/scripts/actions/cross-cutting/gha-helpers.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,10 +110,9 @@
 # related:
 #   references:
 #     - .github/actions/ps-ci-validate/README.md
-#     - tools/scripts/ci/validate-ci-action.sh
+#     - tools/scripts/workflows/ci/validate-ci-action.sh
 #     - tools/scripts/branding/format.sh
-#     - tools/scripts/branding/safe-format.sh
-#     - tools/scripts/actions/cross-cutting/output.sh
+#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
 #
 # ==============================================================================
 
@@ -130,7 +128,7 @@ inputs:
   script_relpath:
     description: "Script path relative to the repository root."
     required: false
-    default: "tools/scripts/ci/validate-ci-action.sh"
+    default: "tools/scripts/workflows/ci/validate-ci-action.sh"
 
 outputs:
   platform_root:
@@ -149,8 +147,8 @@ runs:
         PS_SCRIPT_RELPATH: ${{ inputs.script_relpath }}
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
@@ -164,7 +162,8 @@ runs:
         fi
 
         if [[ -z "${platform_root}" ]]; then
-          v_detail "Set inputs.platform_root or env.PS_PLATFORM_ROOT (e.g. ${GITHUB_WORKSPACE}/.ps-platform)."
+          v_detail "Set inputs.platform_root or env.PS_PLATFORM_ROOT" \
+            "(e.g. ${GITHUB_WORKSPACE}/.ps-platform)."
           fail "CI Validate requires platform root."
         fi
 
@@ -177,7 +176,7 @@ runs:
           fail "platform_root directory not found: ${platform_root}"
         fi
 
-        script_rel="${PS_SCRIPT_RELPATH:-tools/scripts/ci/validate-ci-action.sh}"
+        script_rel="${PS_SCRIPT_RELPATH:-tools/scripts/workflows/ci/validate-ci-action.sh}"
         if [[ -z "${script_rel}" ]]; then
           fail "inputs.script_relpath must not be empty"
         fi
@@ -193,8 +192,8 @@ runs:
         printf 'PS.CI_VALIDATE: platform_root=%s\n' "${platform_root}"
         printf 'PS.CI_VALIDATE: script=%s\n' "${script_abs}"
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/output.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/output.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
 
         emit_output "platform_root" "${platform_root}"
         emit_output "script_abs" "${script_abs}"
@@ -208,19 +207,17 @@ runs:
         set -euo pipefail
         script="${PS_VALIDATE_SCRIPT_ABS}"
 
-        # shellcheck source=tools/scripts/branding/safe-format.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/branding/safe-format.sh"
-        if ps_format_try_load "${GITHUB_WORKSPACE}" "" "PS.CI.VALIDATE"; then
-          if type -t ps_header >/dev/null 2>&1; then
-            ps_header "Policy Gate: CI Validation"
-          fi
+        # shellcheck source=tools/scripts/branding/format.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh" || true
+        if type -t ps_header >/dev/null 2>&1; then
+          ps_header "Policy Gate: CI Validation"
         fi
 
         # Ensure executable bit isn't required (CI runners can run via bash).
         bash "${script}"
 
-    - name: CI Validate complete (PS)
+    - name: Complete (PS)
       shell: bash
       run: |
         set -euo pipefail
-        printf 'PS.CI_VALIDATE: OK\n'
+        printf 'PS.VALIDATE.CI: OK\n'

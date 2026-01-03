@@ -2,19 +2,34 @@
 # Political Sphere — Reusable Workflow: License Compliance
 # ==============================================================================
 #
+# METADATA
+# ------------------------------------------------------------------------------
+# id: _reusable-license-compliance
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-20
+# last_updated: 2025-12-24
+#
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - configs/security/license-policy.yml
+#   - tools/scripts/runners/security/license-check.js
+# actions:
+#   - ./.github/actions/ps-bootstrap/ps-setup-standard
+#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Policy misconfigurations can block legitimate licenses
+# - Package transitive dependencies must be in lockfile
+#
 # PURPOSE
 # ------------------------------------------------------------------------------
 # Enforce OSS license compliance using the Political Sphere policy file and
 # repository lockfile evidence. Produces audit-friendly reports/logs artifacts
 # and a machine-readable summary.
-#
-#
-# METADATA
-# ------------------------------------------------------------------------------
-# - Created:      2025-12-20
-# - Last updated: 2025-12-24
-# - Owner:        political-sphere
-# - Classification: internal
 #
 #
 # SCOPE & RESPONSIBILITIES
@@ -40,6 +55,14 @@
 # - External actions (if used) must be SHA-pinned
 #
 #
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/validate-ci.yml
+# - ./.github/actions/ps-bootstrap/ps-setup-standard
+# - ./.github/actions/ps-teardown/ps-finalize-workflow
+# - ./.github/actions/ps-task/license-check
+#
+#
 # EXECUTION MODEL
 # ------------------------------------------------------------------------------
 # - Triggered via workflow_call (consumer-facing)
@@ -63,18 +86,12 @@
 
 name: License Compliance
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ------------------------------------------------------------------------------
-# - Reusable workflow invoked via workflow_call
-# - Optional direct PR trigger (platform repo convenience)
-# ==============================================================================
 on:
   workflow_call:
 
     # ==========================================================================
     # RUNTIME & ENVIRONMENT CONFIGURATION
-    # --------------------------------------------------------------------------
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
@@ -114,7 +131,7 @@ on:
 
       # ==========================================================================
       # PLATFORM & SHARED TOOLING
-      # --------------------------------------------------------------------------
+      # ==========================================================================
       platform_ref:
         description: "Platform repo ref to checkout for shared scripts/configs"
         type: string
@@ -129,7 +146,7 @@ on:
 
       # ==========================================================================
       # LICENSE INPUTS
-      # --------------------------------------------------------------------------
+      # ==========================================================================
       policy_path:
         description: "License policy path (repo-relative)"
         type: string
@@ -156,7 +173,7 @@ on:
 
       # ==========================================================================
       # ARTIFACT COLLECTION & RETENTION
-      # --------------------------------------------------------------------------
+      # ==========================================================================
       retention_days:
         description: "Artifact retention in days"
         type: number
@@ -165,7 +182,7 @@ on:
 
     # ==========================================================================
     # SECRETS (OPTIONAL, LEAST-PRIVILEGE)
-    # --------------------------------------------------------------------------
+    # ==========================================================================
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
@@ -178,6 +195,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # Ensures a single license-compliance run per ref.
@@ -185,13 +209,6 @@ permissions:
 concurrency:
   group: license-compliance-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
 
 # ==============================================================================
 # GLOBAL ENVIRONMENT
@@ -245,33 +262,15 @@ jobs:
       contents: read
     timeout-minutes: ${{ inputs.license_timeout_minutes }}
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-
-          platform_repo: "PoliticalSphere/ci"
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "0"
-
-          home_dir: ".home"
-          egress_policy: audit
-
-          install_tools: "0"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
           install_dependencies: ${{ inputs.install_dependencies }}
-          working_directory: "."
-          cache_dependency_path: "package-lock.json"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: License compliance (PS)
         uses: ./.github/actions/ps-task/license-check
@@ -283,7 +282,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: license-compliance
           summary_output_path: reports/summary/license-compliance.json

@@ -4,13 +4,25 @@
 #
 # METADATA
 # ------------------------------------------------------------------------------
-# id: build-artifacts
+# id: _reusable-build-artifacts
 # version: 1.1.0
 # owner: political-sphere
 # classification: internal
 # created: 2025-12-20
 # last_updated: 2025-12-24
 #
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - docs/security-ci-policy.md
+# actions:
+#   - ./.github/actions/ps-bootstrap/ps-setup-standard
+#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Artifact retention duration limits storage costs
+# - Large artifacts can slow uploads/downloads
 #
 # PURPOSE
 # ------------------------------------------------------------------------------
@@ -47,10 +59,9 @@
 # DEPENDENCIES
 # ------------------------------------------------------------------------------
 # - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-init
-# - ./.github/actions/ps-bootstrap/ps-node
+# - ./.github/actions/ps-bootstrap/ps-setup-standard
 # - ./.github/actions/ps-task/build
-# - ./.github/actions/ps-teardown/ps-exit
+# - ./.github/actions/ps-teardown/ps-finalize-workflow
 # - tools/scripts/actions/ps-build/build.sh (default)
 #
 #
@@ -81,9 +92,6 @@
 
 name: Build Artifacts
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ==============================================================================
 on:
   workflow_call:
 
@@ -203,6 +211,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # Ensures a single build-artifacts run per ref.
@@ -210,13 +225,6 @@ permissions:
 concurrency:
   group: build-artifacts-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
 
 # ==============================================================================
 # GLOBAL PLATFORM ENVIRONMENT
@@ -269,33 +277,18 @@ jobs:
       contents: read
 
     steps:
-      - name: Job setup (PS)
+      - name: Bootstrap (PS)
         id: job_setup
-        uses: ./.github/actions/ps-bootstrap/ps-init
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          # Prefer the exact PR head SHA when available to avoid ref spoofing.
           checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          platform_repo: ${{ inputs.platform_repository }}
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: ${{ inputs.platform_repository }}
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "0"
-          # Allow outbound network as needed for builds (telemetry, registries)
-          egress_policy: audit
-          install_tools: "0"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
           working_directory: ${{ inputs.working_directory }}
           cache_dependency_path: ${{ inputs.working_directory }}/package-lock.json
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Build (PS)
         id: build
@@ -306,7 +299,7 @@ jobs:
 
       - name: Upload platform snapshot (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           artifacts_name: platform-snapshot
           artifacts_paths: ${{ steps.job_setup.outputs.platform_root }}/tools/scripts/branding/**
@@ -315,7 +308,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: build-artifacts
           summary_output_path: reports/summary/build-artifacts-job.json
@@ -345,25 +338,18 @@ jobs:
     # Note: we intentionally checkout the consumer repository here so that
     # platform exit actions are available to aggregate the multi-job results.
     steps:
-      - name: Job setup (Security Only)
-        # Checkout platform repo so ps-exit can validate inputs via platform
-        # branding scripts (validate-inputs.sh).
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          platform_repo: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: ${{ inputs.platform_repository }}
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          egress_policy: audit
-          install_tools: "0"
+          skip_node: "1"
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: build-artifacts
           summary_output_path: reports/summary/build-artifacts.json

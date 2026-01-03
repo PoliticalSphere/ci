@@ -21,26 +21,29 @@ readonly MAX_ENV_KV_ENTRIES=100
 readonly MAX_ENV_KV_VALUE_BYTES=65536
 readonly MAX_ENV_KV_TOTAL_BYTES=262144
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-. "${script_dir}/../cross-cutting/env.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${script_dir}/../cross-cutting/gha-helpers.sh"
 
-# Resolve print-section.sh (prefer platform, allow workspace fallback for dev/bootstrap).
-section_script=""
+# Resolve format.sh (prefer platform, allow workspace fallback for dev/bootstrap).
+format_script=""
 for candidate in \
-  "${platform_root}/tools/scripts/branding/print-section.sh" \
-  "${workspace_root}/tools/scripts/branding/print-section.sh"; do
+  "${platform_root}/tools/scripts/branding/format.sh" \
+  "${workspace_root}/tools/scripts/branding/format.sh"; do
   if [[ -f "${candidate}" ]]; then
-    section_script="${candidate}"
+    format_script="${candidate}"
     break
   fi
 done
 
-if [[ -z "${section_script}" ]]; then
-  printf 'ERROR: print-section.sh not found.\n' >&2
-  printf 'Tried: %s\n' "${platform_root}/tools/scripts/branding/print-section.sh" >&2
-  printf 'Tried: %s\n' "${workspace_root}/tools/scripts/branding/print-section.sh" >&2
+if [[ -z "${format_script}" ]]; then
+  printf 'ERROR: format.sh not found.\n' >&2
+  printf 'Tried: %s\n' "${platform_root}/tools/scripts/branding/format.sh" >&2
+  printf 'Tried: %s\n' "${workspace_root}/tools/scripts/branding/format.sh" >&2
   exit 1
 fi
+
+# shellcheck source=tools/scripts/branding/format.sh
+. "${format_script}"
 
 rel_script="${PS_REL_SCRIPT:-}"
 if [[ -z "${rel_script}" ]]; then
@@ -125,7 +128,7 @@ log_security_event() {
   return 0
 }
 
-bash "${section_script}" "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"
+ps_print_section "${PS_ID}" "${PS_TITLE}" "${PS_DESCRIPTION}"
 
 # Log task identification for audit trail
 log_security_event "EVENT" "task_id=${PS_ID} title=${PS_TITLE}"

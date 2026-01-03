@@ -8,16 +8,9 @@ set -euo pipefail
 #   Validate build action inputs.
 # ==============================================================================
 
-
-fail() {
-  echo "ERROR: $*" >&2
-  # When sourced, return to the caller; when executed directly, exit the process.
-  if [[ "${BASH_SOURCE[0]}" != "${0}" ]]; then
-    return 1
-  else
-    exit 1
-  fi
-}
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
+# shellcheck source=tools/scripts/core/error-handler.sh
+. "${script_dir}/../../core/error-handler.sh"
 
 # Required-ish: non-empty strings
 [[ -n "${PS_ID:-}" ]] || fail "inputs.id must not be empty"
@@ -30,9 +23,11 @@ if ! [[ "${PS_ID}" =~ ^[a-z0-9]+([a-z0-9-]*[a-z0-9])?$ ]]; then
 fi
 
 # UX section header if platform branding exists
-section_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/print-section.sh"
-if [[ -f "${section_sh}" ]]; then
-  bash "${section_sh}" "build.config" "Build configuration"
+format_sh="${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh"
+if [[ -f "${format_sh}" ]]; then
+  # shellcheck source=tools/scripts/branding/format.sh
+  . "${format_sh}"
+  ps_print_section "build.config" "Build configuration"
 fi
 
 printf 'PS.BUILD: id=%s\n' "${PS_ID}"

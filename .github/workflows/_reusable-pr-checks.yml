@@ -2,6 +2,28 @@
 # Political Sphere — Reusable Workflow: PR Checks
 # ==============================================================================
 #
+# METADATA
+# ------------------------------------------------------------------------------
+# id: _reusable-pr-checks
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-20
+# last_updated: 2025-12-24
+#
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - docs/risk-decisions.md#rd-pr-comments
+# actions:
+#   - ./.github/workflows/pr-gates.yml
+#   - ./.github/workflows/license-compliance.yml
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Fork PRs have comments disabled for security
+# - Secrets are not inherited (explicit pass-through only)
+#
 # PURPOSE
 # ------------------------------------------------------------------------------
 # Provide a reusable orchestration layer that runs Political Sphere’s
@@ -33,6 +55,12 @@
 # - Fork-safe: avoid comment writes and secret use on untrusted PR contexts
 #
 #
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-pr-gates.yml
+# - ./.github/workflows/_reusable-license-compliance.yml
+#
+#
 # EXECUTION MODEL
 # ------------------------------------------------------------------------------
 # - Trigger: workflow_call
@@ -58,11 +86,6 @@
 
 name: PR Checks
 
-# ==============================================================================
-# TRIGGER
-# ------------------------------------------------------------------------------
-# Reusable workflow invoked via workflow_call.
-# ==============================================================================
 on:
   workflow_call:
     inputs:
@@ -116,6 +139,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # One run per PR; cancel older runs when new commits arrive.
@@ -157,17 +187,17 @@ jobs:
     # - contents: read is required for checkout and reads.
     # - pull-requests: write is required only if notify/comments are enabled.
     permissions:
-      contents: read
-      pull-requests: write
+      contents: read  # Justification: repository checkout
+      pull-requests: write  # Justification: post PR failure comments
 
-    # Optional: enable only if your called workflows intentionally use secrets.
-    # Only pass *required* secrets to the called workflow instead of inheriting
-    # all repository secrets (least privilege). For example, pass NODE_AUTH_TOKEN
-    # when private registry access is needed.
+  # Optional: enable only if your called workflows intentionally use secrets.
+  # Only pass *required* secrets to the called workflow instead of inheriting
+  # all repository secrets (least privilege). For example, pass NODE_AUTH_TOKEN
+  # when private registry access is needed.
 
   # ============================================================================
   # POLICY ENFORCEMENT — LICENSE COMPLIANCE (REUSABLE)
-  # ----------------------------------------------------------------------------
+  # ============================================================================
   # Purpose:
   #   Enforce OSS license policy using lockfile + platform policy rules.
   #
@@ -193,6 +223,5 @@ jobs:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}
       fetch_depth: ${{ inputs.fetch_depth }}
-
-    # Optional: enable only if license workflow needs secrets (e.g. private npm).
-    # Only pass required secrets (avoid secrets: inherit).
+      # Optional: enable only if license workflow needs secrets (e.g. private npm).
+      # Only pass required secrets (avoid secrets: inherit).

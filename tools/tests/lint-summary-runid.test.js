@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Lint Summary Run ID Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test lint summary behavior with run IDs for duplicate detection.
+// ==============================================================================
+
 import { execFileSync } from 'node:child_process';
 import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot } from './test-utils.js';
@@ -62,7 +69,9 @@ const filtered = String(out)
   .split('\n')
   .filter((line) => !line.startsWith('PS.LOG '))
   .join('\n');
-const headerCount = (filtered.match(/LINT & TYPE CHECK/g) || []).length;
+// Match either old header "LINT & TYPE CHECK" or new header "Linter Results"
+const headerCount = (filtered.match(/LINT & TYPE CHECK|Linter Results/g) || [])
+  .length;
 if (headerCount !== 1) {
   fail(
     `Unexpected header count with GITHUB_RUN_ID: expected 1, found ${headerCount}\nOutput:\n${filtered}`,

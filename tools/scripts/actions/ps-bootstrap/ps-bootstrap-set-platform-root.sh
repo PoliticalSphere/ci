@@ -9,8 +9,8 @@ set -euo pipefail
 # ==============================================================================
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/actions/cross-cutting/env.sh
-. "${script_dir}/../cross-cutting/env.sh"
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${script_dir}/../cross-cutting/gha-helpers.sh"
 
 emit_env "PS_PLATFORM_ROOT" "${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_INPUT}"
 # Expose repo-relative platform path as a composite action output for callers

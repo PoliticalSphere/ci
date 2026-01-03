@@ -1,15 +1,12 @@
 #!/usr/bin/env node
 
 // ============================================================================
-// Validate-CI — Unit tests
+// Political Sphere — Validate-CI Unit Tests
 // ---------------------------------------------------------------------------
-// Deterministic checks for `scanWorkflows` and `scanActions` behavior.
-//
-// Goals:
-//   - No network calls (remote verifier stubbed)
-//   - Real YAML files written to a scratch workspace (exercise parser + checks)
-//   - Assert key violations *and* some metadata (path/weight/line)
-//   - Avoid brittleness by controlling baselines + allowed-first-steps
+// Purpose:
+//   Deterministic checks for scanWorkflows and scanActions behavior.
+//   No network calls (remote verifier stubbed), real YAML files written to
+//   scratch workspace. Assert key violations and metadata (path/weight/line).
 // ============================================================================
 
 import fs from 'node:fs';

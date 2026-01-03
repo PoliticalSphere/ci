@@ -84,3 +84,54 @@ Copy the block below for each decision:
   - Store findings as artifacts only (no automatic posting of blocking checks).
   expires: 2026-06-23
   approval: platform-governance
+- id: RD-2026-003
+  date: 2026-01-02
+  owner: political-sphere
+  status: approved
+  scope: configs/ci/policies/artifact-policy.yml
+  policy: CI Security Enhancement — Artifact Retention
+  decision: Extend retention for security artifacts (SARIF, secrets scans) to 90 days
+  rationale: Allows sufficient time for security team review, incident response, and compliance audits. Standard artifacts retain 7 days.
+  impact: Increased storage costs; improved audit trail for security findings.
+  mitigation: Auto-cleanup via GitHub Actions artifact retention policies; encrypted storage.
+  expires: 2027-01-02
+  approval: security-team
+
+- id: RD-2026-004
+  date: 2026-01-02
+  owner: political-sphere
+  status: approved
+  scope: package.json
+  policy: Dependency Security Scanning
+  decision: Enable npm audit with --audit-level=moderate by default in preflight
+  rationale: Catches moderate and higher severity vulnerabilities; balances signal-to-noise for developer experience.
+  impact: May block CI if moderate vulnerabilities detected; encourages timely updates.
+  mitigation: Requires risk decision and documented exception to override.
+  expires: 2027-01-02
+  approval: platform-governance
+
+- id: RD-2026-005
+  date: 2026-01-02
+  owner: political-sphere
+  status: approved
+  scope: .github/workflows/_reusable-release.yml
+  policy: Supply Chain Transparency
+  decision: Generate SBOM (CycloneDX) artifact in release workflow
+  rationale: Provides downstream consumers with software bill of materials for dependency audit and transparency.
+  impact: Additional release artifact; minimal CI overhead.
+  mitigation: SBOM is informational; no CI gating.
+  expires: 2027-01-02
+  approval: platform-governance
+
+- id: RD-2026-006
+  date: 2026-01-02
+  owner: political-sphere
+  status: approved
+  scope: configs/ci/policies/inline-bash.yml
+  policy: Shell Injection Prevention
+  decision: Extend inline-bash pattern detection with command injection vectors
+  rationale: Prevent accidental exposure of user-controlled data (issue body, PR title) to shell commands.
+  impact: Stricter validation of inline scripts; may catch legitimate patterns requiring allowlist exemption.
+  mitigation: Clear error messages; allowlist entries with documented rationale.
+  expires: 2027-01-02
+  approval: platform-governance

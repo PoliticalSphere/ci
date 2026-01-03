@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — PS Write Summary Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test ps-write-summary action configuration and behavior.
+// ==============================================================================
+
 import fs from 'node:fs';
 import path from 'node:path';
 import { fail, getRepoRoot, readYamlFile, section } from './test-utils.js';

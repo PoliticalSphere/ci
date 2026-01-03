@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+
+// ==============================================================================
+// Political Sphere — Remote Verify Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test remote SHA verification helpers for validate-ci.
+// ==============================================================================
+
 import assert from 'node:assert/strict';
 import {
   mapStatusToInfo,

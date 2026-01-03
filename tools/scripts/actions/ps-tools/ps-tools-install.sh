@@ -8,7 +8,7 @@ set -euo pipefail
 #   Install selected tools using PS_SCRIPTS_ROOT.
 # ------------------------------------------------------------------------------
 # Dependencies:
-#   - tools/scripts/ci/install-tools.sh
+#   - tools/scripts/workflows/ci/install-tools.sh
 #   - PS_SCRIPTS_ROOT, PS_TOOLS, PS_INSTALL_DIR
 # Dependents:
 #   - ./.github/actions/ps-bootstrap/ps-tools/action.yml
@@ -35,4 +35,4 @@ if [[ -n "${PS_INSTALL_DIR:-}" ]]; then
 fi
 
 cd "${scripts_root}" || { printf 'ERROR: failed to cd into %s\n' "${scripts_root}" >&2; exit 1; }
-bash "${scripts_root}/tools/scripts/ci/install-tools.sh" "${tools_arr[@]}"
+bash "${scripts_root}/tools/scripts/workflows/ci/install-tools.sh" "${tools_arr[@]}"

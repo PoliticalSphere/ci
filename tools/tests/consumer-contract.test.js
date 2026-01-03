@@ -113,7 +113,7 @@ writeFile(
     'permissions: {}',
     'jobs:',
     '  pr-gates:',
-    '    uses: PoliticalSphere/ci-cd-platform/.github/workflows/pr-gates.yml@v1',
+    '    uses: PoliticalSphere/ci/.github/workflows/pr-gates.yml@v1',
     '    permissions:',
     '      contents: read',
     '',
@@ -136,7 +136,7 @@ writeFile(
         tooling: { require: ['typescript'], disallow: [] },
         workflows: {
           required_reusable: [
-            'PoliticalSphere/ci-cd-platform/.github/workflows/pr-gates.yml',
+            'PoliticalSphere/ci/.github/workflows/pr-gates.yml',
           ],
           allowed_top_level: ['pr-gates.yml'],
         },

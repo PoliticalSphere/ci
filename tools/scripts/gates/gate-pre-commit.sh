@@ -52,11 +52,22 @@ export PS_STAGED_ONLY="${PS_STAGED_ONLY:-1}"
 export PS_LINT_PRINT_MODE="${PS_LINT_PRINT_MODE:-auto}"
 
 # Banner
-bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
+ps_print_banner
 gate_log_start
 
 # ------------------------------------------------------------------------------
-# FAST CHECKS ONLY
+# AUTOFIX-FIRST PHASE
+# ------------------------------------------------------------------------------
+# Run autofix for tools that support it. This corrects formatting and simple
+# issues automatically, then re-stages the corrected files before linting.
+# This reduces friction for developers by fixing what can be fixed automatically.
+# ------------------------------------------------------------------------------
+run_autofix "biome" bash "${PS_LINT_SCRIPTS}/biome.sh" --write
+run_autofix "eslint" bash "${PS_LINT_SCRIPTS}/eslint.sh" --fix
+run_autofix "markdown" bash "${PS_LINT_SCRIPTS}/markdownlint.sh" --fix
+
+# ------------------------------------------------------------------------------
+# LINT CHECKS (after autofix)
 # ------------------------------------------------------------------------------
 run_lint_step "lint.biome" "BIOME" "Formatting and correctness checks" \
   bash "${PS_LINT_SCRIPTS}/biome.sh"
@@ -95,7 +106,7 @@ fi
 
 # If any lint/typecheck failed, abort further steps
 if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
-  bash "${PS_BRANDING_SCRIPTS}/print-section.sh" \
+  ps_print_section \
     "gate.failed" \
     "${GATE_NAME} gate failed" \
     "One or more lint/typecheck checks failed (see logs/lint/*.log)"
@@ -104,7 +115,7 @@ if [[ "${LINT_FAILED:-0}" -ne 0 ]]; then
 fi
 
 run_step "naming.checks" "Naming conventions" "Repository naming policy checks" \
-  bash "${PS_NAMING_SCRIPTS}/naming-checks.sh"
+  bash "${PS_NAMING_SCRIPTS}/naming-validate.sh"
 
 run_step "secrets.fast" "Secrets scan (fast)" "Lightweight secret detection" \
   bash "${PS_SECURITY_SCRIPTS}/secret-scan-pr.sh"

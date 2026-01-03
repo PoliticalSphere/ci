@@ -582,3 +582,84 @@ This visual documentation provides a comprehensive understanding of the Politica
 Sphere CI/CD platform architecture, workflow dependencies, execution patterns,
 and security model. The diagrams illustrate the design patterns and best
 practices implemented throughout the platform.
+
+---
+
+## Common Patterns
+
+### Validate-CI Job Pattern
+
+Every reusable workflow includes a `validate-ci` job as a policy gate. This
+ensures CI policy compliance before any other work begins.
+
+**Pattern template** (used in 7+ workflows):
+
+```yaml
+  # ============================================================================
+  # POLICY GATE — VALIDATE CI
+  # ----------------------------------------------------------------------------
+  # Runs the reusable Validate-CI workflow to enforce CI policies.
+  # ============================================================================
+  validate-ci:
+    name: Validate CI (policy gate)
+    uses: ./.github/workflows/validate-ci.yml
+    permissions:
+      contents: read
+    with:
+      runner: ${{ inputs.runner }}
+      node_version: ${{ inputs.node_version }}
+      fetch_depth: ${{ inputs.fetch_depth }}
+      cache: ${{ inputs.cache }}
+      platform_ref: ${{ inputs.platform_ref }}
+      artifact_name: <workflow-name>-validate-ci  # Unique per workflow
+      retention_days: ${{ inputs.retention_days }}
+```
+
+**Workflows using this pattern:**
+- `_reusable-pr-gates.yml`
+- `_reusable-pr-security.yml`
+- `_reusable-build-artifacts.yml`
+- `_reusable-license-compliance.yml`
+- `_reusable-security-scheduled.yml`
+- `_reusable-consumer-contract.yml`
+- `_reusable-release.yml`
+
+**Key aspects:**
+1. Always first in the dependency chain (`needs: [validate-ci]`)
+2. Minimal permissions (`contents: read` only)
+3. Unique artifact name per workflow for traceability
+4. Passes through common inputs (runner, node_version, cache, platform_ref)
+
+### Bootstrap Pattern
+
+Every job uses the standard bootstrap sequence:
+
+```yaml
+steps:
+  - name: Job setup (PS)
+    uses: ./.github/actions/ps-bootstrap/ps-init
+    with:
+      fetch_depth: ${{ inputs.fetch_depth }}
+      egress_policy: audit
+      # ... other bootstrap inputs
+
+  - name: Node setup (PS)
+    uses: ./.github/actions/ps-bootstrap/ps-node
+    with:
+      node_version: ${{ inputs.node_version }}
+      cache: ${{ inputs.cache }}
+      install_dependencies: "1"
+```
+
+### Teardown Pattern
+
+Jobs conclude with consistent teardown:
+
+```yaml
+  - name: Exit (PS)
+    if: always()
+    uses: ./.github/actions/ps-teardown/ps-exit
+    with:
+      artifact_name: ${{ inputs.artifact_name }}
+```
+

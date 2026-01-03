@@ -8,16 +8,13 @@ set -euo pipefail
 #   Resolve repository root for PR comment teardown.
 # ==============================================================================
 
+# Reuse centralized resolver
+# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+. "${GITHUB_WORKSPACE:-$(pwd)}/tools/scripts/actions/cross-cutting/gha-helpers.sh" || true
 
-workspace_root="${GITHUB_WORKSPACE:-$(pwd)}"
-platform_root="${PS_PLATFORM_ROOT:-}"
-
-if [[ -n "${platform_root}" && -d "${platform_root}" ]]; then
-  scripts_root="${platform_root}"
-  printf 'PS.PR_COMMENT: scripts_root=PS_PLATFORM_ROOT (%s)\n' "${scripts_root}"
-else
-  scripts_root="${workspace_root}"
-  printf 'PS.PR_COMMENT: scripts_root=GITHUB_WORKSPACE (%s)\n' "${scripts_root}"
+if ! resolve_scripts_root; then
+  printf '::error:: Failed to resolve scripts root for PR comment.\n' >&2
+  exit 1
 fi
 
-printf 'PS_SCRIPTS_ROOT=%s\n' "${scripts_root}" >> "${GITHUB_ENV}"
+printf 'PS.PR_COMMENT: scripts_root=%s\n' "${PS_SCRIPTS_ROOT}"

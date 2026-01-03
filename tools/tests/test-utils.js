@@ -1,3 +1,10 @@
+// ==============================================================================
+// Political Sphere — Test Utilities
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Shared utilities for test files including console helpers and file loading.
+// ==============================================================================
+
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -84,7 +91,10 @@ export function assertLintSummaryOnce(out, rel = 'lint summary') {
     .split('\n')
     .filter((line) => !line.startsWith('PS.LOG '))
     .join('\n');
-  const headerCount = (filtered.match(/LINT & TYPE CHECK/g) || []).length;
+  // Match either old header "LINT & TYPE CHECK" or new header "Linter Results"
+  const headerCount = (
+    filtered.match(/LINT & TYPE CHECK|Linter Results/g) || []
+  ).length;
   if (headerCount !== 1) {
     fail(
       `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${filtered}`,

@@ -8,11 +8,11 @@ Note: Biome requires a root config file, so `biome.json` lives at repo root.
 
 ## Structure
 
-- `/configs/ci` CI policy, allowlists, and validation rules.
-  - `/configs/ci/policies` enforcement policies and baselines
-  - `/configs/ci/policies` policy files, allowlists, and approved exceptions
-- `/configs/lint` Linting, formatting, and analysis tool configs.
-- `/configs/consumer` Consumer repository contract policies.
+- `/configs/ci` — CI policy, allowlists, and validation rules.
+  - `/configs/ci/policies` — enforcement policies, permission baselines, and approved exceptions
+- `/configs/lint` — Linting, formatting, and analysis tool configs.
+- `/configs/consumer` — Consumer repository contract policies.
+- `/configs/security` — Security scanning configs (gitleaks, trivy, license policy).
 
 ## Usage
 

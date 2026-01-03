@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — PS Run Security Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test ps-run script security behaviors and path sanitization.
+// ==============================================================================
+
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -81,7 +88,10 @@ function extractRunScript(outputPath) {
     Object.assign(env, buildSafeEnv());
     execFileSync(
       'bash',
-      ['-lc', `exec > "${logPath}" 2>&1; ${path.join(workspaceRoot, 'run.sh')}`],
+      [
+        '-lc',
+        `exec > "${logPath}" 2>&1; ${path.join(workspaceRoot, 'run.sh')}`,
+      ],
       { encoding: 'utf8', env },
     );
     fail('expected run to fail due to unsafe log path (symlink)');

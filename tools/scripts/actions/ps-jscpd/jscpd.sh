@@ -21,13 +21,13 @@ script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 # Common script helpers (formatting, repo_root, retry_cmd)
 # shellcheck source=tools/scripts/common.sh
-. "${script_dir}/../../common.sh"
+. "${script_dir}/../../core/base-helpers.sh"
 init_repo_context
 
 # Reuse target selection helpers (PR diff / staged / full scan decision)
-lint_common="${repo_root}/tools/scripts/lint/common.sh"
+lint_common="${repo_root}/tools/scripts/runners/lint/common.sh"
 if [[ -f "${lint_common}" ]]; then
-  # shellcheck source=tools/scripts/lint/common.sh
+  # shellcheck source=tools/scripts/runners/lint/common.sh
   . "${lint_common}"
 else
   error "lint common helpers not found at ${lint_common}"

@@ -330,7 +330,7 @@ ps_cli_header() {
     fi
 
     printf "${PS_FMT_COLOR_WRAP}\n" "${c_dim}" "${rule}" "${c_reset}"
-    printf "${PS_FMT_COLOR_WRAP} %b%s%b\n" "${c_green}" "${icon}" "${c_reset}" "${c_bold}${c_cyan}" "${header_text}" "${c_reset}"
+    printf "%b%s%b %b%s%b\n" "${c_green}" "${icon}" "${c_reset}" "${c_bold}${c_cyan}" "${header_text}" "${c_reset}"
     printf "${PS_FMT_COLOR_WRAP}\n" "${c_dim}" "${rule}" "${c_reset}"
   else
     if [[ -n "${title}" && -n "${command}" ]]; then
@@ -400,4 +400,187 @@ ps_die() {
   fi
   ps_error "$*${loc}"
   exit 1
+}
+
+# ==============================================================================
+# Banner Printing
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Print the Political Sphere ASCII banner once per process execution.
+#
+# Behaviour:
+#   - Missing banner file does NOT fail the gate by default (non-strict).
+#   - Set PS_BANNER_STRICT=1 to make missing banner a hard error.
+#
+# Env:
+#   PS_BANNER_PATH=...   Optional override for banner file path
+#   PS_BANNER_STRICT=1   Fail if banner file missing
+# ==============================================================================
+
+ps_print_banner() {
+  # Skip if already printed
+  if [[ "${PS_BANNER_PRINTED:-0}" == "1" ]]; then
+    return 0
+  fi
+  export PS_BANNER_PRINTED=1
+
+  # Resolve banner path (prefer repo_root if present)
+  local default_banner_path=""
+  if [[ -n "${repo_root:-}" && -f "${repo_root}/branding/ps-banner.txt" ]]; then
+    default_banner_path="${repo_root}/branding/ps-banner.txt"
+  else
+    default_banner_path="${format_dir}/../../../branding/ps-banner.txt"
+  fi
+  local banner_path="${PS_BANNER_PATH:-${default_banner_path}}"
+
+  if [[ ! -f "${banner_path}" ]]; then
+    if [[ "${PS_BANNER_STRICT:-0}" == "1" ]]; then
+      ps_error "Political Sphere banner not found at: ${banner_path}"
+      ps_error "HINT: ensure branding/ps-banner.txt exists and is committed."
+      return 1
+    fi
+    ps_warn "Banner not found at: ${banner_path} (continuing without banner)"
+    return 0
+  fi
+
+  local rule="${PS_FMT_RULE:-────────────────────────────────────────}"
+  local print_rule="${PS_BANNER_RULE:-1}"
+
+  if ps_supports_color; then
+    local c_reset=$'\033[0m'
+    local c_bold=$'\033[1m'
+    local c_cyan=$'\033[36m'
+    local c_dim=$'\033[90m'
+
+    printf "%b" "${c_bold}${c_cyan}"
+    cat "${banner_path}"
+    printf "%b\n" "${c_reset}"
+    if [[ "${print_rule}" != "0" ]]; then
+      printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
+    fi
+  else
+    cat "${banner_path}"
+    printf '\n'
+    if [[ "${print_rule}" != "0" ]]; then
+      printf '%s\n' "${rule}"
+    fi
+  fi
+
+  return 0
+}
+
+# ==============================================================================
+# Section Printing
+# ------------------------------------------------------------------------------
+# Usage:
+#   ps_print_section <id> <title> [description]
+# ==============================================================================
+
+ps_print_section() {
+  local id="${1:-}"
+  local title="${2:-}"
+  local description="${3:-}"
+
+  if [[ -z "${id}" || -z "${title}" ]]; then
+    ps_error "ps_print_section requires <id> and <title>"
+    return 1
+  fi
+
+  local icon="${PS_FMT_ICON:-▶}"
+  local separator="${PS_FMT_SEPARATOR:-—}"
+  local detail_indent="${PS_FMT_DETAIL_INDENT:-  }"
+  local id_case="${PS_FMT_SECTION_ID_CASE:-upper}"
+  local rule="${PS_FMT_RULE:-}"
+  local section_id=""
+
+  # Normalise ID for machine readability
+  case "${id_case}" in
+    upper) section_id="$(tr '[:lower:]' '[:upper:]' <<< "${id}")" ;;
+    lower) section_id="$(tr '[:upper:]' '[:lower:]' <<< "${id}")" ;;
+    *)     section_id="${id}" ;;
+  esac
+
+  # Structured logging
+  if [[ -n "${description}" ]]; then
+    ps_log info section "id=${id}" "title=${title}" "detail=${description}"
+  else
+    ps_log info section "id=${id}" "title=${title}"
+  fi
+
+  echo
+  if ps_supports_color; then
+    local c_reset=$'\033[0m'
+    local c_bold=$'\033[1m'
+    local c_dim=$'\033[90m'
+    local c_cyan=$'\033[36m'
+    local c_green=$'\033[32m'
+
+    printf "%b%s%b %b%s%b %s %b%s%b\n" \
+      "${c_green}" "${icon}" "${c_reset}" \
+      "${c_bold}${c_cyan}" "${section_id}" "${c_reset}" \
+      "${separator}" "${c_bold}" "${title}" "${c_reset}"
+
+    if [[ -n "${rule}" ]]; then
+      printf "%b%s%b\n" "${c_dim}" "${rule}" "${c_reset}"
+    fi
+  else
+    printf '%s\n' "${icon} ${section_id} ${separator} ${title}"
+    if [[ -n "${rule}" ]]; then
+      printf '%s\n' "${rule}"
+    fi
+  fi
+
+  if [[ -n "${description}" ]]; then
+    if ps_supports_color; then
+      local c_reset=$'\033[0m'
+      local c_dim=$'\033[90m'
+      printf "%b%s%s%b\n" "${c_dim}" "${detail_indent}" "${description}" "${c_reset}"
+    else
+      printf '%s\n' "${detail_indent}${description}"
+    fi
+  fi
+
+  return 0
+}
+
+# ==============================================================================
+# Safe format.sh loader helper
+# ------------------------------------------------------------------------------
+# Purpose:
+#   Source branding helpers with optional hash validation.
+# ==============================================================================
+
+ps_format_try_load() {
+  local format_root="${1:-}"
+  local expected_hash="${2:-}"
+  local log_prefix="${3:-PS.BRANDING}"
+  local format_sh=""
+  local py_hash_cmd=""
+  local actual_hash=""
+
+  if [[ -z "${format_root}" ]]; then
+    return 1
+  fi
+
+  format_sh="${format_root}/tools/scripts/branding/format.sh"
+  if [[ ! -f "${format_sh}" ]]; then
+    return 1
+  fi
+
+  if [[ -n "${expected_hash}" ]]; then
+    py_hash_cmd="import hashlib, os"
+    py_hash_cmd+=$'\npath = os.environ.get("FORMAT_SH")'
+    py_hash_cmd+=$'\nprint(hashlib.sha256(open(path, "rb").read()).hexdigest())'
+    actual_hash="$(
+      FORMAT_SH="${format_sh}" python3 -c "${py_hash_cmd}"
+    )"
+    if [[ "${actual_hash}" != "${expected_hash}" ]]; then
+      printf '%s: branding skipped (format.sh hash mismatch)\n' "${log_prefix}"
+      return 1
+    fi
+  fi
+
+  # shellcheck source=/dev/null
+  . "${format_sh}"
+  return 0
 }

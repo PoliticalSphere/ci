@@ -71,10 +71,10 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/ci/emit-report.py,
-#     tools/scripts/actions/cross-cutting/string.sh,
-#     tools/scripts/actions/cross-cutting/path.sh,
-#     tools/scripts/actions/cross-cutting/validate.sh]
+#   internal: [tools/scripts/workflows/ci/emit-report.py,
+#     tools/scripts/core/string.sh,
+#     tools/scripts/core/path-validation.sh,
+#     tools/scripts/core/validation.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,10 +113,10 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/ps-run/README.md
-#     - tools/scripts/ci/emit-report.py
-#     - tools/scripts/actions/cross-cutting/string.sh
-#     - tools/scripts/actions/cross-cutting/path.sh
-#     - tools/scripts/actions/cross-cutting/validate.sh
+#     - tools/scripts/workflows/ci/emit-report.py
+#     - tools/scripts/core/string.sh
+#     - tools/scripts/core/path-validation.sh
+#     - tools/scripts/core/validation.sh
 #
 # ==============================================================================
 
@@ -145,7 +145,6 @@ inputs:
     description: "Working directory to run from (repo-relative)"
     required: false
     default: "."
-
 
   require_files:
     description: "Newline-separated list of required files (repo-relative)"
@@ -245,12 +244,12 @@ runs:
           fi
         }
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/string.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/string.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/path.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/path.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/core/string.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/string.sh"
+        # shellcheck source=tools/scripts/core/path-validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/path-validation.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           if type -t v_error >/dev/null 2>&1; then
@@ -386,7 +385,7 @@ runs:
           end_ms="$(now_ms)"
           dur=$((end_ms - start_ms))
 
-          emit_script="${repo_root}/tools/scripts/ci/emit-report.py"
+          emit_script="${repo_root}/tools/scripts/workflows/ci/emit-report.py"
           export REPORT_PATH="${report_abs}"
           export TASK_ID="${id}"
           export TASK_TITLE="${title}"

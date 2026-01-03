@@ -1,8 +1,11 @@
 #!/usr/bin/env node
 
-// Script safety checks
-// - Find scripts referenced by composite actions (inputs.script defaults or values)
-// - Scan those scripts for unsafe patterns: eval, bash -c, backticks, and echo with ${...}
+// ==============================================================================
+// Political Sphere — Script Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Find scripts referenced by actions and scan for unsafe patterns.
+// ==============================================================================
 
 import fs from 'node:fs';
 import path from 'node:path';

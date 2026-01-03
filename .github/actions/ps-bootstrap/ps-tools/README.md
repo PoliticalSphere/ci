@@ -16,7 +16,7 @@
 #   - ./.github/actions/ps-task/ps-run (optional)
 #
 # Dependents:
-#   - ./.github/actions/ps-bootstrap/ps-init (optional tools install)
+#   - ./.github/actions/ps-bootstrap/ps-initialize-environment (optional tools install)
 # ==============================================================================
 -->
 

@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Regex Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test regex compilation safety against catastrophic backtracking.
+// ==============================================================================
+
 import {
   compileRegex,
   setRegexEngineForTest,

@@ -43,6 +43,14 @@ and invariants.
   - Requires explicit permissions at workflow and job levels
   - Blocks unsafe workflow patterns and unsafe secret handling
   - Flags inline bash where a composite action is appropriate
+- **Evasion & Complexity Scanner**:
+  - Detects lint-evasion patterns (@ts-ignore, eslint-disable, biome-ignore)
+  - Tracks complexity drift with configurable thresholds
+  - Reports to `reports/evasion/evasion-scan.json`
+- **Totem Compliance Checker**:
+  - Validates files against architectural totem patterns
+  - Checks bash, workflow, and JS file headers
+  - Run: `node tools/scripts/ci/totem-check.js`
 - **Reusable workflows**:
   - `pr-gates.yml` for fast PR validation
   - `security-scheduled.yml` for deep security scans

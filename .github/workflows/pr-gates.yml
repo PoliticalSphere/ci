@@ -1,14 +1,53 @@
 # ==============================================================================
 # Political Sphere — PR Gates (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: pr-gates
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-pr-gates.yml for fast,
+# policy-aligned pull request validation.
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-pr-gates.yml with caller inputs
+#   - Pass through gate configuration
+#
+# DOES NOT:
+#   - Perform gate validation directly
+#   - Modify repository state
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-pr-gates.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-pr-gates.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: PR Gates
 
 on:
   workflow_call:
-
     # ==========================================================================
     # RUNTIME & ENVIRONMENT CONFIGURATION
     # --------------------------------------------------------------------------
@@ -152,14 +191,22 @@ on:
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
+permissions:
+  contents: read  # Justification: required for repository checkout only
+  actions: read   # Justification: inspect workflow runs for CI validation
+  pull-requests: read  # Justification: read PR context (number, labels, etc.)
 
 jobs:
   call:
     name: PR Gates
     uses: ./.github/workflows/_reusable-pr-gates.yml
+    # -------------------------------------------------------------------------
+    # Justification: pull-requests: write required to post PR status comments
+    # and add labels. Risk decision: docs/risk-decisions.md#rd-pr-comments
+    # -------------------------------------------------------------------------
     permissions:
       contents: read
-      pull-requests: write
+      pull-requests: write  # Justification: post PR status comments
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}

@@ -1,5 +1,12 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Action Safety Utilities
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Shared utilities for scanning GitHub Action YAML files for safety issues.
+// ==============================================================================
+
 import fs from 'node:fs';
 import path from 'node:path';
 

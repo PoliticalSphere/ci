@@ -74,8 +74,8 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/cross-cutting/output.sh,
-#     tools/scripts/actions/cross-cutting/string.sh]
+#   internal: [tools/scripts/actions/cross-cutting/gha-helpers.sh,
+#     tools/scripts/core/string.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -113,8 +113,8 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # related:
 #   references:
-#     - tools/scripts/actions/cross-cutting/output.sh
-#     - tools/scripts/actions/cross-cutting/string.sh
+#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
+#     - tools/scripts/core/string.sh
 #
 # ==============================================================================
 
@@ -223,13 +223,13 @@ runs:
       run: |
         set -euo pipefail
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/string.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/string.sh"
+        # shellcheck source=tools/scripts/core/string.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/string.sh"
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/output.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/output.sh"
-        # shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/validate.sh"
+        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/validation.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
         fail() {
           v_error "$*"
@@ -255,7 +255,8 @@ runs:
           if [[ -z "${summary_workflow}" || \
             -z "${summary_output_path}" || \
             -z "${summary_results}" ]]; then
-            fail "summary_workflow, summary_output_path, and summary_results must be provided together."
+            fail "summary_workflow, summary_output_path, and summary_results must be"
+            fail "provided together."
           fi
           run_summary="1"
         fi
@@ -328,8 +329,8 @@ runs:
         expected_base_sha: ${{ inputs.expected_base_sha }}
         expected_head_sha: ${{ inputs.expected_head_sha }}
 
-    - name: Teardown complete
+    - name: Complete (PS)
       shell: bash
       run: |
         set -euo pipefail
-        echo "PS.TEARDOWN: OK"
+        printf 'PS.TEARDOWN.EXIT: OK\n'

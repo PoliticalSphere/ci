@@ -2,6 +2,33 @@
 # Political Sphere — Reusable Workflow: Security Scheduled
 # ==============================================================================
 #
+# METADATA
+# ------------------------------------------------------------------------------
+# id: _reusable-security-scheduled
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+# created: 2025-12-20
+# last_updated: 2025-12-24
+#
+# RELATED
+# ------------------------------------------------------------------------------
+# references:
+#   - docs/security-ci-policy.md
+#   - configs/security/gitleaks.toml
+#   - configs/security/trivy.yaml
+# actions:
+#   - ./.github/actions/ps-bootstrap/ps-setup-standard
+#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+#   - ./.github/actions/ps-task/security-codeql
+#   - ./.github/actions/ps-task/semgrep-cli
+#
+# RISKS
+# ------------------------------------------------------------------------------
+# - Scheduled scans run on default branch only
+# - CodeQL and Semgrep may have rate limits on public runners
+# - Full-history scans can be slow on large repositories
+#
 # PURPOSE
 # ------------------------------------------------------------------------------
 # Run scheduled, deep security scans against the repository and publish SARIF
@@ -34,6 +61,18 @@
 # - Full-history checkout where required (secrets scanning)
 # - Internal actions are repository-controlled
 # - External actions are SHA-pinned
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/validate-ci.yml
+# - ./.github/actions/ps-bootstrap/ps-setup-standard
+# - ./.github/actions/ps-teardown/ps-finalize-workflow
+# - ./.github/actions/ps-task/security-codeql
+# - ./.github/actions/ps-task/semgrep-cli
+# - ./.github/actions/ps-task/secret-detection
+# - ./.github/actions/ps-task/scorecard
+# - ./.github/actions/ps-task/security-trivy
 #
 #
 # EXECUTION MODEL
@@ -176,30 +215,26 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: 0
-          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          home_dir: ".home"
-          egress_policy: audit
           cache: ${{ inputs.cache || '1' }}
           install_tools: "1"
           tools_bundle: "security"
+          skip_node: "1"
 
       - name: Secrets scan (Gitleaks full)
         uses: ./.github/actions/ps-task/ps-run
         with:
           id: "secrets.full"
           title: "Secrets scan (full history)"
-          script: "tools/scripts/security/gitleaks-history.sh"
+          script: "tools/scripts/runners/security/gitleaks-history.sh"
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: security-scheduled
           summary_output_path: reports/summary/security-secrets.json
@@ -223,26 +258,22 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: 1
-          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          home_dir: ".home"
-          egress_policy: audit
+          skip_node: "1"
 
       - name: CodeQL scan (PS)
-        uses: ./.github/actions/ps-task/codeql
+        uses: ./.github/actions/ps-task/security-codeql
         with:
           languages: ${{ inputs.codeql_languages || 'javascript' }}
           output: codeql-results
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: security-scheduled
           summary_output_path: reports/summary/codeql.json
@@ -265,17 +296,13 @@ jobs:
       contents: read
       security-events: write
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: 1
-          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          home_dir: ".home"
-          egress_policy: audit
+          skip_node: "1"
 
       - name: Run Semgrep (SARIF)
         uses: ./.github/actions/ps-task/semgrep-cli
@@ -288,7 +315,7 @@ jobs:
           semgrep_allow_unverified: ${{ inputs.semgrep_allow_unverified }}
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: security-scheduled
           summary_output_path: reports/summary/semgrep.json
@@ -311,21 +338,17 @@ jobs:
     permissions:
       contents: read
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: 1
-          platform_repo: "PoliticalSphere/ci"
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: "PoliticalSphere/ci"
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          home_dir: ".home"
-          egress_policy: audit
+          skip_node: "1"
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: security-scheduled
           summary_output_path: reports/summary/security-scheduled.json
