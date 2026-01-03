@@ -260,7 +260,8 @@ print_lint_summary() {
 
   if [[ -n "${LINT_DIR:-}" ]]; then
     mkdir -p "${LINT_DIR}"
-    printf '%s' "${buf}" | sed 's/\x1b\[[0-9;]*[A-Za-z]//g' > "${LINT_DIR}/summary.txt"
+    local ansi_strip_pattern='s/\x1b\[[0-9;]*[A-Za-z]//g'
+    printf '%s' "${buf}" | sed -e "${ansi_strip_pattern}" > "${LINT_DIR}/summary.txt"
   fi
 
   LINT_SUMMARY_LINES=$(( 5 + ${#LINT_IDS[@]} ))
