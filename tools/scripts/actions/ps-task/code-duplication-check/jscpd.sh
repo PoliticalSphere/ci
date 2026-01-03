@@ -20,8 +20,8 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 # Common script helpers (formatting, repo_root, retry_cmd)
-# shellcheck source=tools/scripts/common.sh
-. "${script_dir}/../../core/base-helpers.sh"
+# shellcheck source=tools/scripts/core/base-helpers.sh
+. "${script_dir}/../../../core/base-helpers.sh"
 init_repo_context
 
 # Reuse target selection helpers (PR diff / staged / full scan decision)

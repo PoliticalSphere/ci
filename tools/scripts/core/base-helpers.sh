@@ -22,6 +22,9 @@ set -euo pipefail
 
 _common_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
+# shellcheck source=tools/scripts/core/config.sh
+. "${_common_script_dir}/config.sh"
+
 # shellcheck source=tools/scripts/core/path-resolution.sh
 . "${_common_script_dir}/path-resolution.sh"
 
@@ -50,7 +53,11 @@ retry_cmd() {
 
 # Load shared fail()/die() helper before format.sh so format.sh's ps_error can be used
 # shellcheck source=tools/scripts/core/error-handler.sh
-. "${_common_script_dir}/fail.sh"
+. "${_common_script_dir}/error-handler.sh"
+
+# Load centralized logging (provides log_info, log_debug, log_warn, log_error)
+# shellcheck source=tools/scripts/core/logging.sh
+. "${_common_script_dir}/logging.sh"
 
 # Legacy compatibility: map paths.sh exports to common.sh expected names
 REPO_ROOT="${PS_REPO_ROOT}"

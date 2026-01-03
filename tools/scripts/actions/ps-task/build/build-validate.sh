@@ -10,7 +10,7 @@ set -euo pipefail
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/core/error-handler.sh
-. "${script_dir}/../../core/error-handler.sh"
+. "${script_dir}/../../../core/error-handler.sh"
 
 # Required-ish: non-empty strings
 [[ -n "${PS_ID:-}" ]] || fail "inputs.id must not be empty"

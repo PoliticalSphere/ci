@@ -74,6 +74,10 @@ set -euo pipefail
 # shellcheck source=tools/scripts/branding/format.sh
 . "${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh" || true
 
+# shellcheck source=tools/scripts/core/error-handler.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/core/error-handler.sh"
+# shellcheck source=tools/scripts/core/logging.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/core/logging.sh"
 # shellcheck source=tools/scripts/core/gha-helpers.sh
 . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
 # shellcheck source=tools/scripts/core/path-validation.sh
@@ -81,21 +85,8 @@ set -euo pipefail
 # shellcheck source=tools/scripts/core/validation.sh
 . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
-# -----------------------------------------------------------------------------
-# Local helpers
-# -----------------------------------------------------------------------------
-fail() {
-  v_error "$*"
-  exit 1
-}
-
-log_info() {
-  if type -t ps_detail >/dev/null 2>&1; then
-    ps_detail "$*"
-  else
-    printf 'PS.CHECKOUT.PLATFORM: %s\n' "$*"
-  fi
-}
+# Set log prefix for this script
+PS_LOG_PREFIX="PS.CHECKOUT.PLATFORM"
 
 # -----------------------------------------------------------------------------
 # Validate repository

@@ -49,16 +49,10 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Source dependencies
 # -----------------------------------------------------------------------------
+# shellcheck source=tools/scripts/core/error-handler.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/core/error-handler.sh"
 # shellcheck source=tools/scripts/core/validation.sh
 . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
-
-# -----------------------------------------------------------------------------
-# Local helpers
-# -----------------------------------------------------------------------------
-fail() {
-  v_error "$*"
-  exit 1
-}
 
 # -----------------------------------------------------------------------------
 # Verify platform directory exists
