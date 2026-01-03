@@ -53,8 +53,8 @@ set -euo pipefail
 # -----------------------------------------------------------------------------
 # Load cross-cutting utilities
 # -----------------------------------------------------------------------------
-# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-. "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+# shellcheck source=tools/scripts/core/gha-helpers.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
 # shellcheck source=tools/scripts/core/validation.sh
 # Note: validation.sh now sources core/path-validation.sh automatically
 . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"

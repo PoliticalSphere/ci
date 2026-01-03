@@ -21,7 +21,7 @@ readonly MAX_ENV_KV_ENTRIES=100
 readonly MAX_ENV_KV_VALUE_BYTES=65536
 readonly MAX_ENV_KV_TOTAL_BYTES=262144
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
+# shellcheck source=tools/scripts/core/gha-helpers.sh
 . "${script_dir}/../cross-cutting/gha-helpers.sh"
 
 # Resolve format.sh (prefer platform, allow workspace fallback for dev/bootstrap).

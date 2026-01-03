@@ -249,12 +249,11 @@ function checkRequiredScripts({
 
 function gatherDeps(packageJson) {
   // Combine dependency objects with undefined-safe merging.
-  return Object.assign(
-    {},
-    packageJson.dependencies,
-    packageJson.devDependencies,
-    packageJson.optionalDependencies,
-  );
+  return {
+    ...packageJson.dependencies,
+    ...packageJson.devDependencies,
+    ...packageJson.optionalDependencies,
+  };
 }
 
 function checkTools({

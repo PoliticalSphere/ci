@@ -15,8 +15,8 @@ set -euo pipefail
 #   resolve_scripts_root - Resolve and export PS_SCRIPTS_ROOT
 #
 # Usage:
-#   # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-#   . "${scripts_root}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+#   # shellcheck source=tools/scripts/core/gha-helpers.sh
+#   . "${scripts_root}/tools/scripts/core/gha-helpers.sh"
 #
 # Sourced by:
 #   - Action entrypoints (action.yml run scripts)

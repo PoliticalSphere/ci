@@ -116,7 +116,7 @@ const PLACEHOLDER_DOUBLE_STAR = '__DOUBLE_STAR__';
 const PLACEHOLDER_SINGLE_STAR = '__SINGLE_STAR__';
 
 function escapeRegexFragment(value) {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function globToRegex(pattern) {

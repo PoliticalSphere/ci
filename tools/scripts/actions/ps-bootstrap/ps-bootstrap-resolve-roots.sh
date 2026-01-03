@@ -10,8 +10,8 @@ set -euo pipefail
 
 
 # Reuse centralized resolver
-# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-. "${GITHUB_WORKSPACE:-$(pwd)}/tools/scripts/actions/cross-cutting/gha-helpers.sh" || true
+# shellcheck source=tools/scripts/core/gha-helpers.sh
+. "${GITHUB_WORKSPACE:-$(pwd)}/tools/scripts/core/gha-helpers.sh" || true
 
 if ! resolve_scripts_root; then
   printf 'ERROR: failed to resolve scripts root\n' >&2

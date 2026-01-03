@@ -72,7 +72,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
 #   internal: [tools/scripts/branding/format.sh,
-#     tools/scripts/actions/cross-cutting/gha-helpers.sh,
+#     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/path-validation.sh,
 #     tools/scripts/core/validation.sh,
 #     tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh,
@@ -120,7 +120,7 @@
 #     - tools/scripts/branding/format.sh
 #     - tools/scripts/core/path-validation.sh
 #     - tools/scripts/core/validation.sh
-#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
+#     - tools/scripts/core/gha-helpers.sh
 #     - tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh
 #     - tools/scripts/branding/print-section.sh
 #     - tools/scripts/core/validation.sh
@@ -223,8 +223,8 @@ runs:
         # shellcheck source=tools/scripts/branding/format.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh" || true
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
         # shellcheck source=tools/scripts/core/path-validation.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/core/path-validation.sh"
         # shellcheck source=tools/scripts/core/validation.sh

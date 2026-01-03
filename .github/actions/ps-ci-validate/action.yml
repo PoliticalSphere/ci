@@ -71,7 +71,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
 #   internal: [tools/scripts/workflows/ci/validate-ci-action.sh, tools/scripts/branding/format.sh,
-#     tools/scripts/actions/cross-cutting/gha-helpers.sh]
+#     tools/scripts/core/gha-helpers.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@
 #     - .github/actions/ps-ci-validate/README.md
 #     - tools/scripts/workflows/ci/validate-ci-action.sh
 #     - tools/scripts/branding/format.sh
-#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
+#     - tools/scripts/core/gha-helpers.sh
 #
 # ==============================================================================
 
@@ -192,8 +192,8 @@ runs:
         printf 'PS.CI_VALIDATE: platform_root=%s\n' "${platform_root}"
         printf 'PS.CI_VALIDATE: script=%s\n' "${script_abs}"
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
 
         emit_output "platform_root" "${platform_root}"
         emit_output "script_abs" "${script_abs}"

@@ -12,8 +12,8 @@ format_root="${GITHUB_WORKSPACE}"
 # shellcheck source=tools/scripts/branding/format.sh
 . "${format_root}/tools/scripts/branding/format.sh" || true
 
-# shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-. "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+# shellcheck source=tools/scripts/core/gha-helpers.sh
+. "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
 # shellcheck source=tools/scripts/core/validation.sh
 . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 

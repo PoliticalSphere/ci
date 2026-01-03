@@ -76,7 +76,7 @@
 # dependencies:
 #   internal: [tools/scripts/actions/ps-bootstrap/ps-bootstrap-validate-init.sh,
 #     tools/scripts/actions/cross-cutting/normalize.sh,
-#     tools/scripts/actions/cross-cutting/gha-helpers.sh,
+#     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/path-validation.sh,
 #     tools/scripts/core/validation.sh,
 #     tools/scripts/branding/format.sh,
@@ -120,7 +120,7 @@
 #   references:
 #     - .github/actions/ps-bootstrap/ps-initialize-environment/README.md
 #     - tools/scripts/actions/cross-cutting/normalize.sh
-#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
+#     - tools/scripts/core/gha-helpers.sh
 #     - tools/scripts/core/path-validation.sh
 #     - tools/scripts/core/validation.sh
 #     - tools/scripts/branding/format.sh
@@ -365,8 +365,8 @@ runs:
         if type -t ps_rule >/dev/null 2>&1; then
           ps_rule
         fi
-        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
         home_abs="${GITHUB_WORKSPACE}/${PS_HOME_DIR_VALIDATED}"
         mkdir -p "${home_abs}"
 
@@ -428,8 +428,8 @@ runs:
         # Safety: set -euo pipefail (Strict mode enabled)
         # ----------------------------------------------------------------------------
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
         platform_abs="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH_VALIDATED}"
         emit_env "PS_PLATFORM_ROOT" "${platform_abs}"
         printf 'PS.INIT: PS_PLATFORM_ROOT=%s\n' "${platform_abs}"

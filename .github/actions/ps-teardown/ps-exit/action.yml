@@ -74,7 +74,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/cross-cutting/gha-helpers.sh,
+#   internal: [tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/string.sh]
 #   external: [bash]
 #
@@ -113,7 +113,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # related:
 #   references:
-#     - tools/scripts/actions/cross-cutting/gha-helpers.sh
+#     - tools/scripts/core/gha-helpers.sh
 #     - tools/scripts/core/string.sh
 #
 # ==============================================================================
@@ -226,8 +226,8 @@ runs:
         # shellcheck source=tools/scripts/core/string.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/core/string.sh"
 
-        # shellcheck source=tools/scripts/actions/cross-cutting/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/gha-helpers.sh"
+        # shellcheck source=tools/scripts/core/gha-helpers.sh
+        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
         # shellcheck source=tools/scripts/core/validation.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
 
