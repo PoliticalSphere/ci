@@ -52,21 +52,21 @@ PS_LOG_PREFIX="${PS_LOG_PREFIX:-PS}"
 PS_LOG_TIMESTAMP="${PS_LOG_TIMESTAMP:-0}"
 
 # Log level numeric values for comparison
-declare -A _PS_LOG_LEVELS=(
-  [debug]=0
-  [info]=1
-  [warn]=2
-  [error]=3
-)
+# Note: Using case statement instead of associative array for set -u compatibility
+_ps_log_level_value() {
+  local level="${1:-info}"
+  case "${level}" in
+    debug) echo 0 ;;
+    info)  echo 1 ;;
+    warn)  echo 2 ;;
+    error) echo 3 ;;
+    *)     echo 1 ;;  # Default to info level
+  esac
+}
 
 # -----------------------------------------------------------------------------
 # Internal helpers
 # -----------------------------------------------------------------------------
-_ps_log_level_value() {
-  local level="${1:-info}"
-  echo "${_PS_LOG_LEVELS[${level}]:-1}"
-}
-
 _ps_should_log() {
   local msg_level="$1"
   local min_level="${PS_LOG_LEVEL}"
