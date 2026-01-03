@@ -582,9 +582,11 @@ violations.push(...workflowViolations, ...actionViolations);
       });
 
       if (v?.path && v.message) {
-        const loc = v.line
-          ? `${v.path}:${v.line}${v.column ? `:${v.column}` : ''}`
-          : v.path;
+        let loc = v.path;
+        if (v.line) {
+          const columnSuffix = v.column ? `:${v.column}` : '';
+          loc = `${v.path}:${v.line}${columnSuffix}`;
+        }
         bullet(`${loc} - ${v.message} (weight=${v.weight || 1})`, {
           stream: 'stderr',
         });

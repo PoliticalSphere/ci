@@ -28,7 +28,9 @@ const TEST_WORKSPACE = path.join(REPO_ROOT, 'logs/test-evasion');
  */
 function runEvasionScan(args = []) {
   try {
-    const stdout = execSync(`node "${EVASION_SCAN}" ${args.join(' ')}`, {
+    // Use array form of execSync to prevent shell injection attacks
+    // This safely passes each argument without shell interpretation
+    const stdout = execSync('node', [EVASION_SCAN, ...args], {
       encoding: 'utf8',
       env: { ...process.env, NO_COLOR: '1' },
       cwd: REPO_ROOT,

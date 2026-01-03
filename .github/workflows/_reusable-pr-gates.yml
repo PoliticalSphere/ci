@@ -1,96 +1,18 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: PR Gates
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# PR Gates — Fast PR validation (lint, typecheck, tests, build, secrets scan)
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-pr-gates
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Canonical PR-time quality gate for Political Sphere consumers.
+# Runs Validate-CI first, then quality + security checks in parallel.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - docs/testing-strategy.md
-#   - docs/risk-decisions.md#rd-pr-comments
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
-#   - ./.github/actions/ps-task/*
+# Docs: .github/workflows/README.md#pr-gates
+# Refs: docs/testing-strategy.md, docs/risk-decisions.md#rd-pr-comments
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Fork PRs have comments disabled for security
-# - Sonar baseline is non-blocking and may fail silently
+# Risks:
+#   • Fork PRs have comments disabled (security)
+#   • Sonar baseline is non-blocking (may fail silently)
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Provide fast, policy-aligned pull request validation with structured artifacts.
-# This is the canonical PR-time quality gate for Political Sphere consumers.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI (blocking)
-#   - Run lint, typecheck, tests, duplication detection, and build verification
-#   - Delegate PR-scoped security checks (secrets scan, dependency review) to `pr-security.yml`
-#   - Optionally run SonarCloud baseline analysis (non-blocking)
-#   - Upload artifacts best-effort on failure and publish a structured summary
-#   - Optionally post a PR failure comment (non-fork PRs only, opt-in)
-#
-# DOES NOT:
-#   - Perform deep security scans (scheduled security workflows handle this)
-#   - Deploy, publish, or release artifacts
-#   - Mutate environments or persist credentials
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before any gate job executes
-# - Single canonical bootstrap path (ps-init)
-# - Internal actions are repository-controlled
-# - External actions (if used) must be SHA-pinned
-# - Artifacts and summary are produced best-effort, even on failure
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/workflows/pr-security.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-# - ./.github/actions/ps-task/*
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call
-# - Consumer-facing reusable workflow
-# - Intended for use by downstream application repositories
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly
-# - Default permissions are read-only
-# - Writes are scoped and only enabled where required (PR comments)
-# - Fork PRs never receive write-token comments
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Each job has explicit timeouts
-# - Artifacts are caller-configurable and retention-controlled
-# - Sonar baseline is conditional and non-blocking
-# - Summary output is always produced
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: PR Gates
 

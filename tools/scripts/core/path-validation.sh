@@ -153,7 +153,6 @@ check_under_root() {
   
   # Normalize root to ensure trailing slash comparison works
   local root_normalized="${root%/}/"
-  local resolved_normalized
   
   # Handle case where resolved is exactly the root
   if [[ "${resolved}" == "${root}" ]]; then

@@ -40,6 +40,7 @@ epoch_now() {
     return 0
   fi
   date +%s
+  return $?
 }
 
 # Convert Unix epoch to ISO 8601 UTC format (YYYY-MM-DDTHH:MM:SSZ)
@@ -55,11 +56,13 @@ epoch_to_iso() {
   
   # GNU date (Linux): date -u -d @<epoch>
   date -u -d "@${epoch}" +"%Y-%m-%dT%H:%M:%SZ"
+  return $?
 }
 
 # Get current time as ISO 8601 UTC string
 now_iso() {
   epoch_to_iso "$(epoch_now)"
+  return $?
 }
 
 # Calculate elapsed time between two epochs
@@ -69,6 +72,7 @@ elapsed_seconds() {
   local start="${1:?start epoch required}"
   local end="${2:?end epoch required}"
   printf '%d' $(( end - start ))
+  return $?
 }
 
 # Format duration in human-readable form (e.g., "1m 23s")
@@ -83,4 +87,5 @@ format_duration() {
   else
     printf '%ds' "${secs}"
   fi
+  return $?
 }

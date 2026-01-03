@@ -334,10 +334,8 @@ collect_targets_staged() {
   [[ "${has_git:-0}" == "1" ]] || return 1
 
   # In CI PR context, prefer affected files (if available).
-  if [[ "${CI:-0}" == "1" && -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" ]]; then
-    if collect_targets_pr "${pattern}"; then
-      return 0
-    fi
+  if [[ "${CI:-0}" == "1" && -n "${PS_PR_BASE_SHA:-}" && -n "${PS_PR_HEAD_SHA:-}" ]] && collect_targets_pr "${pattern}"; then
+    return 0
   fi
 
   # NUL-safe staged list

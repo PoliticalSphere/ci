@@ -43,4 +43,5 @@ fail() {
 # Alias for compatibility with scripts using die()
 die() {
   fail "$@"
+  return $?
 }

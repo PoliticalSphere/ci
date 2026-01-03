@@ -40,6 +40,7 @@ ps_resolve_script_dir() {
   local dir
   dir="$(cd "$(dirname "${caller_source}")" >/dev/null 2>&1 && pwd -P)"
   printf '%s' "${dir}"
+  return 0
 }
 
 # Resolve repository root using git, with pwd fallback
@@ -54,6 +55,7 @@ ps_resolve_repo_root() {
 
   [[ -n "${root}" ]] || root="${fallback}"
   printf '%s' "$(ps_git_realpath_dir "${root}")"
+  return 0
 }
 
 # Resolve both script_dir and repo_root in one call
@@ -70,6 +72,7 @@ ps_resolve_paths() {
   repo_root="${PS_REPO_ROOT}"
   
   export PS_SCRIPT_DIR PS_REPO_ROOT
+  return 0
 }
 
 # Auto-resolve paths when this file is sourced

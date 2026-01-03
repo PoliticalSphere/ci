@@ -23,7 +23,7 @@ set -euo pipefail
 _common_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 
 # shellcheck source=tools/scripts/core/path-resolution.sh
-. "${_common_script_dir}/paths.sh"
+. "${_common_script_dir}/path-resolution.sh"
 
 # ----------------------------
 # Retry helper for transient failures

@@ -146,7 +146,7 @@ on_error() {
   else
     error "Tests failed (exit ${rc})"
   fi
-  exit "${rc}"
+  return "${rc}"
 }
 trap 'on_error $?' ERR
 

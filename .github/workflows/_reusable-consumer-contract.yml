@@ -1,88 +1,18 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Consumer Contract
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Consumer Contract — Platform contract policy validation
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-consumer-contract
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Validates consumer repos against platform contract policy + exceptions.
+# Publishes audit-friendly artifacts for contract verification.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - docs/integration-guide.md
-#   - configs/consumer/contract.json
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+# Docs: .github/workflows/README.md#consumer-contract
+# Refs: docs/integration-guide.md, configs/consumer/contract.json
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Contract validation depends on correct manifest paths
-# - Breaking changes in contract require coordinated deployment
+# Risks:
+#   • Contract validation depends on correct manifest paths
+#   • Breaking changes in contract require coordinated deployment
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Validate consumer repositories against the platform contract policy and
-# publish audit-friendly reports/logs artifacts.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI
-#   - Run contract checks against policy + exceptions
-#   - Upload reports/logs artifacts with controlled retention
-#
-# DOES NOT:
-#   - Deploy, release, or publish artifacts
-#   - Modify repository state
-#   - Run tests or quality gates (handled by PR Gates)
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege with explicit permissions
-# - Validate-CI gate runs first
-# - Evidence-first: artifacts best-effort even on failure
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-task/consumer-contract
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-# - tools/scripts/workflows/consumer/contract-check.sh
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call (consumer-facing)
-# - Runs Validate-CI gate, then contract check
-# - Jobs are isolated; bootstrap runs per job as needed
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Egress policy: audit for contract job
-# - Platform ref is pinned by default and validated when required
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Timeouts are configurable via inputs (per job)
-# - Artifacts are uploaded best-effort (if: always())
-# - Contract checks are file-based and network-free
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Consumer Contract
 

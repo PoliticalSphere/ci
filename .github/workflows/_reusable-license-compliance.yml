@@ -1,88 +1,18 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: License Compliance
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# License Compliance — OSS license policy enforcement
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-license-compliance
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Enforces license policy using lockfile + platform policy rules.
+# Produces audit-friendly reports and machine-readable summary.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - configs/security/license-policy.yml
-#   - tools/scripts/runners/security/license-check.js
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+# Docs: .github/workflows/README.md#license-compliance
+# Refs: configs/security/license-policy.yml
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Policy misconfigurations can block legitimate licenses
-# - Package transitive dependencies must be in lockfile
+# Risks:
+#   • Policy misconfigurations can block legitimate licenses
+#   • Package transitive dependencies must be in lockfile
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Enforce OSS license compliance using the Political Sphere policy file and
-# repository lockfile evidence. Produces audit-friendly reports/logs artifacts
-# and a machine-readable summary.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI
-#   - Run license compliance checks against a declared policy + lockfile
-#   - Upload reports/logs as evidence artifacts with controlled retention
-#   - Publish a structured summary JSON
-#
-# DOES NOT:
-#   - Deploy, release, or publish packages
-#   - Mutate repository state
-#   - Require elevated permissions
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before checks execute
-# - Single canonical bootstrap path (ps-init)
-# - External actions (if used) must be SHA-pinned
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-# - ./.github/actions/ps-task/license-check
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call (consumer-facing)
-# - Use the wrapper workflow for pull_request bindings
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Egress policy defaults to audit (observability without blocking)
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Artifacts are always uploaded best-effort (if: always())
-# - Summary is always produced
-# - Inputs are typed and use consistent "0"/"1" string booleans where applicable
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: License Compliance
 
@@ -258,9 +188,9 @@ jobs:
     name: License compliance
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
+    timeout-minutes: ${{ inputs.license_timeout_minutes }}
     permissions:
       contents: read
-    timeout-minutes: ${{ inputs.license_timeout_minutes }}
     steps:
       - name: Bootstrap (PS)
         uses: ./.github/actions/ps-bootstrap/ps-setup-standard

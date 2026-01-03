@@ -1,93 +1,18 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: PR Security
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# PR Security — Fast PR-scoped security checks (secrets, dependencies)
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-pr-security
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-28
-# last_updated: 2025-12-28
+# Runs Gitleaks PR mode, dependency review, Scorecard, Trivy, TruffleHog.
+# Validate-CI must pass before any security job executes.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - docs/security-ci-policy.md
-#   - configs/security/gitleaks.toml
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
-#   - ./.github/actions/ps-task/secret-scan-pr
-#   - ./.github/actions/ps-task/security-dependency-review
+# Docs: .github/workflows/README.md#pr-security
+# Refs: docs/security-ci-policy.md, configs/security/gitleaks.toml
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Fork PRs may not have full dependency review context
-# - Secrets scan may produce false positives requiring baseline configuration
+# Risks:
+#   • Fork PRs may lack full dependency review context
+#   • Secrets scan may produce false positives (configure baseline)
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Provide focused PR-scoped security checks (fast secrets, dependency review)
-# as a separate reusable workflow. Follows the same design and security
-# principles as `pr-gates` but narrows scope to security-related work.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI (blocking)
-#   - Run fast secrets scanning (Gitleaks PR mode)
-#   - Run dependency review for vulnerability detection
-#   - Run OpenSSF Scorecard, Trivy, and TruffleHog scans
-#   - Upload security artifacts and produce structured summary
-#
-# DOES NOT:
-#   - Run lint, typecheck, tests, or build verification
-#   - Deploy or publish artifacts
-#   - Perform full-history security scans (scheduled workflow handles this)
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before any security job executes
-# - Evidence-first: artifacts + summary best-effort even on failure
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-# - ./.github/actions/ps-task/secret-scan-pr
-# - ./.github/actions/ps-task/security-dependency-review
-# - ./.github/actions/ps-task/scorecard
-# - ./.github/actions/ps-task/security-trivy
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call
-# - Reusable workflow for downstream consumers
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Fork PRs never receive write-token comments
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Each job has explicit timeouts
-# - Artifacts are caller-configurable and retention-controlled
-# - Summary output is always produced
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: PR Security
 

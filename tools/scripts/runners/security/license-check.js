@@ -570,20 +570,13 @@ for (const pkg of packages) {
     continue;
   }
 
-  if (!evaluation.ok) {
-    if (evaluation.reason === 'not-allowlisted') {
-      if (pkgPolicy.failOnUnknown) {
-        violations.push({
-          name: pkg.name,
-          version: pkg.version,
-          license: pkg.license,
-          reason: evaluation.reason,
-          match: evaluation.match,
-        });
-      } else {
-        unknown.push(pkg);
-      }
-    } else {
+  if (evaluation.ok) {
+    approved.push(pkg);
+    continue;
+  }
+
+  if (evaluation.reason === 'not-allowlisted') {
+    if (pkgPolicy.failOnUnknown) {
       violations.push({
         name: pkg.name,
         version: pkg.version,
@@ -591,9 +584,17 @@ for (const pkg of packages) {
         reason: evaluation.reason,
         match: evaluation.match,
       });
+    } else {
+      unknown.push(pkg);
     }
   } else {
-    allowed.push(pkg);
+    violations.push({
+      name: pkg.name,
+      version: pkg.version,
+      license: pkg.license,
+      reason: evaluation.reason,
+      match: evaluation.match,
+    });
   }
 }
 

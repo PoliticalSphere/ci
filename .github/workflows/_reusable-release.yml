@@ -1,95 +1,19 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Release
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Release — Git tag and GitHub Release creation
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-release
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Creates SemVer tags and GitHub Releases with dry-run mode support.
+# Validates policy first, uploads evidence, and verifies tag accuracy.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - docs/versioning.md
-#   - docs/risk-decisions.md#rd-release-permissions
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+# Docs: .github/workflows/README.md#release
+# Refs: docs/versioning.md, docs/risk-decisions.md#rd-release-permissions
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Accidental releases cannot be undone (use dry_run mode for validation)
-# - Release permissions require contents: write (scope carefully)
-# - Tag conflicts if manual tags exist
+# Risks:
+#   • Accidental releases cannot be undone (use dry_run for validation)
+#   • Release permissions require contents: write (scope carefully)
+#   • Tag conflicts if manual tags exist
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Create a Git tag and GitHub Release for the Political Sphere platform
-# repository in a controlled, policy-aligned manner.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI (blocking)
-#   - Support a safe DRY-RUN mode that performs validation + planning without
-#     mutating repository state
-#   - Create a SemVer tag `v<release_version>` at the chosen ref (publish mode)
-#   - Publish a GitHub Release (publish mode)
-#   - Support release notes customisation (inline or file-based) with clear
-#     precedence over auto-generation
-#   - Verify the published tag + release match the intended ref (publish mode)
-#   - Upload evidence artifacts (reports/**, logs/**) and a structured summary
-#
-# DOES NOT:
-#   - Build artifacts, run tests, or publish packages/containers
-#   - Deploy to environments
-#   - Mutate repo state outside tagging + release publishing (publish mode only)
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege by default; elevate only where required
-# - Validate-CI MUST pass before release publishing or dry-run planning
-# - SHA-pinned actions only (internal actions are repo-controlled)
-# - Evidence-first: upload artifacts and summary even on failure (best-effort)
-# - Dry-run MUST NOT require write permissions
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call
-# - Intended for internal platform release automation (or trusted callers)
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Uses GitHub-provided token (`github.token`) for tag + release creation
-# - Only the publish job receives `contents: write`
-# - Dry-run job remains read-only
-# - No external credential persistence
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Concurrency is per release_version (prevents double-publishing the same tag)
-# - Do not cancel in progress: releases are stateful (tag + release publish)
-# - Artifact retention is caller-configurable
-# - Fetch-depth defaults to 0 for tag accuracy
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Release
 
@@ -256,9 +180,9 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
     if: ${{ inputs.dry_run == true }}
+    timeout-minutes: 15
     permissions:
       contents: read
-    timeout-minutes: 15
     env:
       PS_DRY_RUN: "1"
       PS_RELEASE_VERSION: ${{ inputs.release_version }}
@@ -305,9 +229,9 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
     if: ${{ inputs.dry_run == false }}
+    timeout-minutes: 20
     permissions:
       contents: write  # Justification: tag + release creation requires write access  # justification: tag + release creation requires contents write
-    timeout-minutes: 20
     env:
       GH_TOKEN: ${{ github.token }}
       PS_DRY_RUN: "0"
@@ -418,9 +342,9 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci, dry-run, release]
     if: ${{ always() }}
+    timeout-minutes: 10
     permissions:
       contents: read
-    timeout-minutes: 10
     steps:
       - name: Bootstrap (PS)
         uses: ./.github/actions/ps-bootstrap/ps-setup-standard

@@ -58,6 +58,7 @@ on_error() {
 
   gate_log_finish "FAIL" "${exit_code}"
   exit "${exit_code}"
+  return 0
 }
 
 # ----------------------------

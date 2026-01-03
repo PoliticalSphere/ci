@@ -96,7 +96,9 @@ function runLicenseCheck(options = {}) {
   );
 
   try {
-    const stdout = execSync(`node "${LICENSE_CHECK}" ${extraArgs}`, {
+    // Use array form of execSync to prevent shell injection attacks
+    // This safely passes each argument without shell interpretation
+    const stdout = execSync('node', [LICENSE_CHECK, ...extraArgs], {
       encoding: 'utf8',
       env: {
         ...process.env,
@@ -588,7 +590,8 @@ policy:
       rmSync(policyPath);
 
       try {
-        execSync(`node "${LICENSE_CHECK}"`, {
+        // Use array form to prevent shell injection attacks
+        execSync('node', [LICENSE_CHECK], {
           encoding: 'utf8',
           env: {
             ...process.env,
@@ -614,7 +617,8 @@ policy:
       rmSync(lockPath);
 
       try {
-        execSync(`node "${LICENSE_CHECK}"`, {
+        // Use array form to prevent shell injection attacks
+        execSync('node', [LICENSE_CHECK], {
           encoding: 'utf8',
           env: {
             ...process.env,

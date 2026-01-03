@@ -129,11 +129,11 @@ function findFiles() {
           CONFIG.exclude.some((pattern) => {
             if (pattern.includes('**')) {
               const regex = new RegExp(
-                pattern.replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*'),
+                pattern.replaceAll('**', '.*').replaceAll('*', '[^/]*'),
               );
               return regex.test(relativePath);
             }
-            return relativePath.includes(pattern.replace(/\*\*/g, ''));
+            return relativePath.includes(pattern.replaceAll('**', ''));
           })
         ) {
           continue;

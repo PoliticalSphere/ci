@@ -57,7 +57,7 @@ Sphere application repos), not this infrastructure repo. The current contract re
 
 - `vitest` and `playwright` as mandatory tooling
 - Specific application source paths (`src`, `apps`, `packages`, `libs`)
-- References to `PoliticalSphere/ci-cd-platform` workflows
+- References to `PoliticalSphere/ci` workflows
 
 Two clarifications needed:
 

@@ -62,6 +62,7 @@ emit_env() {
   local key="$1"
   local value="$2"
   _emit_heredoc "${GITHUB_ENV}" "${key}" "${value}" "ENV"
+  return 0
 }
 
 # emit_output <key> <value>
@@ -70,6 +71,7 @@ emit_output() {
   local key="$1"
   local value="$2"
   _emit_heredoc "${GITHUB_OUTPUT}" "${key}" "${value}" "OUT"
+  return 0
 }
 
 # ==============================================================================

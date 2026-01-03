@@ -63,6 +63,7 @@ PS_LOG_PATH="${PS_LOG_PATH:-}"
 PS_FMT_RESET="${PS_FMT_RESET:-$'\033[0m'}"
 PS_FMT_DIM="${PS_FMT_DIM:-$'\033[2m'}"
 PS_FMT_BOLD="${PS_FMT_BOLD:-$'\033[1m'}"
+PS_FMT_GRAY="${PS_FMT_GRAY:-$'\033[90m'}"
 # Reusable color-format wrapper for printf format strings (no trailing newline)
 PS_FMT_COLOR_WRAP="${PS_FMT_COLOR_WRAP:-%b%s%b}"
 
@@ -314,9 +315,9 @@ ps_cli_header() {
 
   local icon="${PS_FMT_ICON:-▶}"
   if ps_supports_color; then
-    local c_reset=$'\033[0m'
-    local c_bold=$'\033[1m'
-    local c_dim=$'\033[90m'
+    local c_reset="${PS_FMT_RESET}"
+    local c_bold="${PS_FMT_BOLD}"
+    local c_dim="${PS_FMT_GRAY}"
     local c_cyan=$'\033[36m'
     local c_green=$'\033[32m'
     local header_text=""
@@ -344,7 +345,7 @@ ps_cli_header() {
   fi
   printf '\n'
   if ps_supports_color; then
-    local c_reset=$'\033[0m'
+    local c_reset="${PS_FMT_RESET}"
     local c_yellow=$'\033[33m'
     printf '› %bRepository%b      : %s\n' "${c_yellow}" "${c_reset}" "${repo}"
     printf '› %bNode.js%b         : %s\n' "${c_yellow}" "${c_reset}" "${node_version}"
@@ -363,7 +364,7 @@ ps_cli_header() {
 ps_ok() {
   if ps_supports_color; then
     ps_log info ok "$*"
-    _ps_print 1 $'\033[1m\033[32m' "${PS_FMT_RESET}" "${PS_FMT_ICON} OK: $*"
+    _ps_print 1 "${PS_FMT_BOLD}$(printf '%b' '\033[32m')" "${PS_FMT_RESET}" "${PS_FMT_ICON} OK: $*"
   else
     ps_log info ok "$*"
     _ps_print 1 "" "" "${PS_FMT_ICON} OK: $*"
@@ -374,7 +375,7 @@ ps_ok() {
 ps_warn() {
   if ps_supports_color; then
     ps_log warn warn "$*"
-    _ps_print 2 $'\033[1m\033[33m' "${PS_FMT_RESET}" "WARN: $*"
+    _ps_print 2 "${PS_FMT_BOLD}$(printf '%b' '\033[33m')" "${PS_FMT_RESET}" "WARN: $*"
   else
     ps_log warn warn "$*"
     _ps_print 2 "" "" "WARN: $*"
@@ -385,7 +386,7 @@ ps_warn() {
 ps_error() {
   if ps_supports_color; then
     ps_log error error "$*"
-    _ps_print 2 $'\033[1m\033[31m' "${PS_FMT_RESET}" "ERROR: $*"
+    _ps_print 2 "${PS_FMT_BOLD}$(printf '%b' '\033[31m')" "${PS_FMT_RESET}" "ERROR: $*"
   else
     ps_log error error "$*"
     _ps_print 2 "" "" "ERROR: $*"
@@ -509,9 +510,9 @@ ps_print_section() {
 
   echo
   if ps_supports_color; then
-    local c_reset=$'\033[0m'
-    local c_bold=$'\033[1m'
-    local c_dim=$'\033[90m'
+    local c_reset="${PS_FMT_RESET}"
+    local c_bold="${PS_FMT_BOLD}"
+    local c_dim="${PS_FMT_GRAY}"
     local c_cyan=$'\033[36m'
     local c_green=$'\033[32m'
 
@@ -532,8 +533,8 @@ ps_print_section() {
 
   if [[ -n "${description}" ]]; then
     if ps_supports_color; then
-      local c_reset=$'\033[0m'
-      local c_dim=$'\033[90m'
+      local c_reset="${PS_FMT_RESET}"
+      local c_dim="${PS_FMT_GRAY}"
       printf "%b%s%s%b\n" "${c_dim}" "${detail_indent}" "${description}" "${c_reset}"
     else
       printf '%s\n' "${detail_indent}${description}"

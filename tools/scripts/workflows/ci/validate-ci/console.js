@@ -167,12 +167,12 @@ export function section(id, title, detail = '') {
     const dim = '\x1b[2m';
     const cyan = '\x1b[36m';
     const green = '\x1b[32m';
-    console.log(
-      `\n${green}${FORMAT.icon}${reset} ${bold}${cyan}${sid}${reset} ${FORMAT.separator} ${bold}${title}${reset}`,
-    );
+    const headerLine = `\n${green}${FORMAT.icon}${reset} ${bold}${cyan}${sid}${reset} ${FORMAT.separator} ${bold}${title}${reset}`;
+    console.log(headerLine);
     if (detail) {
       // CLI output: detail printed to stdout intentionally
-      console.log(`${FORMAT.detailIndent}${dim}${detail}${reset}`);
+      const detailLine = `${FORMAT.detailIndent}${dim}${detail}${reset}`;
+      console.log(detailLine);
     }
     return;
   }

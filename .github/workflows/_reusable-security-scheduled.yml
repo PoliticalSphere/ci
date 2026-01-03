@@ -1,99 +1,19 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Security Scheduled
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Security Scheduled — Deep security scans (CodeQL, Semgrep, Scorecard, Trivy)
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-security-scheduled
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Runs full-history secrets, CodeQL, Semgrep CE, Scorecard, and Trivy scans.
+# Publishes SARIF + evidence artifacts for security posture monitoring.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - docs/security-ci-policy.md
-#   - configs/security/gitleaks.toml
-#   - configs/security/trivy.yaml
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
-#   - ./.github/actions/ps-task/security-codeql
-#   - ./.github/actions/ps-task/semgrep-cli
+# Docs: .github/workflows/README.md#security-scheduled
+# Refs: docs/security-ci-policy.md, configs/security/
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Scheduled scans run on default branch only
-# - CodeQL and Semgrep may have rate limits on public runners
-# - Full-history scans can be slow on large repositories
+# Risks:
+#   • Scheduled scans run on default branch only
+#   • CodeQL/Semgrep may have rate limits on public runners
+#   • Full-history scans can be slow on large repositories
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Run scheduled, deep security scans against the repository and publish SARIF
-# and supporting artifacts for long-term security posture monitoring.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance (Validate-CI)
-#   - Run full-history secrets scanning
-#   - Run CodeQL static analysis
-#   - Run Semgrep CE analysis
-#   - Run OpenSSF Scorecard analysis
-#   - Run Trivy filesystem security scanning
-#   - Publish SARIF + evidence artifacts
-#   - Produce a machine-readable summary
-#
-# DOES NOT:
-#   - Run tests or builds
-#   - Deploy or publish artifacts
-#   - Modify repository state
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before any scan executes
-# - Full-history checkout where required (secrets scanning)
-# - Internal actions are repository-controlled
-# - External actions are SHA-pinned
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-# - ./.github/actions/ps-task/security-codeql
-# - ./.github/actions/ps-task/semgrep-cli
-# - ./.github/actions/ps-task/secret-detection
-# - ./.github/actions/ps-task/scorecard
-# - ./.github/actions/ps-task/security-trivy
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call
-# - Use the wrapper workflow for schedule/dispatch bindings
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - No secrets required
-# - SARIF uploads require security-events: write
-# - No credentials persisted
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Artifact retention: 14 days (security evidence)
-# - Summary artifact is always produced
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Security Scheduled
 

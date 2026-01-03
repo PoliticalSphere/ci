@@ -248,12 +248,13 @@ function checkRequiredScripts({
 }
 
 function gatherDeps(packageJson) {
-  // Combine dependency objects using object spread for clarity and modern style
-  return {
-    ...(packageJson.dependencies || {}),
-    ...(packageJson.devDependencies || {}),
-    ...(packageJson.optionalDependencies || {}),
-  };
+  // Combine dependency objects with undefined-safe merging.
+  return Object.assign(
+    {},
+    packageJson.dependencies,
+    packageJson.devDependencies,
+    packageJson.optionalDependencies,
+  );
 }
 
 function checkTools({

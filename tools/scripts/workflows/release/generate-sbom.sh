@@ -24,8 +24,8 @@ REPO_ROOT="$(cd "${SCRIPT_DIR}/../../.." && pwd)"
 # shellcheck source=tools/scripts/core/error-handler.sh
 . "${REPO_ROOT}/tools/scripts/core/error-handler.sh"
 
-info() { echo "INFO: $*"; }
-warn() { echo "WARN: $*" >&2; }
+info() { echo "INFO: $*"; return 0; }
+warn() { echo "WARN: $*" >&2; return 0; }
 
 # ------------------------------------------------------------------
 # SBOM Generation

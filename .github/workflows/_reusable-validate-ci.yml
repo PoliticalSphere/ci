@@ -1,87 +1,18 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Validate CI
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Validate CI — CI policy gate (SHA pinning, permissions, patterns)
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-validate-ci
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Enforces CI policy compliance. MUST run first in all workflows.
+# Blocks downstream jobs on policy violations.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - configs/ci/policies/
-#   - docs/ci-policy-governance.md
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-ci-validate
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+# Docs: .github/workflows/README.md#validate-ci
+# Refs: configs/ci/policies/, docs/ci-policy-governance.md
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Policy validation failure blocks all downstream jobs
-# - Remote SHA verification requires network access
+# Risks:
+#   • Policy validation failure blocks all downstream jobs
+#   • Remote SHA verification requires network access
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Enforce CI policy compliance (Validate-CI) and publish evidence artifacts.
-# This workflow is designed to run FIRST in calling workflows as a policy gate.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Checkout target repository + platform repository (for shared scripts/config)
-#   - Optionally install dependencies in the target repo (for validation tooling)
-#   - Optionally install dependencies in the platform repo (for platform tooling)
-#   - Execute the Validate-CI policy gate
-#   - Upload reports/logs as CI evidence
-#
-# DOES NOT:
-#   - Run lint/typecheck/tests/build
-#   - Perform deep security scans (handled elsewhere)
-#   - Write to the repository or publish artifacts externally
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic and non-interactive execution
-# - Least privilege (contents: read)
-# - Hardened runner via ps-init (canonical bootstrap)
-# - SHA-pinned external actions (enforced by Validate-CI itself)
-# - Evidence artifacts always uploaded (best-effort)
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-ci-validate
-# - ./.github/actions/ps-upload-artifacts
-# - tools/scripts/branding/print-section.sh (platform)
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Trigger: workflow_call
-# - Reusable workflow (internal platform building block)
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets: optional NODE_AUTH_TOKEN (npm installs only)
-# - Permissions: contents: read
-# - PR diff mode supported via pr_only + base/head SHAs
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Timeout: 10 minutes (policy gate should stay fast)
-# - Artifacts: reports/**, logs/** uploaded under artifact_name
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Validate CI
 

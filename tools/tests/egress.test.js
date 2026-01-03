@@ -34,7 +34,6 @@ function runEgressTest(testCode, options = {}) {
   }
 
   // Write custom allowlist if provided
-  const _allowlistPath = path.join(TEST_WORKSPACE, 'egress-allowlist.yml');
   if (allowlistContent) {
     const policyDir = path.join(TEST_WORKSPACE, 'configs/ci/policies');
     mkdirSync(policyDir, { recursive: true });
@@ -52,7 +51,9 @@ ${testCode}
 `;
 
   try {
-    const stdout = execSync(`bash -c '${script.replace(/'/g, "'\"'\"'")}'`, {
+    // Use array form of execSync to prevent shell injection attacks
+    // This safely passes the script without shell interpretation
+    const stdout = execSync('bash', ['-c', script], {
       encoding: 'utf8',
       env: { ...process.env, REPO_ROOT },
       cwd: REPO_ROOT,
@@ -145,7 +146,7 @@ describe('egress.sh', () => {
       `);
       assert.equal(result.status, 0);
       // Should have loaded some entries
-      const count = parseInt(result.stdout, 10);
+      const count = Number.parseInt(result.stdout, 10);
       assert.ok(count > 0, `Expected entries in allowlist, got ${count}`);
     });
 

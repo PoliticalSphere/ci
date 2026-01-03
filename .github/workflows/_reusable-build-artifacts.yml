@@ -1,94 +1,18 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Build Artifacts
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Build Artifacts — Deterministic builds + artifact upload
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: _reusable-build-artifacts
-# version: 1.1.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Builds artifacts in a clean, hardened environment and uploads CI evidence.
+# Validates CI policy first, then executes build with controlled retention.
 #
-# RELATED
-# ------------------------------------------------------------------------------
-# references:
-#   - docs/security-ci-policy.md
-# actions:
-#   - ./.github/actions/ps-bootstrap/ps-setup-standard
-#   - ./.github/actions/ps-teardown/ps-finalize-workflow
+# Docs: .github/workflows/README.md#build-artifacts
+# Refs: docs/security-ci-policy.md
 #
-# RISKS
-# ------------------------------------------------------------------------------
-# - Artifact retention duration limits storage costs
-# - Large artifacts can slow uploads/downloads
+# Risks:
+#   • Artifact retention duration limits storage costs
+#   • Large artifacts can slow uploads/downloads
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Build deterministic artifacts for consumer repositories and publish them as
-# CI evidence. This workflow verifies CI policy compliance, executes a clean
-# build in a hardened environment, uploads declared artifacts, and produces a
-# machine-readable summary.
-#
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI
-#   - Perform a deterministic build in a clean environment
-#   - Upload build artifacts with controlled retention
-#   - Publish a structured, machine-readable summary
-#
-# DOES NOT:
-#   - Run tests or quality gates (handled by PR Gates)
-#   - Perform deep security scans
-#   - Publish packages or deploy artifacts
-#   - Perform releases or environment mutations
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before any build executes
-# - Single canonical bootstrap path for build (ps-init)
-# - Evidence-first: artifacts + summary best-effort even on failure
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-setup-standard
-# - ./.github/actions/ps-task/build
-# - ./.github/actions/ps-teardown/ps-finalize-workflow
-# - tools/scripts/actions/ps-build/build.sh (default)
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call (consumer-facing)
-# - Runs Validate-CI gate, then build, then summary
-# - Jobs are isolated; bootstrap runs per job as needed
-# - Summary job always runs and aggregates validate-ci + build results
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Egress policy: audit for build and summary (summary checks out platform repo)
-# - Platform ref is pinned by default and validated when required
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Artifacts are uploaded best-effort (if: always()); build artifacts are strict
-# - Summary output is always produced
-# - Platform snapshot artifacts are captured for branding evidence (warn if missing)
-# - Summary job checks out the platform repo to satisfy teardown validation
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Build Artifacts
 
@@ -331,9 +255,9 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci, build]
     if: ${{ always() }}
+    timeout-minutes: 10
     permissions:
       contents: read
-    timeout-minutes: 10
 
     # Note: we intentionally checkout the consumer repository here so that
     # platform exit actions are available to aggregate the multi-job results.
