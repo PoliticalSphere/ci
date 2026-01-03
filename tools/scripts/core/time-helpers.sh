@@ -68,7 +68,7 @@ now_iso() {
 elapsed_seconds() {
   local start="${1:?start epoch required}"
   local end="${2:?end epoch required}"
-  echo $(( end - start ))
+  printf '%d' $(( end - start ))
 }
 
 # Format duration in human-readable form (e.g., "1m 23s")
