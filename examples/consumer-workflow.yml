@@ -5,7 +5,7 @@
 #   Demonstrate how a consumer repository calls the reusable PR gates workflow.
 #
 # Notes:
-#   - Replace org/repo and version with your actual platform repository.
+#   - Replace @v1.0.0 with the platform version tag you want to pin to.
 #   - Set least-privilege permissions appropriate to your repo.
 # ==============================================================================
 
@@ -19,7 +19,7 @@ permissions:
 
 jobs:
   pr-gates:
-    uses: org/ps-cicd-platform/.github/workflows/pr-gates.yml@vX.Y.Z
+    uses: PoliticalSphere/ci/.github/workflows/pr-gates.yml@v1.0.0  # Pin to release tag
     permissions:
       contents: read
     with:

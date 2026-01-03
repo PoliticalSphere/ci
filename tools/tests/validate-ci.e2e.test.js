@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 // ============================================================================
-// Validate-CI — E2E tests
+// Political Sphere — Validate-CI E2E Tests
 // ---------------------------------------------------------------------------
-// Runs the full validate-ci script against isolated minimal workspaces to verify
-// end-to-end behavior, exit codes, and key policy checks.
+// Purpose:
+//   Run full validate-ci script against isolated minimal workspaces to verify
+//   end-to-end behavior, exit codes, and key policy checks.
 // ============================================================================
 
 import { execFileSync } from 'node:child_process';

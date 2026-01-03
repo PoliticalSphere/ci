@@ -9,11 +9,14 @@ dist/
 build/
 coverage/
 reports/
+logs/
+*.tsbuildinfo
+.eslintcache
 
-!.github/actions/build/
-!.github/actions/build/**
 !.github/actions/ps-task/build/
 !.github/actions/ps-task/build/**
+!tools/scripts/actions/ps-task/build/
+!tools/scripts/actions/ps-task/build/**
 
 # Editor
 .DS_Store
@@ -26,3 +29,4 @@ Thumbs.db
 # Misc
 .env
 .env.*
+.qodo

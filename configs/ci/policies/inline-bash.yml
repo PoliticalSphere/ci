@@ -72,6 +72,12 @@ policy:
     applies_to:
       - ".github/workflows/**/*.yml"
       - ".github/workflows/**/*.yaml"
+    # Detection engine hints for validators
+    injection_patterns:
+      - "User input interpolation without quoting (e.g., ${{ github.event.pull_request.title }})"
+      - "Command substitution with external data (e.g., $(curl ...))"
+      - "Unquoted variable expansion in command contexts"
+      - "eval-like execution patterns (eval, bash -c with variables)"
 
   # Expired entries MUST be treated as non-matching (fail closed).
   expiry:
@@ -98,6 +104,17 @@ constraints:
       # Coarse command blacklist (for simple token-based detectors).
       commands:
         - curl
+        - wget
+        - ssh
+        - scp
+        - eval
+      # Additional dangerous patterns to catch common injection vectors
+      special_patterns:
+        - "\\${{\\s*github\\.event\\.issue\\.body\\b"  # User-controlled issue body
+        - "\\${{\\s*github\\.event\\.comment\\.body\\b"  # User-controlled comment
+        - "\\|\\s*sh\\b"  # Pipe to uncontrolled shell
+        - "&&\\s*curl\\s+.*\\|\\s*bash"  # Download and execute
+        - "\\$\\(.*curl.*|.*wget.*\\)"  # Command substitution with network call
         - wget
         - eval
         - ssh

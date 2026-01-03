@@ -1,72 +1,22 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Release
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Release — Git tag and GitHub Release creation
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Create a Git tag and GitHub Release for the Political Sphere platform
-# repository in a controlled, policy-aligned manner.
+# Creates SemVer tags and GitHub Releases with dry-run mode support.
+# Validates policy first, uploads evidence, and verifies tag accuracy.
 #
+# Docs: .github/workflows/README.md#release
+# Refs: docs/versioning.md, docs/risk-decisions.md#rd-release-permissions
 #
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI (blocking)
-#   - Support a safe DRY-RUN mode that performs validation + planning without
-#     mutating repository state
-#   - Create a SemVer tag `v<release_version>` at the chosen ref (publish mode)
-#   - Publish a GitHub Release (publish mode)
-#   - Support release notes customisation (inline or file-based) with clear
-#     precedence over auto-generation
-#   - Verify the published tag + release match the intended ref (publish mode)
-#   - Upload evidence artifacts (reports/**, logs/**) and a structured summary
+# Risks:
+#   • Accidental releases cannot be undone (use dry_run for validation)
+#   • Release permissions require contents: write (scope carefully)
+#   • Tag conflicts if manual tags exist
 #
-# DOES NOT:
-#   - Build artifacts, run tests, or publish packages/containers
-#   - Deploy to environments
-#   - Mutate repo state outside tagging + release publishing (publish mode only)
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege by default; elevate only where required
-# - Validate-CI MUST pass before release publishing or dry-run planning
-# - SHA-pinned actions only (internal actions are repo-controlled)
-# - Evidence-first: upload artifacts and summary even on failure (best-effort)
-# - Dry-run MUST NOT require write permissions
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call
-# - Intended for internal platform release automation (or trusted callers)
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Uses GitHub-provided token (`github.token`) for tag + release creation
-# - Only the publish job receives `contents: write`
-# - Dry-run job remains read-only
-# - No external credential persistence
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Concurrency is per release_version (prevents double-publishing the same tag)
-# - Do not cancel in progress: releases are stateful (tag + release publish)
-# - Artifact retention is caller-configurable
-# - Fetch-depth defaults to 0 for tag accuracy
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Release
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ------------------------------------------------------------------------------
-# Reusable workflow invoked via workflow_call.
-# ==============================================================================
 on:
   workflow_call:
 
@@ -175,6 +125,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # One release per version at a time. Do not cancel in progress: releases are
@@ -183,13 +140,6 @@ permissions:
 concurrency:
   group: release-${{ github.repository }}-${{ inputs.release_version }}
   cancel-in-progress: false
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
 
 # ==============================================================================
 # GLOBAL ENVIRONMENT
@@ -230,9 +180,9 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
     if: ${{ inputs.dry_run == true }}
+    timeout-minutes: 15
     permissions:
       contents: read
-    timeout-minutes: 15
     env:
       PS_DRY_RUN: "1"
       PS_RELEASE_VERSION: ${{ inputs.release_version }}
@@ -242,40 +192,27 @@ jobs:
       PS_RELEASE_NOTES_INLINE: ${{ inputs.release_notes }}
       PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ inputs.release_ref }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Setup Node.js (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: "0"
           install_dependencies: "0"
-          working_directory: "."
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Compute release plan (no mutation)
         uses: ./.github/actions/ps-task/ps-run
         with:
           id: compute-release-plan
           title: Compute release plan (no mutation)
-          script: tools/scripts/release/compute-plan.sh
+          script: tools/scripts/workflows/release/compute-plan.sh
 
       - name: Upload artifacts (dry-run evidence) (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           artifacts_name: release-dry-run
           artifacts_paths: |
@@ -292,9 +229,9 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci]
     if: ${{ inputs.dry_run == false }}
-    permissions:
-      contents: write  # justification: tag + release creation requires contents write
     timeout-minutes: 20
+    permissions:
+      contents: write  # Justification: tag + release creation requires write access  # justification: tag + release creation requires contents write
     env:
       GH_TOKEN: ${{ github.token }}
       PS_DRY_RUN: "0"
@@ -305,36 +242,23 @@ jobs:
       PS_RELEASE_NOTES_INLINE: ${{ inputs.release_notes }}
       PS_RELEASE_NOTES_PATH: ${{ inputs.release_notes_path }}
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ inputs.release_ref }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Setup Node.js (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: "0"
           install_dependencies: "0"
-          working_directory: "."
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Validate release inputs (publish)
         uses: ./.github/actions/ps-task/ps-run
         with:
           id: validate-release-inputs
           title: Validate release inputs (publish)
-          script: tools/scripts/release/validate-release-inputs.sh
+          script: tools/scripts/workflows/release/validate-release-inputs.sh
 
       - name: Prepare release notes mode
         id: notes
@@ -342,7 +266,7 @@ jobs:
         with:
           id: prepare-release
           title: Prepare release notes mode
-          script: tools/scripts/release/prepare-release.sh
+          script: tools/scripts/workflows/release/prepare-release.sh
 
       - name: Publish release (PS)
         uses: ./.github/actions/ps-task/ps-run
@@ -350,7 +274,31 @@ jobs:
           id: "release.publish"
           title: "Publish release"
           description: "Tag and create GitHub Release"
-          script: "tools/scripts/release/release.sh"
+          script: "tools/scripts/workflows/release/release.sh"
+
+      # ------------------------------------------------------------------------
+      # SBOM GENERATION (Supply Chain Transparency)
+      # ------------------------------------------------------------------------
+      - name: Generate SBOM (PS)
+        uses: ./.github/actions/ps-task/ps-run
+        with:
+          id: "release.sbom"
+          title: "Generate SBOM"
+          description: "Create CycloneDX and SPDX SBOMs for supply chain transparency"
+          script: "tools/scripts/workflows/release/generate-sbom.sh"
+        continue-on-error: true
+        env:
+          CI: "1"
+
+      - name: Upload SBOM as artifact
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0
+        with:
+          name: release-sbom
+          path: reports/sbom/**
+          retention-days: 90  # Keep SBOM longer for supply chain audits
+          if-no-files-found: warn
+        continue-on-error: true
 
       # ------------------------------------------------------------------------
       # RELEASE VERIFICATION (DETERMINISTIC)
@@ -360,7 +308,7 @@ jobs:
         with:
           id: verify-release
           title: Verify tag + release
-          script: tools/scripts/release/verify-release.sh
+          script: tools/scripts/workflows/release/verify-release.sh
         env:
           GH_TOKEN: ${{ github.token }}
 
@@ -370,11 +318,11 @@ jobs:
         with:
           id: release-complete
           title: Release complete
-          script: tools/scripts/release/release-complete.sh
+          script: tools/scripts/workflows/release/release-complete.sh
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: release
           summary_output_path: reports/summary/release.json
@@ -394,37 +342,24 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci, dry-run, release]
     if: ${{ always() }}
+    timeout-minutes: 10
     permissions:
       contents: read
-    timeout-minutes: 10
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: 1
           checkout_ref: ${{ inputs.release_ref }}
-          egress_policy: audit
-          home_dir: ".home"
-          platform_repo: PoliticalSphere/ci
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: PoliticalSphere/ci
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          install_tools: "0"
-          tools_bundle: "none"
-
-      - name: Setup Node.js (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: "0"
           install_dependencies: "0"
-          working_directory: "."
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: release
           summary_output_path: reports/summary/release.json

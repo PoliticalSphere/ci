@@ -70,7 +70,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/security/secret-scan-pr.sh]
+#   internal: [tools/scripts/runners/security/secret-scan-pr.sh]
 #   external: [none]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/secret-scan-pr/README.md
-#     - tools/scripts/security/secret-scan-pr.sh
+#     - tools/scripts/runners/security/secret-scan-pr.sh
 #
 # ==============================================================================
 
@@ -136,9 +136,9 @@ runs:
         id: "secrets.pr"
         title: "Secrets scan (PR)"
         description: "Fast PR-scoped secret scan"
-        script: "tools/scripts/security/secret-scan-pr.sh"
+        script: "tools/scripts/runners/security/secret-scan-pr.sh"
         require_files: |
-          tools/scripts/security/secret-scan-pr.sh
+          tools/scripts/runners/security/secret-scan-pr.sh
         artifact_paths: |
           ${{ inputs.report_dir }}
           ${{ inputs.log_dir }}

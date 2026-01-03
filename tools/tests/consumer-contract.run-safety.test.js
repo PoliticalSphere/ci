@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 
-// Ensure consumer-contract action does not interpolate inputs directly in run blocks
+// ==============================================================================
+// Political Sphere — Consumer Contract Run Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Ensure consumer-contract action does not interpolate inputs in run blocks.
+// ==============================================================================
 
 import fs from 'node:fs';
 import path from 'node:path';

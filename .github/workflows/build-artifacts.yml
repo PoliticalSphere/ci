@@ -1,14 +1,58 @@
 # ==============================================================================
 # Political Sphere — Build Artifacts (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: build-artifacts
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-build-artifacts.yml for
+# deterministic build and artifact collection.
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-build-artifacts.yml with caller inputs
+#   - Pass through build configuration (script, working directory, artifacts)
+#   - Support artifact retention and compression settings
+#
+# DOES NOT:
+#   - Perform the build directly
+#   - Run policy validation (handled by _reusable-build-artifacts.yml)
+#   - Deploy or publish artifacts externally
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-build-artifacts.yml
+# - ./.github/workflows/validate-ci.yml (invoked by reusable as gate)
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-build-artifacts.yml
+# - Permissions: contents: read (for checkout and artifact collection)
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Secrets: optional NODE_AUTH_TOKEN (npm installs only)
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: Build Artifacts
 
 on:
   workflow_call:
-
     # ==========================================================================
     # Runtime & Environment Configuration
     # ==========================================================================
@@ -121,6 +165,9 @@ on:
 # ==============================================================================
 # DEFAULT PERMISSIONS (LEAST PRIVILEGE)
 # ==============================================================================
+permissions:
+  contents: read  # Justification: required for repository checkout
+  actions: read   # Justification: inspect workflow runs for CI validation
 
 jobs:
   call:

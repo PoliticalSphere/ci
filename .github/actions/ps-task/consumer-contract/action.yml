@@ -71,7 +71,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
 #   internal: [configs/consumer/contract.json, configs/consumer/exceptions.json,
-#     tools/scripts/consumer/contract-check.sh]
+#     tools/scripts/workflows/consumer/contract-check.sh]
 #   external: [bash]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -112,7 +112,7 @@
 #     - .github/actions/ps-task/consumer-contract/README.md
 #     - configs/consumer/contract.json
 #     - configs/consumer/exceptions.json
-#     - tools/scripts/consumer/contract-check.sh
+#     - tools/scripts/workflows/consumer/contract-check.sh
 #
 # ==============================================================================
 
@@ -154,9 +154,9 @@ runs:
         id: "contract.check"
         title: "Consumer contract"
         description: "Validate repo contract vs policy"
-        script: "tools/scripts/consumer/contract-check.sh"
+        script: "tools/scripts/workflows/consumer/contract-check.sh"
         require_files: |
-          tools/scripts/consumer/contract-check.sh
+          tools/scripts/workflows/consumer/contract-check.sh
           ${{ inputs.policy_path }}
         env_kv: |
           PS_CONTRACT_POLICY=${{ inputs.policy_path }}
@@ -170,21 +170,8 @@ runs:
       env:
         SUMMARY_PATH: "${{ inputs.summary_path }}"
       run: |
-        # Protect against unsafe user-controlled paths: ensure repo-relative,
-        # no traversal or absolute paths
-        summary_path="${SUMMARY_PATH:-}"
-        if [[ -z "${summary_path}" ]]; then
-          exit 0
-        fi
-        if [[ "${summary_path}" = /* ]] || [[ "${summary_path}" == *".."* ]]; then
-          echo "WARN: summary_path appears unsafe or contains traversal," \
-            "skipping: ${summary_path}" >&2
-          exit 0
-        fi
-        if [[ -f "${summary_path}" && -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-          # Use explicit -- to avoid filename starting with '-'
-          cat -- "${summary_path}" >> "${GITHUB_STEP_SUMMARY}"
-        fi
+        set -euo pipefail
+        bash "${GITHUB_WORKSPACE}/tools/scripts/workflows/consumer/contract-summary.sh"
 
     - name: Complete (PS)
       shell: bash

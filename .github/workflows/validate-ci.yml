@@ -1,8 +1,52 @@
 # ==============================================================================
 # Political Sphere — Validate CI (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
-# ============================================================================== 
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: validate-ci
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-validate-ci.yml for
+# CI workflow policy validation (SHA pinning, permissions, unsafe patterns).
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-validate-ci.yml with caller inputs
+#   - Pass through all configuration (runner, timeouts, platform ref, etc)
+#   - Support optional dependency installation and remote SHA verification
+#
+# DOES NOT:
+#   - Perform any policy validation directly
+#   - Run tests, lint, or build operations
+#   - Deploy or publish artifacts externally
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-validate-ci.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-validate-ci.yml
+# - Permissions: contents: read (for checkout and policy reads)
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Secrets: optional NODE_AUTH_TOKEN (npm installs only)
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned by default for supply chain security
+#
+# ==============================================================================
 
 name: Validate CI
 
@@ -94,10 +138,20 @@ on:
         description: "Optional token for private registry installs"
         required: false
 
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
+permissions:
+  contents: read  # Justification: required for repository and workflow checkout
+  actions: read
+
 jobs:
   call:
     name: Validate CI
     uses: ./.github/workflows/_reusable-validate-ci.yml
+    permissions:
+      contents: read
+      actions: read
     with:
       runner: ${{ inputs.runner }}
       node_version: ${{ inputs.node_version }}

@@ -71,7 +71,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-test/test.sh]
+#   internal: [tools/scripts/actions/ps-task/test/test.sh]
 #   external: [none]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/test/README.md
-#     - tools/scripts/actions/ps-test/test.sh
+#     - tools/scripts/actions/ps-task/test/test.sh
 #
 # ==============================================================================
 
@@ -121,7 +121,7 @@ inputs:
   script:
     description: "Test script path (repo-relative)"
     required: false
-    default: "tools/scripts/actions/ps-test/test.sh"
+    default: "tools/scripts/actions/ps-task/test/test.sh"
 
   working_directory:
     description: "Working directory to run from (repo-relative)"

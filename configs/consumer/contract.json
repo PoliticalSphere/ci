@@ -1,10 +1,23 @@
 {
   "meta": {
-    "version": "1.0.0",
+    "version": "1.1.0",
     "owner": "political-sphere",
     "classification": "internal",
-    "last_reviewed": "2025-12-19",
-    "review_interval_days": 180
+    "last_reviewed": "2026-01-02",
+    "review_interval_days": 180,
+    "changelog": [
+      {
+        "version": "1.1.0",
+        "date": "2026-01-02",
+        "changes": [
+          "Fixed repository reference from ci-cd-platform to ci",
+          "Updated path_integrity.roots to match actual app structure (apps, libs, tools)",
+          "Added ai directory to path_integrity.roots",
+          "Added .vitest, .playwright, prisma to ignore list",
+          "Updated last_reviewed date"
+        ]
+      }
+    ]
   },
   "policy": {
     "mode": "enforce",
@@ -23,13 +36,25 @@
       "build": ["build"]
     },
     "tooling": {
-      "require": ["typescript", "vitest", "playwright", "eslint", "biome"],
-      "disallow": ["jest", "mocha", "ts-jest", "tslint"]
+      "require": [
+        "typescript",
+        "vitest",
+        "@playwright/test",
+        "eslint",
+        "@biomejs/biome"
+      ],
+      "disallow": ["jest", "mocha", "ts-jest", "tslint"],
+      "notes": {
+        "biome": "Fast general linting and formatting",
+        "eslint": "Specialist and security-focused rules",
+        "vitest": "Unit and integration testing",
+        "@playwright/test": "E2E and accessibility testing"
+      }
     },
     "workflows": {
       "required_reusable": [
-        "PoliticalSphere/ci-cd-platform/.github/workflows/pr-gates.yml",
-        "PoliticalSphere/ci-cd-platform/.github/workflows/security-scheduled.yml"
+        "PoliticalSphere/ci/.github/workflows/pr-gates.yml",
+        "PoliticalSphere/ci/.github/workflows/security-scheduled.yml"
       ],
       "allowed_top_level": [
         "pr-gates.yml",
@@ -49,12 +74,12 @@
       {
         "path": "README.md",
         "contains": "playwright",
-        "requires_tools": ["playwright"]
+        "requires_tools": ["@playwright/test"]
       }
     ],
     "path_integrity": {
       "enabled": true,
-      "roots": ["src", "apps", "packages", "libs"],
+      "roots": ["apps", "libs", "tools", "ai"],
       "ignore": [
         "node_modules",
         "dist",
@@ -63,7 +88,11 @@
         "logs",
         "coverage",
         ".next",
-        ".turbo"
+        ".turbo",
+        ".nx",
+        ".vitest",
+        ".playwright",
+        "prisma/generated"
       ],
       "extensions": [".ts", ".tsx", ".js", ".jsx", ".mts", ".cts"]
     }

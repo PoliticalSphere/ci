@@ -9,8 +9,8 @@ set -euo pipefail
 # ==============================================================================
 
 scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
-# shellcheck source=tools/scripts/actions/cross-cutting/validate.sh
-. "${scripts_root}/tools/scripts/actions/cross-cutting/validate.sh"
+# shellcheck source=tools/scripts/core/validation.sh
+. "${scripts_root}/tools/scripts/core/validation.sh"
 
 require_nonempty "inputs.pr_number" "${PS_PR_NUMBER}" || exit 1
 require_number "inputs.pr_number" "${PS_PR_NUMBER}" || exit 1

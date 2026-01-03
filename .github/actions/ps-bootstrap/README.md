@@ -7,9 +7,9 @@
 #
 # Dependencies:
 #   - ./.github/actions/ps-bootstrap/ps-harden-runner
-#   - ./.github/actions/ps-bootstrap/ps-checkout-repo
+#   - ./.github/actions/ps-bootstrap/ps-checkout-source
 #   - ./.github/actions/ps-bootstrap/ps-checkout-platform
-#   - ./.github/actions/ps-bootstrap/ps-init
+#   - ./.github/actions/ps-bootstrap/ps-initialize-environment
 #   - ./.github/actions/ps-bootstrap/ps-tools
 #
 # Dependents:
@@ -37,7 +37,7 @@ blocks.
 
 ```yaml
 - name: PS init
-  uses: ./.github/actions/ps-bootstrap/ps-init
+  uses: ./.github/actions/ps-bootstrap/ps-initialize-environment
   with:
     egress_policy: audit
     fetch_depth: "1"

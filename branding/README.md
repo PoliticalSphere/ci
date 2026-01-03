@@ -8,7 +8,7 @@ This directory defines the branding assets and usage rules.
 - `branding/ps-banner.txt` Political Sphere ASCII banner.
 - `tools/scripts/branding/format.env` Output formatting tokens for CLI sections.
 - `tools/scripts/branding/format.sh` Formatting helpers for bash scripts.
-- `tools/scripts/branding/validate-inputs.sh` Shared input validation helpers.
+- `tools/scripts/actions/cross-cutting/validate.sh` Shared input validation helpers.
 
 ## Usage Rules
 
@@ -18,8 +18,7 @@ This directory defines the branding assets and usage rules.
 
 ## Where It’s Used
 
-- `tools/scripts/branding/print-banner.sh`
-- `tools/scripts/branding/print-section.sh`
+- `tools/scripts/branding/format.sh` (source once, then call `ps_print_banner`/`ps_print_section`)
 - `tools/scripts/gates/gate-pre-commit.sh`
 - `tools/scripts/gates/gate-pre-push.sh`
 

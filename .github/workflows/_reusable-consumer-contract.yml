@@ -1,81 +1,21 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Consumer Contract
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Consumer Contract — Platform contract policy validation
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: consumer-contract
-# version: 1.0.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-20
+# Validates consumer repos against platform contract policy + exceptions.
+# Publishes audit-friendly artifacts for contract verification.
 #
+# Docs: .github/workflows/README.md#consumer-contract
+# Refs: docs/integration-guide.md, configs/consumer/contract.json
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Validate consumer repositories against the platform contract policy and
-# publish audit-friendly reports/logs artifacts.
+# Risks:
+#   • Contract validation depends on correct manifest paths
+#   • Breaking changes in contract require coordinated deployment
 #
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI
-#   - Run contract checks against policy + exceptions
-#   - Upload reports/logs artifacts with controlled retention
-#
-# DOES NOT:
-#   - Deploy, release, or publish artifacts
-#   - Modify repository state
-#   - Run tests or quality gates (handled by PR Gates)
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege with explicit permissions
-# - Validate-CI gate runs first
-# - Evidence-first: artifacts best-effort even on failure
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-init
-# - ./.github/actions/ps-task/consumer-contract
-# - ./.github/actions/ps-teardown/ps-exit
-# - tools/scripts/consumer/contract-check.sh
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call (consumer-facing)
-# - Runs Validate-CI gate, then contract check
-# - Jobs are isolated; bootstrap runs per job as needed
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Egress policy: audit for contract job
-# - Platform ref is pinned by default and validated when required
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Timeouts are configurable via inputs (per job)
-# - Artifacts are uploaded best-effort (if: always())
-# - Contract checks are file-based and network-free
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Consumer Contract
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ==============================================================================
 on:
   workflow_call:
 
@@ -213,6 +153,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # Ensures a single consumer-contract run per ref.
@@ -221,13 +168,6 @@ permissions:
 concurrency:
   group: consumer-contract-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
 
 # ==============================================================================
 # GLOBAL PLATFORM ENVIRONMENT
@@ -280,20 +220,14 @@ jobs:
       contents: read
 
     steps:
-      - name: Job setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          # Prefer the exact PR head SHA when available to avoid ref spoofing.
           checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          platform_repo: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: ${{ inputs.platform_repository }}
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          egress_policy: audit
-          install_tools: "0"
+          skip_node: "1"
 
       - name: Contract check
         uses: ./.github/actions/ps-task/consumer-contract
@@ -306,7 +240,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: consumer-contract
           summary_output_path: reports/summary/consumer-contract.json

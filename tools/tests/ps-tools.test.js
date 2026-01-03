@@ -1,8 +1,16 @@
 #!/usr/bin/env node
+
+// ==============================================================================
+// Political Sphere — PS Tools Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test ps-tools script functionality and output.
+// ==============================================================================
+
 import { strict as assert } from 'node:assert';
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { getSafePathEnv } from '../scripts/workflows/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot } from './test-utils.js';
 
 const repoRoot = getRepoRoot();

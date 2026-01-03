@@ -184,3 +184,9 @@ runs:
         post_root="${post_root}/ps-pr-comment"
         post_script="${post_root}/ps-pr-comment-post.sh"
         bash "${post_script}"
+
+    - name: Complete (PS)
+      shell: bash
+      run: |
+        set -euo pipefail
+        printf 'PS.TEARDOWN.PR_COMMENT: OK\n'

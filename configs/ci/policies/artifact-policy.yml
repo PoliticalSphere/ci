@@ -15,13 +15,20 @@ meta:
 
 policy:
   default_retention_days: 7
+  security_artifact_retention_days: 90  # SARIF, secrets scans, security evidence
   require_artifacts_for_ci: true
   required_paths:
     - reports/**
     - logs/**
 
+  # Caller workflows delegate artifact uploading to their reusable counterparts.
+  # Only reusable workflows (_reusable-*.yml) are checked for artifact paths.
+  skip_caller_workflows: true
+
 allowlist:
-  pr-gates:
+  # Only reusable workflows that directly upload artifacts are listed here.
+  # Caller workflows (without _reusable- prefix) delegate to these.
+  _reusable-pr-gates:
     - name: pr-gates-validate-ci
     - name: pr-gates-lint
     - name: pr-gates-typecheck
@@ -33,7 +40,7 @@ allowlist:
     - name: pr-gates-summary
     - name: pr-gates-sonar
     - name: pr-gates-notify
-  pr-security:
+  _reusable-pr-security:
     - name: pr-security-validate-ci
     - name: pr-security-secrets
     - name: pr-security-dependency-review
@@ -42,32 +49,46 @@ allowlist:
     - name: pr-security-trufflehog
     - name: pr-security-summary
     - name: pr-security-notify
-  build-artifacts:
+  _reusable-build-artifacts:
     - name: build-artifacts
     - name: build-artifacts-validate-ci
     - name: build-artifacts-summary
     - name: platform-snapshot
     - name: ${{ env.PS_ARTIFACT_PREFIX }}
     - name: ${{ env.PS_ARTIFACT_PREFIX }}-summary
-  security-scheduled:
+  _reusable-security-scheduled:
     - name: security-scheduled-validate-ci
+      retention_days: 90  # Security evidence: retain longer
     - name: security-secrets
+      retention_days: 90
     - name: codeql-sarif
+      retention_days: 90
     - name: semgrep-sarif
+      retention_days: 90
     - name: scorecard-sarif
+      retention_days: 90
     - name: trufflehog-sarif
+      retention_days: 90
     - name: trivy-sarif
+      retention_days: 90
     - name: security-scheduled-summary
-  license-compliance:
+      retention_days: 90
+  _reusable-license-compliance:
     - name: license-compliance-validate-ci
     - name: license-compliance-report
     - name: license-compliance-summary
-  consumer-contract:
+  _reusable-consumer-contract:
     - name: consumer-contract-validate-ci
     - name: consumer-contract-report
     - name: consumer-contract-summary
-  release:
+  _reusable-release:
     - name: release-validate-ci
-    - name: release-artifacts
-    - name: release-summary
+      retention_days: 90
     - name: release-dry-run
+      retention_days: 7
+    - name: release-artifacts
+      retention_days: 30  # Release artifacts kept for reasonable period
+    - name: release-sbom
+      retention_days: 180  # SBOM kept longer for supply chain compliance
+    - name: release-summary
+      retention_days: 30

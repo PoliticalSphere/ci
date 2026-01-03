@@ -1,89 +1,21 @@
-# ==============================================================================
-# Political Sphere — Reusable Workflow: Build Artifacts
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
+# Build Artifacts — Deterministic builds + artifact upload
+# ══════════════════════════════════════════════════════════════════════════════
 #
-# METADATA
-# ------------------------------------------------------------------------------
-# id: build-artifacts
-# version: 1.1.0
-# owner: political-sphere
-# classification: internal
-# created: 2025-12-20
-# last_updated: 2025-12-24
+# Builds artifacts in a clean, hardened environment and uploads CI evidence.
+# Validates CI policy first, then executes build with controlled retention.
 #
+# Docs: .github/workflows/README.md#build-artifacts
+# Refs: docs/security-ci-policy.md
 #
-# PURPOSE
-# ------------------------------------------------------------------------------
-# Build deterministic artifacts for consumer repositories and publish them as
-# CI evidence. This workflow verifies CI policy compliance, executes a clean
-# build in a hardened environment, uploads declared artifacts, and produces a
-# machine-readable summary.
+# Risks:
+#   • Artifact retention duration limits storage costs
+#   • Large artifacts can slow uploads/downloads
 #
-#
-# SCOPE & RESPONSIBILITIES
-# ------------------------------------------------------------------------------
-# DOES:
-#   - Enforce CI policy compliance via Validate-CI
-#   - Perform a deterministic build in a clean environment
-#   - Upload build artifacts with controlled retention
-#   - Publish a structured, machine-readable summary
-#
-# DOES NOT:
-#   - Run tests or quality gates (handled by PR Gates)
-#   - Perform deep security scans
-#   - Publish packages or deploy artifacts
-#   - Perform releases or environment mutations
-#
-#
-# DESIGN PRINCIPLES
-# ------------------------------------------------------------------------------
-# - Deterministic, non-interactive execution
-# - Least privilege at workflow and job level
-# - Validate-CI MUST pass before any build executes
-# - Single canonical bootstrap path for build (ps-init)
-# - Evidence-first: artifacts + summary best-effort even on failure
-#
-#
-# DEPENDENCIES
-# ------------------------------------------------------------------------------
-# - ./.github/workflows/validate-ci.yml
-# - ./.github/actions/ps-bootstrap/ps-init
-# - ./.github/actions/ps-bootstrap/ps-node
-# - ./.github/actions/ps-task/build
-# - ./.github/actions/ps-teardown/ps-exit
-# - tools/scripts/actions/ps-build/build.sh (default)
-#
-#
-# EXECUTION MODEL
-# ------------------------------------------------------------------------------
-# - Triggered via workflow_call (consumer-facing)
-# - Runs Validate-CI gate, then build, then summary
-# - Jobs are isolated; bootstrap runs per job as needed
-# - Summary job always runs and aggregates validate-ci + build results
-#
-#
-# SECURITY & POLICY NOTES
-# ------------------------------------------------------------------------------
-# - Secrets are optional and passed explicitly (NODE_AUTH_TOKEN only)
-# - Default permissions are read-only (contents: read)
-# - Egress policy: audit for build and summary (summary checks out platform repo)
-# - Platform ref is pinned by default and validated when required
-#
-#
-# OPERATIONAL NOTES
-# ------------------------------------------------------------------------------
-# - Artifacts are uploaded best-effort (if: always()); build artifacts are strict
-# - Summary output is always produced
-# - Platform snapshot artifacts are captured for branding evidence (warn if missing)
-# - Summary job checks out the platform repo to satisfy teardown validation
-#
-# ==============================================================================
+# ══════════════════════════════════════════════════════════════════════════════
 
 name: Build Artifacts
 
-# ==============================================================================
-# TRIGGER & INVOCATION MODEL
-# ==============================================================================
 on:
   workflow_call:
 
@@ -203,6 +135,13 @@ permissions:
   contents: read
 
 # ==============================================================================
+# GLOBAL EXECUTION DEFAULTS
+# ==============================================================================
+defaults:
+  run:
+    shell: bash
+
+# ==============================================================================
 # CONCURRENCY CONTROL
 # ------------------------------------------------------------------------------
 # Ensures a single build-artifacts run per ref.
@@ -210,13 +149,6 @@ permissions:
 concurrency:
   group: build-artifacts-${{ github.repository }}-${{ github.ref }}
   cancel-in-progress: true
-
-# ==============================================================================
-# GLOBAL EXECUTION DEFAULTS
-# ==============================================================================
-defaults:
-  run:
-    shell: bash
 
 # ==============================================================================
 # GLOBAL PLATFORM ENVIRONMENT
@@ -269,33 +201,18 @@ jobs:
       contents: read
 
     steps:
-      - name: Job setup (PS)
+      - name: Bootstrap (PS)
         id: job_setup
-        uses: ./.github/actions/ps-bootstrap/ps-init
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
-          # Prefer the exact PR head SHA when available to avoid ref spoofing.
           checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          platform_repo: ${{ inputs.platform_repository }}
-          platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: ${{ inputs.platform_repository }}
-          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "0"
-          # Allow outbound network as needed for builds (telemetry, registries)
-          egress_policy: audit
-          install_tools: "0"
-
-      - name: Node setup (PS)
-        uses: ./.github/actions/ps-bootstrap/ps-node
-        with:
           node_version: ${{ inputs.node_version }}
           cache: ${{ inputs.cache }}
-          install_dependencies: "1"
           working_directory: ${{ inputs.working_directory }}
           cache_dependency_path: ${{ inputs.working_directory }}/package-lock.json
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
+          platform_ref: ${{ inputs.platform_ref }}
+          platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
 
       - name: Build (PS)
         id: build
@@ -306,7 +223,7 @@ jobs:
 
       - name: Upload platform snapshot (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           artifacts_name: platform-snapshot
           artifacts_paths: ${{ steps.job_setup.outputs.platform_root }}/tools/scripts/branding/**
@@ -315,7 +232,7 @@ jobs:
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: build-artifacts
           summary_output_path: reports/summary/build-artifacts-job.json
@@ -338,32 +255,25 @@ jobs:
     runs-on: ${{ inputs.runner }}
     needs: [validate-ci, build]
     if: ${{ always() }}
+    timeout-minutes: 10
     permissions:
       contents: read
-    timeout-minutes: 10
 
     # Note: we intentionally checkout the consumer repository here so that
     # platform exit actions are available to aggregate the multi-job results.
     steps:
-      - name: Job setup (Security Only)
-        # Checkout platform repo so ps-exit can validate inputs via platform
-        # branding scripts (validate-inputs.sh).
-        uses: ./.github/actions/ps-bootstrap/ps-init
+      - name: Bootstrap (PS)
+        uses: ./.github/actions/ps-bootstrap/ps-setup-standard
         with:
           fetch_depth: ${{ inputs.fetch_depth }}
           checkout_ref: ${{ github.event.pull_request.head.sha || github.sha }}
-          platform_repo: ${{ inputs.platform_repository }}
           platform_ref: ${{ inputs.platform_ref }}
-          platform_path: ".ps-platform"
-          platform_allowed_repositories: ${{ inputs.platform_repository }}
           platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
-          skip_platform_checkout: "false"
-          egress_policy: audit
-          install_tools: "0"
+          skip_node: "1"
 
       - name: Job teardown (PS)
         if: always()
-        uses: ./.github/actions/ps-teardown/ps-exit
+        uses: ./.github/actions/ps-teardown/ps-finalize-workflow
         with:
           summary_workflow: build-artifacts
           summary_output_path: reports/summary/build-artifacts.json

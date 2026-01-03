@@ -118,16 +118,17 @@ description: "Run OpenSSF Scorecard and write JSON report to reports/security/sc
 runs:
   using: "composite"
   steps:
-    - name: Run Scorecard action
+    - name: Run Scorecard (PS)
       uses: ossf/scorecard-action@4a0b87a20cc42672e6c80e82e63b5cd8f25f108a
       with:
         # Use JSON output and write to `scorecard.json` in workspace
         format: json
         output: scorecard.json
 
-    - name: Move Scorecard output to reports
+    - name: Move output to reports (PS)
       shell: bash
       run: |
+        set -euo pipefail
         mkdir -p reports/security
         if [[ -f scorecard.json ]]; then mv scorecard.json reports/security/scorecard.json; fi
 

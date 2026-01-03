@@ -21,6 +21,7 @@ export default [
       '**/build/**',
       '**/coverage/**',
       '**/reports/**',
+      '**/logs/**',
       '**/.turbo/**',
       '**/.nx/**',
     ],

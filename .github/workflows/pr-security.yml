@@ -1,7 +1,47 @@
 # ==============================================================================
 # Political Sphere — PR Security (Caller)
 # ==============================================================================
-# Wrapper workflow that delegates to the reusable job definition.
+#
+# METADATA
+# ------------------------------------------------------------------------------
+# id: pr-security
+# version: 1.0.0
+# owner: political-sphere
+# classification: internal
+#
+# PURPOSE
+# ------------------------------------------------------------------------------
+# Caller workflow that delegates to _reusable-pr-security.yml for
+# PR-triggered security scans (secrets, dependency review).
+#
+#
+# SCOPE & RESPONSIBILITIES
+# ------------------------------------------------------------------------------
+# DOES:
+#   - Invoke _reusable-pr-security.yml with caller inputs
+#   - Pass through security scan configuration
+#
+# DOES NOT:
+#   - Perform security scans directly
+#   - Block merges (advisory role only)
+#
+#
+# DEPENDENCIES
+# ------------------------------------------------------------------------------
+# - ./.github/workflows/_reusable-pr-security.yml
+#
+#
+# EXECUTION MODEL
+# ------------------------------------------------------------------------------
+# - Trigger: workflow_call (internal reusable)
+# - Single job: delegates to _reusable-pr-security.yml
+#
+#
+# SECURITY & POLICY NOTES
+# ------------------------------------------------------------------------------
+# - Permissions: minimal (contents: read)
+# - Platform ref must be SHA-pinned for supply chain security
+#
 # ==============================================================================
 
 name: PR Security
@@ -88,14 +128,24 @@ on:
         description: "Optional token for private registry installs"
         required: false
 
+# ==============================================================================
+# DEFAULT PERMISSIONS (LEAST PRIVILEGE)
+# ==============================================================================
+permissions:
+  contents: read  # Justification: required for repository checkout and secrets scanning
 
 jobs:
   call:
     name: PR Security
     uses: ./.github/workflows/_reusable-pr-security.yml
+    # -------------------------------------------------------------------------
+    # Justification: pull-requests: write required to post security findings
+    # as PR comments. security-events: write for SARIF upload.
+    # -------------------------------------------------------------------------
     permissions:
       contents: read
-      pull-requests: write
+      security-events: write  # Justification: upload SARIF reports
+      pull-requests: write  # Justification: post security finding comments
     with:
       runner: ${{ inputs.runner }}
       fetch_depth: ${{ inputs.fetch_depth }}

@@ -54,7 +54,7 @@ export PS_SECTION_SPACING="${PS_SECTION_SPACING:-1}"
 # ----------------------------
 on_interrupt() {
   echo
-  bash "${PS_BRANDING_SCRIPTS}/print-section.sh" \
+  ps_print_section \
     "gate.interrupted" \
     "${GATE_NAME} gate interrupted" \
     "Interrupted by user or signal"
@@ -88,7 +88,7 @@ if ! command -v npm >/dev/null 2>&1; then
   exit 1
 fi
 
-bash "${PS_BRANDING_SCRIPTS}/print-banner.sh"
+ps_print_banner
 gate_log_start
 
 run_step "typecheck" "TypeScript typecheck" "Strict TypeScript checks" \

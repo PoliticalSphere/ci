@@ -1,9 +1,16 @@
 #!/usr/bin/env node
 
+// ==============================================================================
+// Political Sphere — Regex Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Test regex compilation safety against catastrophic backtracking.
+// ==============================================================================
+
 import {
   compileRegex,
   setRegexEngineForTest,
-} from '../scripts/ci/validate-ci/checks.js';
+} from '../scripts/workflows/ci/validate-ci/checks.js';
 import { fail, section } from './test-utils.js';
 
 function assert(condition, message) {

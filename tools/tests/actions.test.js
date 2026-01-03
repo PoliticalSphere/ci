@@ -42,7 +42,7 @@ if (!fs.existsSync(actionsRoot) || !fs.statSync(actionsRoot).isDirectory()) {
 
 // Collect actions. Support two layouts:
 // 1) Top-level action directory with an action.yml present (e.g. `.github/actions/ps-tools/action.yml`)
-// 2) Namespace directory containing per-action subdirectories (e.g. `.github/actions/ps-bootstrap/ps-init/action.yml`)
+// 2) Namespace directory containing per-action subdirectories (e.g. `.github/actions/ps-bootstrap/ps-initialize-environment/action.yml`)
 const entries = fs.readdirSync(actionsRoot, { withFileTypes: true });
 const actionDirs = [];
 for (const e of entries) {
@@ -121,7 +121,7 @@ const actionDirSet = new Set(actionDirs);
 const topLevelDirs = entries.filter((e) => e.isDirectory()).map((e) => e.name);
 const topLevelSet = new Set(topLevelDirs);
 
-// An action is considered present in the catalog if either the full name (e.g. 'ps-bootstrap/ps-init')
+// An action is considered present in the catalog if either the full name (e.g. 'ps-bootstrap/ps-initialize-environment')
 // is listed, or the top-level namespace is listed (e.g. 'ps-bootstrap').
 const missingInCatalog = actionDirs.filter((d) => {
   const top = d.includes('/') ? d.split('/')[0] : d;

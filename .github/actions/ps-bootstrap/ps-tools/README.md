@@ -6,17 +6,17 @@
 #   Security contract and operational guidance for PS Tools.
 #
 # Dependencies:
-#   - tools/scripts/actions/ps-tools/ps-tools-resolve-root.sh
-#   - tools/scripts/actions/ps-tools/ps-tools-validate-inputs.sh
-#   - tools/scripts/actions/ps-tools/ps-tools-assemble.sh
-#   - tools/scripts/actions/ps-tools/ps-tools-install.sh
+#   - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-resolve-root.sh
+#   - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-validate-inputs.sh
+#   - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-assemble.sh
+#   - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-install.sh
 #   - tools/scripts/ci/install-tools.sh
 #   - configs/security/*.env (version pins for tooling)
 #   - actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 (optional)
 #   - ./.github/actions/ps-task/ps-run (optional)
 #
 # Dependents:
-#   - ./.github/actions/ps-bootstrap/ps-init (optional tools install)
+#   - ./.github/actions/ps-bootstrap/ps-initialize-environment (optional tools install)
 # ==============================================================================
 -->
 

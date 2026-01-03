@@ -1,4 +1,12 @@
 #!/usr/bin/env node
+
+// ==============================================================================
+// Political Sphere — PS Tools Wrappers Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Ensure deprecated wrapper actions have been removed.
+// ==============================================================================
+
 import fs from 'node:fs';
 import { fail, getRepoRoot } from './test-utils.js';
 

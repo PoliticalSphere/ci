@@ -1,3 +1,10 @@
+// ==============================================================================
+// Political Sphere — Test Utilities
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Shared utilities for test files including console helpers and file loading.
+// ==============================================================================
+
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -10,7 +17,7 @@ export {
   info,
   isCI,
   section,
-} from '../scripts/ci/validate-ci/console.js';
+} from '../scripts/workflows/ci/validate-ci/console.js';
 
 export function fail(message) {
   console.error(`ERROR: ${message}`);
@@ -40,8 +47,8 @@ export function assertContains(text, needle, rel, hint) {
 }
 
 import { execFileSync } from 'node:child_process';
-import { getRepoRoot } from '../scripts/ci/validate-ci/console.js';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { getRepoRoot } from '../scripts/workflows/ci/validate-ci/console.js';
+import { getSafePathEnv } from '../scripts/workflows/ci/validate-ci/safe-path.js';
 
 export const SAFE_PATH = getSafePathEnv();
 
@@ -84,7 +91,10 @@ export function assertLintSummaryOnce(out, rel = 'lint summary') {
     .split('\n')
     .filter((line) => !line.startsWith('PS.LOG '))
     .join('\n');
-  const headerCount = (filtered.match(/LINT & TYPE CHECK/g) || []).length;
+  // Match either old header "LINT & TYPE CHECK" or new header "Linter Results"
+  const headerCount = (
+    filtered.match(/LINT & TYPE CHECK|Linter Results/g) || []
+  ).length;
   if (headerCount !== 1) {
     fail(
       `${rel}: Unexpected header count: expected 1, found ${headerCount}\nOutput:\n${filtered}`,

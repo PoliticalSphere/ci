@@ -1,12 +1,16 @@
 #!/usr/bin/env node
 
-// Run 'bash -n' on repository shell scripts under tools/scripts and .github/actions
-// to ensure scripts have no syntax errors. This will be executed in CI.
+// ==============================================================================
+// Political Sphere — Bash Syntax Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Run 'bash -n' on shell scripts to ensure no syntax errors.
+// ==============================================================================
 
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
-import { getSafePathEnv } from '../scripts/ci/validate-ci/safe-path.js';
+import { getSafePathEnv } from '../scripts/workflows/ci/validate-ci/safe-path.js';
 import { fail, getRepoRoot, section } from './test-utils.js';
 
 const repoRoot = getRepoRoot();
