@@ -22,6 +22,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { getRepoRoot } from '../core/cli.js';
+import { safeCompileRegex } from '../core/regex.js';
 
 const repoRoot = getRepoRoot();
 
@@ -111,6 +112,31 @@ const CONFIG = {
   },
 };
 
+const PLACEHOLDER_DOUBLE_STAR = '__DOUBLE_STAR__';
+const PLACEHOLDER_SINGLE_STAR = '__SINGLE_STAR__';
+
+function escapeRegexFragment(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function globToRegex(pattern) {
+  const normalized = pattern
+    .replaceAll('**', PLACEHOLDER_DOUBLE_STAR)
+    .replaceAll('*', PLACEHOLDER_SINGLE_STAR);
+  const escaped = escapeRegexFragment(normalized);
+  return escaped
+    .replaceAll(PLACEHOLDER_DOUBLE_STAR, '.*')
+    .replaceAll(PLACEHOLDER_SINGLE_STAR, '[^/]*');
+}
+
+const EXCLUDE_MATCHERS = CONFIG.exclude.map((pattern) => {
+  if (!pattern.includes('*')) {
+    return (relPath) => relPath.includes(pattern);
+  }
+  const regex = safeCompileRegex(globToRegex(pattern));
+  return (relPath) => regex.test(relPath);
+});
+
 // -----------------------------------------------------------------------------
 // File Discovery
 // -----------------------------------------------------------------------------
@@ -125,17 +151,7 @@ function findFiles() {
         const relativePath = path.relative(repoRoot, fullPath);
 
         // Check exclusions
-        if (
-          CONFIG.exclude.some((pattern) => {
-            if (pattern.includes('**')) {
-              const regex = new RegExp(
-                pattern.replaceAll('**', '.*').replaceAll('*', '[^/]*'),
-              );
-              return regex.test(relativePath);
-            }
-            return relativePath.includes(pattern.replaceAll('**', ''));
-          })
-        ) {
+        if (EXCLUDE_MATCHERS.some((match) => match(relativePath))) {
           continue;
         }
 

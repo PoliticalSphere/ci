@@ -5,6 +5,17 @@
 //   Provide a minimal guard against catastrophic backtracking patterns.
 // ==============================================================================
 
+import { createRequire } from 'node:module';
+
+// Prefer RE2 if available to avoid backtracking-based DoS.
+let RE2 = null;
+try {
+  const require = createRequire(import.meta.url);
+  RE2 = require('re2');
+} catch {
+  RE2 = null;
+}
+
 function parseBraceQuantifier(str, i) {
   const slice = str.slice(i);
   const match = slice.match(/^\{\s*(\d*)\s*(?:,\s*(\d*)\s*)?\}/);
@@ -40,6 +51,52 @@ function skipCharClass(str, idx) {
     idx++;
   }
   return idx;
+}
+
+function hasLookaround(pat) {
+  const len = pat.length;
+  let i = 0;
+  while (i < len) {
+    const ch = pat[i];
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === '[') {
+      i = skipCharClass(pat, i);
+      continue;
+    }
+    if (ch === '(' && pat[i + 1] === '?') {
+      const next = pat[i + 2];
+      if (next === '=' || next === '!') return true;
+      if (next === '<' && (pat[i + 3] === '=' || pat[i + 3] === '!'))
+        return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+function hasBackreference(pat) {
+  const len = pat.length;
+  let i = 0;
+  while (i < len) {
+    const ch = pat[i];
+    if (ch === '\\') {
+      const next = pat[i + 1];
+      if (next >= '1' && next <= '9') return true;
+      if (next === 'k' && (pat[i + 2] === '<' || pat[i + 2] === "'"))
+        return true;
+      i += 2;
+      continue;
+    }
+    if (ch === '[') {
+      i = skipCharClass(pat, i);
+      continue;
+    }
+    i++;
+  }
+  return false;
 }
 
 function isUnboundedQuantifierAt(str, idx) {
@@ -141,10 +198,19 @@ function detectNestedUnbounded(pat) {
 }
 
 export function safeCompileRegex(pattern, flags = '') {
+  if (/[^gimsu]/.test(flags)) {
+    throw new Error(`unsupported regex flags '${flags}'`);
+  }
+  if (hasLookaround(pattern) || hasBackreference(pattern)) {
+    throw new Error(
+      `unsafe regex pattern detected (backreference/lookaround): ${pattern}`,
+    );
+  }
   if (detectNestedUnbounded(pattern)) {
     throw new Error(
       `unsafe regex pattern detected (potential catastrophic backtracking): ${pattern}`,
     );
   }
+  if (RE2) return new RE2(pattern, flags);
   return new RegExp(pattern, flags);
 }

@@ -218,6 +218,52 @@ function hasOuterUnboundedAt(pat, pos) {
   return false;
 }
 
+function hasLookaroundIn(pat) {
+  const len = pat.length;
+  let i = 0;
+  while (i < len) {
+    const ch = pat[i];
+    if (ch === '\\') {
+      i += 2;
+      continue;
+    }
+    if (ch === '[') {
+      i = skipCharClassFrom(pat, i);
+      continue;
+    }
+    if (ch === '(' && pat[i + 1] === '?') {
+      const next = pat[i + 2];
+      if (next === '=' || next === '!') return true;
+      if (next === '<' && (pat[i + 3] === '=' || pat[i + 3] === '!'))
+        return true;
+    }
+    i++;
+  }
+  return false;
+}
+
+function hasBackreferenceIn(pat) {
+  const len = pat.length;
+  let i = 0;
+  while (i < len) {
+    const ch = pat[i];
+    if (ch === '\\') {
+      const next = pat[i + 1];
+      if (next >= '1' && next <= '9') return true;
+      if (next === 'k' && (pat[i + 2] === '<' || pat[i + 2] === "'"))
+        return true;
+      i += 2;
+      continue;
+    }
+    if (ch === '[') {
+      i = skipCharClassFrom(pat, i);
+      continue;
+    }
+    i++;
+  }
+  return false;
+}
+
 function _detectNestedUnbounded(pat) {
   const len = pat.length;
   let i = 0;
@@ -262,6 +308,11 @@ function compileRegex(reStr) {
 
   if (/[^im]/.test(flags)) {
     throw new Error(`unsupported regex flags '${flags}'`);
+  }
+  if (hasLookaroundIn(pattern) || hasBackreferenceIn(pattern)) {
+    throw new Error(
+      `unsafe regex pattern detected (backreference/lookaround): ${pattern}`,
+    );
   }
 
   // Detect potentially catastrophic backtracking patterns such as nested
