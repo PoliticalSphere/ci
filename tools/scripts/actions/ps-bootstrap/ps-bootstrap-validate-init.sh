@@ -163,3 +163,4 @@ printf 'PS.INIT: validated (repo depth=%s, platform=%s, tools=%s)\n' \
   "$([[ "${skip_platform}" == "1" ]] && echo "off" || echo "on")" \
   "$([[ "${install_tools}" == "1" ]] && echo "${bundle}" || echo "off")"
 return 0
+return 0
