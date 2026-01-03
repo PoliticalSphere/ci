@@ -75,7 +75,7 @@
 #     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/path-validation.sh,
 #     tools/scripts/core/validation.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh,
 #     tools/scripts/branding/print-section.sh,
 #     tools/scripts/core/validation.sh,
 #     tools/scripts/workflows/ci/validate-ci/index.js, configs/ci/policies/validate-ci.yml]
@@ -121,7 +121,7 @@
 #     - tools/scripts/core/path-validation.sh
 #     - tools/scripts/core/validation.sh
 #     - tools/scripts/core/gha-helpers.sh
-#     - tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh
 #     - tools/scripts/branding/print-section.sh
 #     - tools/scripts/core/validation.sh
 #
@@ -219,97 +219,7 @@ runs:
         PS_ALLOWED_REPOSITORIES_INPUT: ${{ inputs.allowed_repositories }}
       run: |
         set -euo pipefail
-
-        # shellcheck source=tools/scripts/branding/format.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh" || true
-
-        # shellcheck source=tools/scripts/core/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
-        # shellcheck source=tools/scripts/core/path-validation.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/path-validation.sh"
-        # shellcheck source=tools/scripts/core/validation.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
-
-        fail() {
-          v_error "$*"
-          exit 1
-        }
-
-        log_info() {
-          if type -t ps_detail >/dev/null 2>&1; then
-            ps_detail "$*"
-          else
-            printf 'PS.CHECKOUT.PLATFORM: %s\n' "$*"
-          fi
-        }
-
-        repo="${PS_REPOSITORY_INPUT:-}"
-        if [[ -z "${repo}" ]]; then
-          fail "inputs.repository is required"
-        fi
-        repo="$(require_owner_repo "inputs.repository" "${repo}")"
-
-        allowlist="${PS_ALLOWED_REPOSITORIES_INPUT:-}"
-        if [[ -z "${allowlist}" ]]; then
-          owner="${repo%%/*}"
-          if [[ "${owner}" != "PoliticalSphere" ]]; then
-            fail "inputs.repository owner must be PoliticalSphere unless allowlisted (got ${repo})"
-          fi
-        fi
-
-        # Optional allowlist guard (high value for internal platform safety)
-        if [[ -n "${allowlist}" ]]; then
-          allowed="0"
-          while IFS= read -r line; do
-            tool_trim="$(printf '%s' "${line}" | sed 's/^[[:space:]]*//; s/[[:space:]]*$//')"
-            [[ -z "${tool_trim}" ]] && continue
-            [[ "${tool_trim}" == "#"* ]] && continue
-            if [[ "${tool_trim}" == "${repo}" ]]; then
-              allowed="1"
-              break
-            fi
-          done <<< "${allowlist}"
-          if [[ "${allowed}" != "1" ]]; then
-            fail "repository ${repo} not in allowed_repositories allowlist"
-          fi
-        fi
-
-        ref="${PS_REF_INPUT:-}"
-        if [[ -z "${ref}" ]]; then
-          fail "inputs.ref must not be empty"
-        fi
-
-        path="${PS_PATH_INPUT:-.ps-platform}"
-        if [[ -z "${path}" ]]; then
-          fail "inputs.path must not be empty"
-        fi
-        # Path traversal guard (defense-in-depth): forbid absolute or ".." anywhere.
-        if ! safe_relpath_no_dotdot "${path}"; then
-          fail "inputs.path must be a repo-relative safe path (got ${path})"
-        fi
-
-        require_pinned="$(require_true_false "inputs.require_pinned_ref" \
-          "${PS_REQUIRE_PINNED_REF_INPUT:-false}")"
-        clean="$(require_true_false "inputs.clean_path" \
-          "${PS_CLEAN_PATH_INPUT:-false}")"
-
-        ws="${GITHUB_WORKSPACE}"
-        PS_LOG_PREFIX="PS.CHECKOUT.PLATFORM" \
-        PS_ENV_PREFIX="PS_PLATFORM" \
-          bash "$ws/tools/scripts/actions/ps-bootstrap/ps-checkout-validate-common.sh"
-
-        emit_env "PS_PLATFORM_REPO_VALIDATED" "${repo}"
-        emit_env "PS_PLATFORM_REF_VALIDATED" "${ref}"
-        emit_env "PS_PLATFORM_PATH_VALIDATED" "${path}"
-        emit_env "PS_PLATFORM_CLEAN_PATH_VALIDATED" "${clean}"
-        emit_env "PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED" \
-          "${require_pinned}"
-
-        log_info "repository=${repo}"
-        log_info "ref=${ref}"
-        log_info "path=${path}"
-        log_info "clean_path=${clean}"
-        log_info "require_pinned_ref=${require_pinned}"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-platform-validate-inputs.sh"
 
     - name: Clean platform path (optional)
       if: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == 'true' }}
@@ -341,64 +251,7 @@ runs:
           ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED }}
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/core/validation.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
-
-        fail() {
-          v_error "$*"
-          exit 1
-        }
-
-        platform_dir="${GITHUB_WORKSPACE}/${PS_PLATFORM_PATH}"
-        if [[ ! -d "${platform_dir}" ]]; then
-          fail "platform checkout path not found: ${platform_dir}"
-        fi
-
-        if ! git -C "${platform_dir}" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-          fail "platform checkout is not a git repository: ${platform_dir}"
-        fi
-
-        head_sha="$(git -C "${platform_dir}" rev-parse HEAD)"
-        printf 'PS.CHECKOUT.PLATFORM: head_sha=%s\n' "${head_sha}"
-
-        if [[ "${PS_PLATFORM_REQUIRE_PINNED_REF}" == "true" ]]; then
-          if [[ ! "${PS_PLATFORM_REF}" =~ ^[0-9a-fA-F]{40}$ ]]; then
-            fail "platform ref must be a full 40-char commit SHA when" \
-              "require_pinned_ref=true (got ${PS_PLATFORM_REF})"
-          fi
-        fi
-
-        if [[ "${PS_PLATFORM_REF}" =~ ^[0-9a-fA-F]{7,40}$ ]]; then
-          expected_sha="$(git -C "${platform_dir}" rev-parse "${PS_PLATFORM_REF}^{commit}")"
-          if [[ "${head_sha}" != "${expected_sha}" ]]; then
-            fail "platform ref mismatch (expected ${expected_sha}, got ${head_sha})"
-          fi
-        fi
-
-        if [[ -n "$(git -C "${platform_dir}" status --porcelain)" ]]; then
-          v_error "platform checkout is not clean"
-          git -C "${platform_dir}" status --porcelain >&2
-          exit 1
-        fi
-
-        missing="0"
-        for rel in \
-          "tools/scripts/branding/format.sh" \
-          "tools/scripts/branding/print-section.sh" \
-          "tools/scripts/core/validation.sh" \
-          "tools/scripts/workflows/ci/validate-ci/index.js" \
-          "configs/ci/policies/validate-ci.yml"; do
-          if [[ ! -f "${platform_dir}/${rel}" ]]; then
-            v_error "platform missing required file: ${rel}"
-            missing="1"
-          fi
-        done
-
-        if [[ "${missing}" == "1" ]]; then
-          exit 1
-        fi
-
-        printf 'PS.BOOTSTRAP.CHECKOUT_PLATFORM: integrity=ok\n'
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-platform-verify-integrity.sh"
 
     - name: Emit outputs (PS)
       id: ps_checkout_platform_outputs

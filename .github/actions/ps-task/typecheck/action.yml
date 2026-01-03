@@ -70,7 +70,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-typecheck/typecheck.sh]
+#   internal: [tools/scripts/actions/ps-task/typecheck/typecheck.sh]
 #   external: [none]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/typecheck/README.md
-#     - tools/scripts/actions/ps-typecheck/typecheck.sh
+#     - tools/scripts/actions/ps-task/typecheck/typecheck.sh
 #
 # ==============================================================================
 
@@ -120,7 +120,7 @@ inputs:
   script:
     description: "Typecheck script path (repo-relative)"
     required: false
-    default: "tools/scripts/actions/ps-typecheck/typecheck.sh"
+    default: "tools/scripts/actions/ps-task/typecheck/typecheck.sh"
 
   working_directory:
     description: "Working directory to run from (repo-relative)"

@@ -71,7 +71,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-build/build.sh]
+#   internal: [tools/scripts/actions/ps-task/build/build.sh]
 #   external: [none]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -110,7 +110,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/build/README.md
-#     - tools/scripts/actions/ps-build/build.sh
+#     - tools/scripts/actions/ps-task/build/build.sh
 #
 # ==============================================================================
 
@@ -142,7 +142,7 @@ inputs:
   script:
     description: "Build script path (repo-relative)"
     required: false
-    default: "tools/scripts/actions/ps-build/build.sh"
+    default: "tools/scripts/actions/ps-task/build/build.sh"
 
   args:
     description: "Optional arguments to pass to the build script (space-separated). Prefer parsing inside the script."

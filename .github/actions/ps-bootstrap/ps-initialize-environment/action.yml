@@ -74,7 +74,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-bootstrap/ps-bootstrap-validate-init.sh,
+#   internal: [tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-validate-init.sh,
 #     tools/scripts/actions/cross-cutting/normalize.sh,
 #     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/path-validation.sh,
@@ -306,7 +306,7 @@ runs:
         PS_TOOLS_BUNDLE_INPUT: ${{ inputs.tools_bundle }}
       run: |
         set -euo pipefail
-        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-bootstrap-validate-init.sh"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-validate-init.sh"
 
     # -----------------------------------------------------------------------------
     # PHASE 3: CHECKOUT REPOSITORY
@@ -355,34 +355,8 @@ runs:
       if: ${{ env.PS_HOME_ISOLATION_VALIDATED == '1' }}
       shell: bash
       run: |
-        # [PS.INIT.HOME] ------------------------------------------------------------
-        # Intent: Prepare and enable HOME/XDG isolation for the job.
-        # Safety: set -euo pipefail (Strict mode enabled)
-        # ----------------------------------------------------------------------------
         set -euo pipefail
-        # shellcheck source=tools/scripts/branding/format.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/branding/format.sh" || true
-        if type -t ps_rule >/dev/null 2>&1; then
-          ps_rule
-        fi
-        # shellcheck source=tools/scripts/core/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
-        home_abs="${GITHUB_WORKSPACE}/${PS_HOME_DIR_VALIDATED}"
-        mkdir -p "${home_abs}"
-
-        # Apply HOME + XDG dirs (keeps tools isolated/deterministic)
-        emit_env "HOME" "${home_abs}"
-        emit_env "HOME_ORIGINAL" "${PS_HOME_ORIGINAL}"
-        emit_env "XDG_CACHE_HOME" "${home_abs}/.cache"
-        emit_env "XDG_CONFIG_HOME" "${home_abs}/.config"
-        emit_env "XDG_STATE_HOME" "${home_abs}/.state"
-
-        mkdir -p "${home_abs}/bin"
-        echo "${home_abs}/bin" >> "${GITHUB_PATH}"
-        mkdir -p "${home_abs}/.cache" "${home_abs}/.config" "${home_abs}/.state"
-        echo "home_abs=${home_abs}" >> "${GITHUB_OUTPUT}"
-
-        printf 'PS.INIT: HOME=%s\n' "${home_abs}"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-init-prepare-home.sh"
 
     # =========================================================================
     # 5) CHECKOUT PLATFORM (OPTIONAL)
@@ -470,46 +444,4 @@ runs:
         PS_HOME_ABS: ${{ steps.ps_home.outputs.home_abs }}
       run: |
         set -euo pipefail
-
-        repo_root="${GITHUB_WORKSPACE}"
-        platform_root="${PS_PLATFORM_ROOT:-}"
-        platform_enabled="false"
-        home_dir=""
-        home_isolation_enabled="false"
-        home_original="${PS_HOME_ORIGINAL:-}"
-
-        if [[ "${PS_HOME_ISOLATION_VALIDATED}" == "1" ]]; then
-          home_dir="${PS_HOME_ABS}"
-          home_isolation_enabled="true"
-        else
-          home_dir="${home_original}"
-        fi
-
-        if [[ "${PS_SKIP_PLATFORM_VALIDATED}" == "0" ]]; then
-          platform_enabled="true"
-        fi
-
-        {
-          echo "repo_root=${repo_root}"
-          echo "home_dir=${home_dir}"
-          echo "home_original=${home_original}"
-          echo "home_isolation_enabled=${home_isolation_enabled}"
-          echo "platform_root=${platform_root}"
-          echo "platform_enabled=${platform_enabled}"
-          timestamp="$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
-          format='{"repo_root":"%s","home_dir":"%s","is_isolated":%s,'
-          format+='"platform_enabled":%s,"timestamp":"%s"}'
-          init_metadata="$(printf "${format}" \
-            "${repo_root}" \
-            "${home_dir}" \
-            "${home_isolation_enabled}" \
-            "${platform_enabled}" \
-            "${timestamp}")"
-          echo "init_metadata=${init_metadata}"
-        } >> "${GITHUB_OUTPUT}"
-
-        printf 'PS.BOOTSTRAP.INIT: repo_root=%s\n' "${repo_root}"
-        printf 'PS.BOOTSTRAP.INIT: home_isolation=%s\n' "${home_isolation_enabled}"
-        printf 'PS.BOOTSTRAP.INIT: platform_enabled=%s\n' "${platform_enabled}"
-        printf 'PS.BOOTSTRAP.INIT: platform_root=%s\n' "${platform_root}"
-        printf 'PS.BOOTSTRAP.INIT: OK\n'
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-init-emit-outputs.sh"

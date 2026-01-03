@@ -242,4 +242,4 @@ export function fatal(message) {
 }
 
 // Re-export canonical implementations from lib
-export { getRepoRoot, isCI } from '../../core/cli.js';
+export { getRepoRoot, isCI } from '../../../core/cli.js';
