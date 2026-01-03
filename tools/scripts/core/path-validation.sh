@@ -41,7 +41,12 @@ safe_relpath() {
   [[ "${p}" != /* ]] || return 1
   # Reject traversal segments rather than any ".." substring.
   case "${p}" in
-    *"/../"*|*"\../"*|*"/.."*|*"../"*|*"\\.."*|*"..\\"* ) return 1 ;;
+    *"/../"*)   return 1 ;;  # Unix-style traversal segment /../ in the middle of a path
+    *"/.."*)    return 1 ;;  # Unix-style traversal segment /.. at the end of a path
+    *"../"*)    return 1 ;;  # Unix-style traversal segment ../ at the start or middle of a path
+    *"\../"*)   return 1 ;;  # Mixed separator segment \../ (defensive pattern for odd combinations)
+    *"\\.."*)   return 1 ;;  # Windows-style traversal segment \.. in the middle of a path
+    *"..\\"*)   return 1 ;;  # Windows-style traversal segment ..\ at the end of a path
   esac
   return 0
 }
