@@ -37,7 +37,7 @@ on:
         type: string
 
       fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
         required: false
         default: 0
         type: number
@@ -72,12 +72,6 @@ on:
 
       # ==========================================================================
       # RELEASE NOTES
-      # --------------------------------------------------------------------------
-      # Precedence:
-      #   1) release_notes (inline)
-      #   2) release_notes_path (file in repo at release_ref)
-      #   3) generate_notes=true (GitHub auto-generation)
-      #   4) else: empty body
       # ==========================================================================
       generate_notes:
         description: "Auto-generate GitHub release notes (if no custom notes provided)"
@@ -104,7 +98,7 @@ on:
         type: string
 
       # ==========================================================================
-      # PLATFORM CONFIGURATION
+      # PLATFORM & SHARED TOOLING
       # ==========================================================================
       platform_ref:
         description: "Platform repo ref to checkout for shared scripts/configs"
@@ -258,7 +252,7 @@ jobs:
         with:
           id: validate-release-inputs
           title: Validate release inputs (publish)
-          script: tools/scripts/workflows/release/validate-release-inputs.sh
+          script: tools/scripts/workflows/release/validate-inputs.sh
 
       - name: Prepare release notes mode
         id: notes
@@ -308,7 +302,7 @@ jobs:
         with:
           id: verify-release
           title: Verify tag + release
-          script: tools/scripts/workflows/release/verify-release.sh
+          script: tools/scripts/workflows/release/verify.sh
         env:
           GH_TOKEN: ${{ github.token }}
 

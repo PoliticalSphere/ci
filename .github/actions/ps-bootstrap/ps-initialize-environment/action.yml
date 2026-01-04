@@ -74,8 +74,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-validate-init.sh,
-#     tools/scripts/actions/cross-cutting/normalize.sh,
+#   internal: [tools/scripts/actions/ps-bootstrap/ps-initialize-environment/validate-inputs.sh,
 #     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/path-validation.sh,
 #     tools/scripts/core/validation.sh,
@@ -119,7 +118,6 @@
 # related:
 #   references:
 #     - .github/actions/ps-bootstrap/ps-initialize-environment/README.md
-#     - tools/scripts/actions/cross-cutting/normalize.sh
 #     - tools/scripts/core/gha-helpers.sh
 #     - tools/scripts/core/path-validation.sh
 #     - tools/scripts/core/validation.sh
@@ -306,7 +304,7 @@ runs:
         PS_TOOLS_BUNDLE_INPUT: ${{ inputs.tools_bundle }}
       run: |
         set -euo pipefail
-        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-validate-init.sh"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/validate-inputs.sh"
 
     # -----------------------------------------------------------------------------
     # PHASE 3: CHECKOUT REPOSITORY
@@ -343,7 +341,7 @@ runs:
         PS_PLATFORM_SNAPSHOT_PATH: ${{ env.PS_PLATFORM_PATH_VALIDATED }}
       run: |
         snapshot_script="${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap"
-        snapshot_script="${snapshot_script}/ps-bootstrap-detect-platform-snapshot.sh"
+        snapshot_script="${snapshot_script}/ps-setup-standard/detect-platform-snapshot.sh"
         bash "${snapshot_script}"
 
     # -----------------------------------------------------------------------------
@@ -356,7 +354,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-init-prepare-home.sh"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/prepare-home.sh"
 
     # =========================================================================
     # 5) CHECKOUT PLATFORM (OPTIONAL)
@@ -444,4 +442,4 @@ runs:
         PS_HOME_ABS: ${{ steps.ps_home.outputs.home_abs }}
       run: |
         set -euo pipefail
-        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-init-emit-outputs.sh"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/emit-outputs.sh"

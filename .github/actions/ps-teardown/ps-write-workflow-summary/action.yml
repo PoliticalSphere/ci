@@ -138,7 +138,7 @@ runs:
       run: |
         summary_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
         summary_root="${summary_root}/ps-write-summary"
-        summary_script="${summary_root}/ps-write-summary.sh"
+        summary_script="${summary_root}/write-summary.sh"
         bash "${summary_script}"
 
     - name: Complete (PS)

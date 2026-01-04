@@ -18,42 +18,56 @@ name: PR Checks
 
 on:
   workflow_call:
+    
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
         type: string
         required: false
         default: "ubuntu-22.04"
+
       node_version:
         description: "Node.js major version"
         type: string
         required: false
         default: "22"
+
       fetch_depth:
         description: "Git fetch depth (1 = shallow, 0 = full history)"
         type: number
         required: false
         default: 1
+
+      # ==========================================================================
+      # PULL REQUEST CONTEXT
+      # ==========================================================================
       pr_number:
         description: "Pull request number"
         type: string
         required: false
         default: ""
+
       pr_is_fork:
         description: "Whether the PR originates from a fork (true/false)"
         type: string
         required: false
         default: "false"
+
       allow_pr_comments:
         description: "Allow PR failure comments (1 = on, 0 = off)"
         type: string
         required: false
         default: "0"
+
       pr_base_ref:
         description: "PR base SHA"
         type: string
         required: false
         default: ""
+
       pr_head_ref:
         description: "PR head SHA"
         type: string

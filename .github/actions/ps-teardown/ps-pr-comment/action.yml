@@ -143,7 +143,7 @@ runs:
       run: |
         resolve_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
         resolve_root="${resolve_root}/ps-pr-comment"
-        resolve_script="${resolve_root}/ps-pr-comment-resolve-root.sh"
+        resolve_script="${resolve_root}/resolve-root.sh"
         bash "${resolve_script}"
 
     - name: Validate inputs
@@ -157,7 +157,7 @@ runs:
       run: |
         validate_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
         validate_root="${validate_root}/ps-pr-comment"
-        validate_script="${validate_root}/ps-pr-comment-validate-inputs.sh"
+        validate_script="${validate_root}/validate-inputs.sh"
         bash "${validate_script}"
 
     - name: Validate PR refs
@@ -182,7 +182,7 @@ runs:
       run: |
         post_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
         post_root="${post_root}/ps-pr-comment"
-        post_script="${post_root}/ps-pr-comment-post.sh"
+        post_script="${post_root}/post.sh"
         bash "${post_script}"
 
     - name: Complete (PS)

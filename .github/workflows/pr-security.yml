@@ -48,6 +48,10 @@ name: PR Security
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
@@ -61,12 +65,9 @@ on:
         required: false
         default: 1
 
-      cache:
-        description: "Enable dependency caching (1 = on, 0 = off)"
-        type: string
-        required: false
-        default: "1"
-
+      # ==========================================================================
+      # PLATFORM & SHARED TOOLING
+      # ==========================================================================
       platform_ref:
         description: "Platform repository ref for shared scripts/configs"
         type: string
@@ -79,6 +80,9 @@ on:
         required: false
         default: "true"
 
+      # ==========================================================================
+      # ARTIFACT COLLECTION & RETENTION
+      # ==========================================================================
       artifact_paths:
         description: "Artifact paths to upload"
         type: string
@@ -93,6 +97,9 @@ on:
         required: false
         default: 7
 
+      # ==========================================================================
+      # PULL REQUEST CONTEXT
+      # ==========================================================================
       pr_number:
         description: "Pull request number (enables dependency review + PR comments)"
         type: string
@@ -123,6 +130,9 @@ on:
         required: false
         default: ""
 
+    # ==========================================================================
+    # SECRETS (OPTIONAL, LEAST-PRIVILEGE)
+    # ==========================================================================
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
@@ -149,7 +159,6 @@ jobs:
     with:
       runner: ${{ inputs.runner }}
       fetch_depth: ${{ inputs.fetch_depth }}
-      cache: ${{ inputs.cache }}
       platform_ref: ${{ inputs.platform_ref }}
       platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref }}
       artifact_paths: ${{ inputs.artifact_paths }}

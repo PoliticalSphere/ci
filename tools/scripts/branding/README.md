@@ -8,9 +8,8 @@ Output helpers for consistent Political Sphere CLI presentation.
 - `format.sh`: shared formatting helpers for bash scripts.
   - Includes `ps_log` for structured `PS.LOG` records (see `docs/terminal-output-standard.md`).
   - Includes `ps_cli_header` for standardized CLI run headers.
-- `validate-inputs.sh`: legacy input validation helpers (kept for compatibility).
 
-Validation helpers now live in `tools/scripts/lib/validation.sh`.
+Validation helpers now live in `tools/scripts/core/validation.sh` and shared bootstrap helpers live in `tools/scripts/actions/ps-bootstrap/shared/validate-inputs-common.sh`.
 
 ## Usage
 

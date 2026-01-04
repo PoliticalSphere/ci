@@ -116,7 +116,7 @@ const PLACEHOLDER_DOUBLE_STAR = '__DOUBLE_STAR__';
 const PLACEHOLDER_SINGLE_STAR = '__SINGLE_STAR__';
 
 function escapeRegexFragment(value) {
-  return value.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function globToRegex(pattern) {
@@ -352,7 +352,7 @@ function generateReport(findings, complexityFindings) {
 function printPatternSummary(name, data) {
   const status = data.exceeded ? '❌' : '✓';
   const thresholdStr =
-    data.threshold !== null ? `(threshold: ${data.threshold})` : '(no limit)';
+    data.threshold != null ? `(threshold: ${data.threshold})` : '(no limit)';
   console.log(`${status} ${name}: ${data.count} ${thresholdStr}`);
 
   // Show first 3 findings

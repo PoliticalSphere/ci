@@ -17,7 +17,7 @@ contract for tooling, scripts, workflows, and path integrity.
 ## Usage
 
 ```bash
-bash tools/scripts/consumer/contract-check.sh
+bash tools/scripts/workflows/consumer/contract-check.sh
 ```
 
 Policy defaults live under `configs/consumer/`.

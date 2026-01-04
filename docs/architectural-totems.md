@@ -1,7 +1,20 @@
 # Architectural Totems
 
+> Part of the [Vision](./VISION.md) — Enabling cognitive ergonomics through standardization.
+
 This document identifies **exemplar files** that represent best practices and serve as
 authoritative references for AI code generation, manual review, and new file creation.
+
+## Relationship to Vision Principles
+
+Totems implement the Vision's documentation strategy:
+
+| Vision Principle | Totem Implementation |
+|------------------|---------------------|
+| **DRY** | Totems are the single source of truth for patterns |
+| **POLS** | Consistent structure eliminates surprises |
+| **Cognitive Ergonomics** | Standardized headers reduce onboarding friction |
+| **KISS** | Minimal, focused patterns avoid over-engineering |
 
 ## Document Metadata
 

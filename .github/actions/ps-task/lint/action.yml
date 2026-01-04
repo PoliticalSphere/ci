@@ -70,7 +70,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/gates/gate-pre-commit.sh]
+#   internal: [tools/scripts/gates/pre-commit.sh]
 #   external: [none]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-task/lint/README.md
-#     - tools/scripts/gates/gate-pre-commit.sh
+#     - tools/scripts/gates/pre-commit.sh
 #
 # ==============================================================================
 
@@ -120,7 +120,7 @@ inputs:
   script:
     description: "Gate script path (repo-relative)"
     required: false
-    default: "tools/scripts/gates/gate-pre-commit.sh"
+    default: "tools/scripts/gates/pre-commit.sh"
 
   working_directory:
     description: "Working directory to run from (repo-relative)"

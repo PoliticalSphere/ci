@@ -23,7 +23,7 @@
 #   - assert_egress_allowed_url() (optional, from egress.sh)
 #
 # Sourced by:
-#   - tools/scripts/runners/security/semgrep-cli.sh
+#   - tools/scripts/runners/security/semgrep/cli.sh
 #   - (future) Other security tools producing SARIF
 # ==============================================================================
 [[ -n "${_PS_SARIF_UPLOAD_LOADED:-}" ]] && return 0
@@ -35,6 +35,7 @@ if ! declare -F fail >/dev/null 2>&1; then
     printf 'ERROR: %s\n' "$*" >&2
     exit 1
   }
+  return 0
 fi
 
 # upload_sarif <sarif_path>

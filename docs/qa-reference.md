@@ -199,21 +199,21 @@ formatting before committing.
 **Solution:**
 Implemented "autofix-first" pattern in the pre-commit gate:
 
-1. **New helper function** `run_autofix` added to `gate-common.sh`:
+1. **New helper function** `run_autofix` added to `common.sh`:
    - Runs the autofix command (e.g., `biome --write`, `eslint --fix`)
    - Captures originally staged files before autofix
    - Re-stages any modified files after autofix completes
    - Logs autofix activity for traceability
 
-2. **Modified pre-commit gate** (`gate-pre-commit.sh`):
+2. **Modified pre-commit gate** (`pre-commit.sh`):
    - Added autofix phase BEFORE lint checks
    - Runs autofix for: biome (--write), eslint (--fix), markdownlint (--fix)
    - Lint checks now run on already-fixed code
 
 **Files Changed:**
 
-- `tools/scripts/gates/gate-common.sh` - Added `run_autofix()` helper function
-- `tools/scripts/gates/gate-pre-commit.sh` - Added autofix phase before lint checks
+- `tools/scripts/gates/common.sh` - Added `run_autofix()` helper function
+- `tools/scripts/gates/pre-commit.sh` - Added autofix phase before lint checks
 
 **Behaviour:**
 
@@ -252,9 +252,9 @@ Created `docs/architectural-totems.md` documenting exemplar files (totems) for e
 
 | Type | Totem File | Purpose |
 | --- | --- | --- |
-| Gate Script | `tools/scripts/gates/gate-pre-commit.sh` | Bash gate entrypoint pattern |
+| Gate Script | `tools/scripts/gates/pre-commit.sh` | Bash gate entrypoint pattern |
 | Lint Wrapper | `tools/scripts/lint/biome.sh` | Lint tool wrapper pattern |
-| Shared Library | `tools/scripts/gates/gate-common.sh` | Bash helper library pattern |
+| Shared Library | `tools/scripts/gates/common.sh` | Bash helper library pattern |
 | Reusable Workflow | `.github/workflows/_reusable-pr-gates.yml` | GitHub Actions workflow pattern |
 | Test File | `tools/tests/consumer-contract.test.js` | JavaScript test pattern |
 | Policy JSON | `configs/consumer/contract.json` | Versioned policy pattern |

@@ -15,9 +15,24 @@
 
 # Composite Actions
 
+> Part of the [Vision](../../docs/VISION.md) — Implementing SRP and DRY through modular actions.
+
 Shared, reusable composite actions for the Political Sphere CI/CD platform.
 These actions are the single source of truth for CI behavior consumed by
 workflows and downstream repositories.
+
+---
+
+## Vision Alignment
+
+These actions implement the Vision's architectural principles:
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Single Responsibility (SRP)** | Each action has one clear purpose |
+| **DRY** | Common logic centralized here, not duplicated in workflows |
+| **Immutable Gates** | Actions are SHA-pinnable, providing supply chain security |
+| **Cognitive Ergonomics** | Standardized interfaces and predictable behavior |
 
 ---
 

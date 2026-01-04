@@ -2,104 +2,81 @@
 set -euo pipefail
 
 # ==============================================================================
-# Political Sphere — Hadolint (Deterministic)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Validate Dockerfiles using hadolint + repo config.
+# Political Sphere — Hadolint Lint Runner
+# ==============================================================================
+# ps_header_v: 6
+#
+# IDENTITY
+# -----------------------------------------------------------------------------
+# meta:
+#   file_id: tools/scripts/runners/lint/hadolint.sh
+#   file_type: script
+#   language: bash
+#   version: 2.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# INTENT
+# -----------------------------------------------------------------------------
+# Run Hadolint Dockerfile validation checks using repo configuration.
 #
 # Modes:
-#   - Default (local): staged Dockerfiles only (fast)
-#   - CI / full scan: all Dockerfiles when PS_FULL_SCAN=1 or CI=1
+#   - Fast local (pre-commit): staged Dockerfiles only
+#   - PR mode: affected Dockerfiles only
+#   - Full scan: PS_FULL_SCAN=1 (or CI without PR context)
+#
+# USAGE
+# -----------------------------------------------------------------------------
+#   bash tools/scripts/runners/lint/hadolint.sh
+#   PS_FULL_SCAN=1 bash tools/scripts/runners/lint/hadolint.sh
+#
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/runners/lint/common.sh
-. "${script_dir}/common.sh"
+# Load runner abstraction
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/scripts/core/runner-base.sh
+. "${_script_dir}/../../core/runner-base.sh"
 
-set_repo_root_and_git
-set_full_scan_flag
-PS_LOG_COMPONENT="lint.hadolint"
-lint_log_init "lint.hadolint" "HADOLINT" "Dockerfile security and quality" "$(lint_log_mode)"
+# Configuration
+readonly HADOLINT_ID="lint.hadolint"
+readonly HADOLINT_TITLE="HADOLINT"
+readonly HADOLINT_DESC="Dockerfile security and quality"
+readonly HADOLINT_CONFIG="configs/lint/hadolint.yaml"
+readonly HADOLINT_FILE_PATTERN="Dockerfile|Dockerfile.*|*.Dockerfile"
 
-config_path="${repo_root}/configs/lint/hadolint.yaml"
-if [[ ! -f "${config_path}" ]]; then
-  lint_log_set_status "ERROR"
-  ps_error "hadolint config not found: ${config_path}"
-  exit 1
-fi
+# Initialize runner
+runner_init "${HADOLINT_ID}" "${HADOLINT_TITLE}" "${HADOLINT_DESC}"
 
-HADOLINT_BIN="${HADOLINT_BIN:-hadolint}"
-if ! command -v "${HADOLINT_BIN}" >/dev/null 2>&1; then
-  lint_log_set_status "ERROR"
-  ps_error "hadolint is required but not found on PATH"
-  ps_detail_err "HINT: install hadolint or provide it via your tooling image."
-  exit 1
-fi
+# Require configuration and tool
+runner_require_config "${HADOLINT_CONFIG}" "Hadolint config"
+runner_require_tool "hadolint" "" "0"
 
-HADOLINT_ARGS=("$@")
+# Collect Dockerfile targets
+runner_collect_targets "${HADOLINT_FILE_PATTERN}"
 
-# Recognise common Dockerfile patterns
-_is_dockerfile_path() {
-  local p="$1"
+# Filter to enforce Dockerfile naming patterns
+local -a filtered=()
+for f in "${RUNNER_TARGETS[@]}"; do
   local base
-  base="$(basename -- "${p}")"
-
-  [[ "${base}" == "Dockerfile" ]] && return 0
-  [[ "${base}" == Dockerfile.* ]] && return 0
-  [[ "${base}" == *.Dockerfile ]] && return 0
-  return 1
-}
-
-targets=()
-
-if [[ "${full_scan}" == "1" ]]; then
-  # Find all plausible dockerfiles, then filter with naming rules.
-  # (collect_targets_find already excludes node_modules/dist/build/etc.)
-  collect_targets_find \( -name "Dockerfile" -o -name "Dockerfile.*" -o -name "*.Dockerfile" \)
-
-  if [[ "${#targets[@]}" -eq 0 ]]; then
-    lint_log_set_targets 0
-    lint_log_set_status "SKIPPED"
-    ps_detail "Hadolint: no Dockerfiles found."
-    exit 0
+  base="$(basename -- "${f}")"
+  if [[ "${base}" == "Dockerfile" ]] || \
+     [[ "${base}" == Dockerfile.* ]] || \
+     [[ "${base}" == *.Dockerfile ]]; then
+    filtered+=("${f}")
   fi
+done
+RUNNER_TARGETS=("${filtered[@]}")
 
-  # Filter to enforce naming rules consistently (defensive)
-  filtered=()
-  for f in "${targets[@]}"; do
-    if _is_dockerfile_path "${f}"; then
-      filtered+=("${f}")
-    fi
-  done
-  targets=("${filtered[@]}")
-
-else
-  # Staged mode: collect staged files and filter via naming rules.
-  # Note: case patterns support alternation with |.
-  collect_targets_staged "Dockerfile|Dockerfile.*|*.Dockerfile"
-
-  if [[ "${#targets[@]}" -eq 0 ]]; then
-    lint_log_set_targets 0
-    lint_log_set_status "SKIPPED"
-    ps_detail "Hadolint: no staged Dockerfiles to check."
-    exit 0
-  fi
-
-  filtered=()
-  for f in "${targets[@]}"; do
-    if _is_dockerfile_path "${f}"; then
-      filtered+=("${f}")
-    fi
-  done
-  targets=("${filtered[@]}")
-fi
-
-if [[ "${#targets[@]}" -eq 0 ]]; then
-  lint_log_set_targets 0
-  lint_log_set_status "SKIPPED"
-  ps_detail "Hadolint: no Dockerfiles to check."
+# Skip if no targets
+if runner_skip_if_no_targets "No Dockerfiles to check"; then
   exit 0
 fi
-lint_log_set_targets "${#targets[@]}"
 
-"${HADOLINT_BIN}" --config "${config_path}" "${HADOLINT_ARGS[@]}" "${targets[@]}"
+# Execute hadolint
+runner_exec "${RUNNER_TOOL_BIN}" \
+  --config "${RUNNER_CONFIG}" \
+  "${RUNNER_TARGETS[@]}"
+
+exit "${RUNNER_STATUS}"

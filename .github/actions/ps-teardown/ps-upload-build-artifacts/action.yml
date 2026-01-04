@@ -153,7 +153,7 @@ runs:
       run: |
         validate_root="${GITHUB_ACTION_PATH}/../../../tools/scripts/actions/ps-teardown"
         validate_root="${validate_root}/ps-upload-artifacts"
-        validate_script="${validate_root}/ps-upload-artifacts-validate.sh"
+        validate_script="${validate_root}/validate-inputs.sh"
         bash "${validate_script}"
     - name: Upload artifacts
       uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f  # v6.0.0

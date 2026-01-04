@@ -336,8 +336,8 @@ Boolean inputs use **string values** and are normalized by the platform:
 | `"1"`, `"true"`, `"yes"`, `"on"` | `"1"` |
 | `"0"`, `"false"`, `"no"`, `"off"`, `""` | `"0"` |
 
-**Convention**: Use `"0"` and `"1"` for new inputs. The normalization layer
-(`tools/scripts/actions/cross-cutting/normalize.sh`) handles both styles.
+**Convention**: Use `"0"` and `"1"` for new inputs. The validation layer
+(`tools/scripts/actions/ps-bootstrap/shared/validate-inputs-common.sh`) handles normalization.
 
 ```yaml
 # Preferred style

@@ -3,101 +3,96 @@ set -euo pipefail
 
 # ==============================================================================
 # Political Sphere — Biome Lint
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Run Biome formatting + lint checks using repo configuration.
+# ==============================================================================
+# ps_header_v: 6
 #
-# Default behaviour:
+# IDENTITY
+# -----------------------------------------------------------------------------
+# meta:
+#   file_id: tools/scripts/runners/lint/biome.sh
+#   file_type: script
+#   language: bash
+#   version: 2.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# INTENT
+# -----------------------------------------------------------------------------
+# Run Biome formatting + lint checks using repo configuration.
+#
+# Modes:
 #   - Fast local (pre-commit): staged JS/TS/JSON only
-#   - Full scan: PS_FULL_SCAN=1 (or CI=1)
+#   - PR mode: affected files only
+#   - Full scan: PS_FULL_SCAN=1 (or CI without PR context)
 #
-# Usage:
+# USAGE
+# -----------------------------------------------------------------------------
 #   bash tools/scripts/runners/lint/biome.sh
 #   bash tools/scripts/runners/lint/biome.sh --write
 #   PS_FULL_SCAN=1 bash tools/scripts/runners/lint/biome.sh
+#
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/runners/lint/common.sh
-. "${script_dir}/common.sh"
+# -----------------------------------------------------------------------------
+# Bootstrap: Load runner abstraction
+# -----------------------------------------------------------------------------
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/scripts/core/runner-base.sh
+. "${_script_dir}/../../core/runner-base.sh"
 
-set_repo_root_and_git
-set_full_scan_flag
-PS_LOG_COMPONENT="lint.biome"
-lint_log_init "lint.biome" "BIOME" "Formatting and correctness checks" "$(lint_log_mode)"
+# -----------------------------------------------------------------------------
+# Runner Configuration
+# -----------------------------------------------------------------------------
+readonly BIOME_ID="lint.biome"
+readonly BIOME_TITLE="BIOME"
+readonly BIOME_DESC="Formatting and correctness checks"
+readonly BIOME_CONFIG="biome.json"
+readonly BIOME_LOCAL_BIN="node_modules/.bin/biome"
+readonly BIOME_FILE_PATTERN="*.js|*.mjs|*.cjs|*.jsx|*.ts|*.mts|*.cts|*.tsx|*.json|*.jsonc"
 
-config_path="${repo_root}/biome.json"
-if [[ ! -f "${config_path}" ]]; then
-  lint_log_set_status "ERROR"
-  ps_error "Biome config not found: ${config_path}"
-  exit 1
+# -----------------------------------------------------------------------------
+# Initialize Runner
+# -----------------------------------------------------------------------------
+runner_init "${BIOME_ID}" "${BIOME_TITLE}" "${BIOME_DESC}"
+
+# Require configuration
+runner_require_config "${BIOME_CONFIG}" "Biome config"
+
+# Require tool (prefer local, allow global fallback)
+runner_require_tool "biome" "${BIOME_LOCAL_BIN}" "1"
+
+# Parse pass-through arguments (e.g., --write, --unsafe)
+runner_parse_args "$@"
+
+# -----------------------------------------------------------------------------
+# Collect Targets
+# -----------------------------------------------------------------------------
+runner_collect_targets "${BIOME_FILE_PATTERN}"
+
+# Skip if no targets
+if runner_skip_if_no_targets "No staged JS/TS/JSON files to check"; then
+  exit 0
 fi
 
-# Prefer project-local biome for determinism; fall back to PATH only if needed.
-BIOME_BIN=""
-if [[ -x "${repo_root}/node_modules/.bin/biome" ]]; then
-  BIOME_BIN="${repo_root}/node_modules/.bin/biome"
-elif command -v biome >/dev/null 2>&1; then
-  BIOME_BIN="$(command -v biome)"
+# -----------------------------------------------------------------------------
+# Execute Biome
+# -----------------------------------------------------------------------------
+# Build command arguments
+declare -a cmd_args=("check" "--config-path" "${RUNNER_CONFIG}")
+
+# Add pass-through args if any
+if [[ "${#RUNNER_ARGS[@]:-0}" -gt 0 ]]; then
+  cmd_args+=("${RUNNER_ARGS[@]}")
+fi
+
+# Add targets
+if [[ "${RUNNER_MODE}" == "full" ]]; then
+  cmd_args+=("${PS_REPO_ROOT}")
 else
-  lint_log_set_status "ERROR"
-  ps_error "Biome not found. Fix: npm ci"
-  exit 1
+  cmd_args+=("${RUNNER_TARGETS[@]}")
 fi
 
-# Pass-through args safely (e.g. --write, --unsafe, etc.)
-declare -a BIOME_ARGS=("$@")
-
-# Determine targets:
-# - Full repo when full_scan=1
-# - Otherwise: staged files only
-declare -a targets=()
-
-# Helper: collect staged targets into a local array, without relying on globals.
-# Expects common.sh to provide `collect_targets_staged` that prints NUL- or newline-separated paths.
-_ps_collect_staged_targets() {
-  # If your collect_targets_staged already echoes newline-separated paths, this works.
-  # If it mutates a global, we still fall back to reading the global `targets` below.
-  local pattern="$1"
-
-  # Try capture from stdout first (preferred).
-  local out=""
-  if out="$(collect_targets_staged "${pattern}" 2>/dev/null || true)" && [[ -n "${out}" ]]; then
-    # shellcheck disable=SC2206 # we want word-splitting on newlines for file lists
-    targets=(${out})
-    return 0
-  fi
-
-  # Fallback: if common.sh mutates global `targets`, copy it.
-  if declare -p targets >/dev/null 2>&1; then
-    return 0
-  fi
-
-  return 0
-}
-
-if [[ "${full_scan}" == "1" ]]; then
-  targets=("${repo_root}")
-else
-  # NOTE: Keep this in one place so it’s easy to update.
-  # If your helper expects a regex, the '|' form is fine; if it expects globs, adjust in common.sh.
-  file_selector="*.js|*.mjs|*.cjs|*.jsx|*.ts|*.mts|*.cts|*.tsx|*.json|*.jsonc"
-  _ps_collect_staged_targets "${file_selector}"
-
-  if [[ "${#targets[@]}" -eq 0 ]]; then
-    lint_log_set_targets 0
-    lint_log_set_status "SKIPPED"
-    ps_detail "Biome: no staged JS/TS/JSON files to check."
-    exit 0
-  fi
-fi
-lint_log_set_targets "${#targets[@]}"
-
-# Execute (handle empty/unset args safely)
-declare -a cmd_args=()
-if [[ "${#BIOME_ARGS[@]:-0}" -ne 0 ]]; then
-  cmd_args+=("${BIOME_ARGS[@]}")
-fi
-cmd_args+=("${targets[@]}")
-
-"${BIOME_BIN}" check --config-path "${config_path}" "${cmd_args[@]}"
+# Execute
+runner_exec "${RUNNER_TOOL_BIN}" "${cmd_args[@]}"

@@ -16,9 +16,10 @@ set -euo pipefail
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # shellcheck source=tools/scripts/core/base-helpers.sh
 . "${script_dir}/../../../core/base-helpers.sh"
-# shellcheck source=tools/scripts/core/time-helpers.sh
-. "${script_dir}/../../../core/time-helpers.sh"
 init_repo_context
+
+# shellcheck source=tools/scripts/core/time-helpers.sh
+. "${repo_root}/tools/scripts/core/time-helpers.sh"
 
 cd "${repo_root}"
 

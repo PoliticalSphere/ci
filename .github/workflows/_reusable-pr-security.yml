@@ -5,6 +5,10 @@
 # Runs Gitleaks PR mode, dependency review, Scorecard, Trivy, TruffleHog.
 # Validate-CI must pass before any security job executes.
 #
+# NOTE: node_version is intentionally omitted — all security scanning tools
+# (Gitleaks, Trivy, TruffleHog, Scorecard, dependency-review) run natively
+# without Node.js dependencies. All jobs skip Node installation.
+#
 # Docs: .github/workflows/README.md#pr-security
 # Refs: docs/security-ci-policy.md, configs/security/gitleaks.toml
 #
@@ -18,6 +22,10 @@ name: PR Security
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
@@ -31,12 +39,9 @@ on:
         required: false
         default: 1
 
-      cache:
-        description: "Enable dependency caching (1 = on, 0 = off)"
-        type: string
-        required: false
-        default: "1"
-
+      # ==========================================================================
+      # PLATFORM & SHARED TOOLING
+      # ==========================================================================
       platform_ref:
         description: "Platform repository ref for shared scripts/configs"
         type: string
@@ -49,6 +54,9 @@ on:
         required: false
         default: "true"
 
+      # ==========================================================================
+      # ARTIFACT COLLECTION & RETENTION
+      # ==========================================================================
       artifact_paths:
         description: "Artifact paths to upload"
         type: string
@@ -63,6 +71,9 @@ on:
         required: false
         default: 7
 
+      # ==========================================================================
+      # PULL REQUEST CONTEXT
+      # ==========================================================================
       pr_number:
         description: "Pull request number (enables dependency review + PR comments)"
         type: string
@@ -93,6 +104,9 @@ on:
         required: false
         default: ""
 
+    # ==========================================================================
+    # SECRETS (OPTIONAL, LEAST-PRIVILEGE)
+    # ==========================================================================
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"
@@ -128,7 +142,6 @@ jobs:
     with:
       runner: ${{ inputs.runner }}
       fetch_depth: ${{ inputs.fetch_depth }}
-      cache: ${{ inputs.cache }}
       platform_ref: ${{ inputs.platform_ref }}
       pr_only: "1"
       pr_base_ref: ${{ inputs.pr_base_ref }}

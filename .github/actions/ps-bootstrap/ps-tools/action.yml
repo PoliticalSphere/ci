@@ -70,13 +70,12 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-resolve-root.sh,
-#     tools/scripts/actions/cross-cutting/normalize.sh,
+#   internal: [tools/scripts/actions/ps-bootstrap/ps-tools/resolve-root.sh,
 #     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/validation.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-validate-inputs.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-assemble.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-install.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-tools/validate-inputs.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-tools/assemble.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-tools/install.sh,
 #     tools/scripts/workflows/ci/install-tools.sh, configs/security,
 #     tools/scripts/runners/security/secret-scan-pr.sh]
 #   external: [bash, actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830]
@@ -117,12 +116,11 @@
 # related:
 #   references:
 #     - .github/actions/ps-bootstrap/ps-tools/README.md
-#     - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-resolve-root.sh
-#     - tools/scripts/actions/cross-cutting/normalize.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-tools/resolve-root.sh
 #     - tools/scripts/core/gha-helpers.sh
 #     - tools/scripts/core/validation.sh
-#     - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-validate-inputs.sh
-#     - tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-assemble.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-tools/validate-inputs.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-tools/assemble.sh
 #
 # ==============================================================================
 
@@ -209,7 +207,7 @@ runs:
           exit 1
         }
         scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
-        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-resolve-root.sh"
+        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/resolve-root.sh"
 
     # ==========================================================================
     # 1) INPUT VALIDATION (DEFENSIVE)
@@ -225,8 +223,6 @@ runs:
         PS_CACHE_TOOLS_INPUT: ${{ inputs.cache_tools }}
       run: |
         set -euo pipefail
-        # shellcheck source=tools/scripts/actions/cross-cutting/normalize.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/actions/cross-cutting/normalize.sh"
         # shellcheck source=tools/scripts/core/gha-helpers.sh
         . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
         # shellcheck source=tools/scripts/core/validation.sh
@@ -238,7 +234,7 @@ runs:
 
         # Delegate canonical validation + normalisation to scripts
         scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
-        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-validate-inputs.sh"
+        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/validate-inputs.sh"
 
         emit_env "PS_RUN_SECURITY_SCANS_VALIDATED" "${run_scans}"
         emit_env "PS_CACHE_TOOLS_VALIDATED" "${cache_tools}"
@@ -259,7 +255,7 @@ runs:
       run: |
         set -euo pipefail
         scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
-        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-assemble.sh"
+        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/assemble.sh"
 
     - name: Prepare tools bin path (PS)
       shell: bash
@@ -308,7 +304,7 @@ runs:
         py_installer_hash_cmd+=$'\nroot = os.environ.get("PS_SCRIPTS_ROOT") or '
         py_installer_hash_cmd+=$'os.environ.get("GITHUB_WORKSPACE","")'
         py_installer_hash_cmd+=$'\npath = os.path.join(root, '
-        py_installer_hash_cmd+=$'"tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-install.sh")'
+        py_installer_hash_cmd+=$'"tools/scripts/actions/ps-bootstrap/ps-tools/install.sh")'
         py_installer_hash_cmd+=$'\nif os.path.exists(path):'
         py_installer_hash_cmd+=$'\n    data = open(path, "rb").read()'
         py_installer_hash_cmd+=$'\n    print(hashlib.sha256(data).hexdigest())'
@@ -361,7 +357,7 @@ runs:
         mkdir -p "${GITHUB_WORKSPACE}/${PS_INSTALL_DIR}"
 
         scripts_root="${{ steps.ps_tools_resolve_root.outputs.scripts_root }}"
-        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/ps-tools-install.sh"
+        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-tools/install.sh"
 
         printf 'PS.TOOLS: install complete\n'
 

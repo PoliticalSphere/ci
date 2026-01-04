@@ -20,7 +20,7 @@ on:
   workflow_call:
 
     # ==========================================================================
-    # Runtime & Environment Configuration
+    # RUNTIME & ENVIRONMENT CONFIGURATION
     # ==========================================================================
     inputs:
       runner:
@@ -33,13 +33,7 @@ on:
         description: "Node.js major version"
         type: string
         required: false
-        default: "22"
-
-      cache:
-        description: "Enable dependency caching (1 = on, 0 = off)"
-        type: string
-        required: false
-        default: "1"
+        default: "22"   
 
       fetch_depth:
         description: "Git fetch depth (1 = shallow, 0 = full history)"
@@ -47,8 +41,14 @@ on:
         required: false
         default: 1
 
+      cache:
+        description: "Enable dependency caching (1 = on, 0 = off)"
+        type: string
+        required: false
+        default: "1"
+
       # ==========================================================================
-      # PLATFORM TRUST & SECURITY
+      # PLATFORM & SHARED TOOLING
       # ==========================================================================
       platform_repository:
         description: "Platform repository for shared configs"

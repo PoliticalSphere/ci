@@ -1,42 +1,193 @@
-# Workflows
+# 🔧 Political Sphere Workflows
 
-Reusable GitHub Actions workflows for the Political Sphere CI/CD platform.
-These workflows are policy-enforcing building blocks consumed by PS repositories.
+> **Reusable GitHub Actions workflows for the Political Sphere CI/CD platform.**  
+> These workflows are policy-enforcing building blocks consumed by all PS repositories.
+
+> 📖 See the [Vision Document](../../docs/VISION.md) for architectural philosophy.
+
+---
+
+## 📖 Table of Contents
+
+- [Vision Alignment](#vision-alignment)
+- [Architecture Overview](#architecture-overview)
+- [Workflow Relationships](#workflow-relationships)
+- [Workflow Catalog](#workflow-catalog)
+- [Workflow Details](#workflow-details)
+- [Mandatory Invariants](#mandatory-invariants)
+- [Design Principles](#design-principles)
+- [Security Scanning Architecture](#security-scanning-architecture)
+- [Permission Model](#permission-model)
+- [Quickstart](#quickstart)
+- [Inputs and Outputs](#inputs-and-outputs)
+- [Dependency Policy](#dependency-policy)
+- [Testing](#testing)
+- [Related Documentation](#related-documentation)
+
+---
+
+## Vision Alignment
+
+These workflows implement the Vision's CI/CD Architectural Standard:
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Structural Isolation** | Workflows are externalized from game source code |
+| **Immutable Gates** | Validate-CI enforces policy before any work executes |
+| **SRP** | Caller/Reusable/Task separation of concerns |
+| **DRY** | Shared logic in composite actions, not duplicated |
+| **POLS** | Explicit, predictable execution paths |
 
 ---
 
 ## Architecture Overview
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        WORKFLOW EXECUTION FLOW                               │
-└─────────────────────────────────────────────────────────────────────────────┘
+### High-Level Execution Flow
 
-                              ┌─────────────────┐
-                              │  Caller Workflow │
-                              │  (pr-gates.yml)  │
-                              └────────┬────────┘
-                                       │
-                                       ▼
-                         ┌─────────────────────────┐
-                         │  _reusable-pr-gates.yml │
-                         └────────────┬────────────┘
-                                      │
-              ┌───────────────────────┼───────────────────────┐
-              │                       │                       │
-              ▼                       ▼                       ▼
-     ┌────────────────┐     ┌────────────────┐     ┌────────────────┐
-     │  Validate-CI   │     │   PR Security  │     │  Quality Gates │
-     │  (MUST PASS)   │     │   (parallel)   │     │   (parallel)   │
-     └────────┬───────┘     └────────────────┘     └────────────────┘
-              │
-              ▼
-     ┌────────────────────────────────────────────────────────────────┐
-     │  Downstream Jobs Execute ONLY if Validate-CI Passes            │
-     │  ┌────────────┐ ┌────────────┐ ┌────────────┐ ┌────────────┐  │
-     │  │   Lint     │ │ Typecheck  │ │   Tests    │ │   Build    │  │
-     │  └────────────┘ └────────────┘ └────────────┘ └────────────┘  │
-     └────────────────────────────────────────────────────────────────┘
+The platform follows a **caller → reusable → task** pattern. Event-triggered callers delegate to reusable workflows, which orchestrate composite actions (tasks).
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           WORKFLOW EXECUTION MODEL                                  │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│    EVENT TRIGGER              CALLER                 REUSABLE                       │
+│    ─────────────              ──────                 ────────                       │
+│                                                                                     │
+│    pull_request  ──────────►  pr-checks.yml  ──────►  _reusable-pr-checks.yml       │
+│                                     │                         │                     │
+│                                     │                         ├──► Validate-CI      │
+│                                     │                         ├──► Lint/Type/Test   │
+│                                     │                         └──► Build            │
+│                                     │                                               │
+│    workflow_call ──────────►  pr-gates.yml   ──────►  _reusable-pr-gates.yml        │
+│                                                               │                     │
+│                                                               ├──► Validate-CI      │
+│                                                               ├──► PR Security      │
+│                                                               └──► Quality Gates    │
+│                                                                                     │
+│    schedule      ──────────►  security-scheduled.yml ──────►  Deep security scans   │
+│    workflow_dispatch                                                                │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Job Dependency Flow
+
+All workflows follow a **policy-first** execution model where `Validate-CI` acts as the blocking gate.
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              JOB DEPENDENCY GRAPH                                   │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│                               ┌──────────────────┐                                  │
+│                               │   Validate-CI    │ ◄─── MUST PASS (blocking gate)   │
+│                               │  (policy gate)   │                                  │
+│                               └────────┬─────────┘                                  │
+│                                        │                                            │
+│            ┌───────────────────────────┼───────────────────────────┐                │
+│            │                           │                           │                │
+│            ▼                           ▼                           ▼                │
+│   ┌────────────────┐         ┌────────────────┐         ┌────────────────┐          │
+│   │  PR Security   │         │  Quality Gates │         │ License Check  │          │
+│   │  (secrets,     │         │  (lint, type,  │         │  (OSS policy)  │          │
+│   │   deps scan)   │         │   test, build) │         │                │          │
+│   └────────────────┘         └────────┬───────┘         └────────────────┘          │
+│                                       │                                             │
+│                                       ▼                                             │
+│                          ┌─────────────────────────┐                                │
+│                          │  Finalize & Artifacts   │                                │
+│                          │  (summary, upload)      │                                │
+│                          └─────────────────────────┘                                │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Workflow Relationships
+
+Understanding how workflows connect is critical for consumers and maintainers.
+
+### PR Checks vs PR Gates
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                          PR CHECKS vs PR GATES                                      │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│   PR CHECKS (Event-Triggered)              PR GATES (Reusable)                      │
+│   ────────────────────────────             ───────────────────                      │
+│                                                                                     │
+│   ┌───────────────────────┐               ┌───────────────────────┐                 │
+│   │     pr-checks.yml     │               │     pr-gates.yml      │                 │
+│   │                       │               │                       │                 │
+│   │  Trigger: pull_request│               │  Trigger: workflow_call│                │
+│   │  (opened, reopened,   │               │  (called by other     │                 │
+│   │   synchronize)        │               │   workflows)          │                 │
+│   │                       │               │                       │                 │
+│   │  Skips: docs-only PRs │               │  Configurable inputs  │                 │
+│   └───────────┬───────────┘               │  for all runtime      │                 │
+│               │                           │  parameters           │                 │
+│               │ calls                     └───────────┬───────────┘                 │
+│               ▼                                       │ calls                       │
+│   ┌───────────────────────┐               ┌───────────▼───────────┐                 │
+│   │ _reusable-pr-checks   │               │ _reusable-pr-gates    │                 │
+│   │                       │               │                       │                 │
+│   │  • Fixed defaults     │               │  • Full configurability│                │
+│   │  • PR context auto-   │               │  • Artifact paths     │                 │
+│   │    detected           │               │  • Retention days     │                 │
+│   │  • Fork-aware         │               │  • Sonar integration  │                 │
+│   └───────────────────────┘               └───────────────────────┘                 │
+│                                                                                     │
+│   USE CASE: Direct PR trigger             USE CASE: Called from other workflows,    │
+│   with auto-detected context              custom integrations, or manual dispatch   │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### Complete Workflow Topology
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           COMPLETE WORKFLOW TOPOLOGY                                │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│   ┌─────────────┐      ┌─────────────┐      ┌─────────────┐      ┌─────────────┐    │
+│   │ CALLERS     │      │ REUSABLE    │      │ ACTIONS     │      │ SCRIPTS     │    │
+│   │ (triggers)  │──────│ (logic)     │──────│ (tasks)     │──────│ (execution) │    │
+│   └─────────────┘      └─────────────┘      └─────────────┘      └─────────────┘    │
+│                                                                                     │
+│   pr-checks.yml ───────► _reusable-pr-checks.yml                                    │
+│        │                        │                                                   │
+│        │                        ├──► ps-bootstrap/ps-setup-standard                 │
+│        │                        ├──► ps-task/lint, ps-task/typecheck, ...           │
+│        │                        └──► ps-teardown/ps-finalize-workflow               │
+│        │                                                                            │
+│   pr-gates.yml ────────► _reusable-pr-gates.yml                                     │
+│        │                        │                                                   │
+│        │                        ├──► _reusable-validate-ci.yml (blocking)           │
+│        │                        ├──► _reusable-pr-security.yml (parallel)           │
+│        │                        └──► Quality gate tasks (parallel)                  │
+│        │                                                                            │
+│   pr-security.yml ─────► _reusable-pr-security.yml                                  │
+│        │                        │                                                   │
+│        │                        ├──► ps-task/secret-scan-pr                         │
+│        │                        ├──► ps-task/security-dependency-review             │
+│        │                        └──► ps-task/security-trivy                         │
+│        │                                                                            │
+│   security-scheduled ──► Deep scans (CodeQL, Semgrep, Scorecard, Trivy)             │
+│        │                                                                            │
+│   license-compliance ──► _reusable-license-compliance.yml                           │
+│        │                                                                            │
+│   consumer-contract ───► Contract validation                                        │
+│        │                                                                            │
+│   build-artifacts ─────► Deterministic build + upload                               │
+│        │                                                                            │
+│   release.yml ─────────► Tag creation + GitHub Release                              │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -45,106 +196,170 @@ These workflows are policy-enforcing building blocks consumed by PS repositories
 
 ### Quick Reference
 
-| Workflow | Purpose | Trigger |
-|----------|---------|---------|
-| `pr-gates.yml` | Fast PR validation (lint/type/test/build + secrets) | `pull_request` |
-| `pr-checks.yml` | Orchestrator for PR Gates + License Compliance | `pull_request` |
-| `pr-security.yml` | PR-scoped security checks (Gitleaks, dependencies) | `pull_request` |
-| `validate-ci.yml` | CI policy gate (SHA pinning, permissions, patterns) | `workflow_call` |
-| `security-scheduled.yml` | Deep security scans (CodeQL, Semgrep, Scorecard, Trivy) | `schedule` |
-| `license-compliance.yml` | Dependency license policy checks | `workflow_call` |
-| `consumer-contract.yml` | Consumer repository contract validation | `workflow_call` |
-| `build-artifacts.yml` | Deterministic builds + artifact upload | `workflow_call` |
-| `release.yml` | Git tag and GitHub Release creation | `workflow_dispatch` |
+| Workflow | Type | Purpose | Trigger |
+|----------|------|---------|---------|
+| `pr-checks.yml` | Caller | PR event entrypoint → runs PR validation | `pull_request` |
+| `pr-gates.yml` | Caller | Reusable PR validation wrapper | `workflow_call` |
+| `pr-security.yml` | Caller | PR-scoped security checks | `workflow_call` |
+| `validate-ci.yml` | Caller | CI policy gate (runs first, always) | `workflow_call` |
+| `security-scheduled.yml` | Caller | Deep security scans on schedule | `schedule` |
+| `license-compliance.yml` | Caller | Dependency license policy checks | `workflow_call` |
+| `consumer-contract.yml` | Caller | Consumer repository contract validation | `workflow_call` |
+| `build-artifacts.yml` | Caller | Deterministic builds + artifact upload | `workflow_call` |
+| `release.yml` | Caller | Git tag and GitHub Release creation | `workflow_dispatch` |
 
-Reusable definitions live in `_reusable-*.yml`. The non-prefixed workflows are
-callers that bind events to the reusable job definitions.
+### Naming Convention
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                              FILE NAMING PATTERN                                    │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│   CALLERS (event triggers)           REUSABLES (implementation)                     │
+│   ────────────────────────           ──────────────────────────                     │
+│                                                                                     │
+│   pr-checks.yml            ────────►  _reusable-pr-checks.yml                       │
+│   pr-gates.yml             ────────►  _reusable-pr-gates.yml                        │
+│   pr-security.yml          ────────►  _reusable-pr-security.yml                     │
+│   validate-ci.yml          ────────►  _reusable-validate-ci.yml                     │
+│   license-compliance.yml   ────────►  _reusable-license-compliance.yml              │
+│                                                                                     │
+│   PATTERN:                                                                          │
+│   • Callers: <name>.yml (binds events to reusable)                                  │
+│   • Reusables: _reusable-<name>.yml (contains actual logic)                         │
+│   • Underscore prefix (_) = internal, not called directly by consumers              │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Workflow Details
 
-### PR Gates {#pr-gates}
+### PR Checks {#pr-checks}
 
-**Purpose**: Fast, policy-aligned pull request validation with structured artifacts.
-This is the canonical PR-time quality gate for Political Sphere consumers.
+> **The main PR entrypoint.** Fires on `pull_request` events and delegates to reusable workflows.
+
+**Trigger**: `pull_request` (opened, reopened, synchronize)
+
+**What it does**:
+```
+pull_request event
+       │
+       ▼
+┌──────────────────┐
+│  pr-checks.yml   │  ◄── Skips docs-only changes via paths-ignore
+└────────┬─────────┘
+         │
+         │  calls with PR context
+         ▼
+┌──────────────────────────────┐
+│  _reusable-pr-checks.yml     │
+│                              │
+│  • Auto-detects PR number    │
+│  • Detects fork PRs          │
+│  • Disables comments on forks│
+│  • Fixed runtime defaults    │
+└──────────────────────────────┘
+```
 
 **Scope**:
-- ✅ Enforce CI policy compliance via Validate-CI (blocking)
-- ✅ Run lint, typecheck, tests, duplication detection, and build verification
-- ✅ Delegate PR-scoped security checks to `pr-security.yml`
-- ✅ Optionally run SonarCloud baseline analysis (non-blocking)
-- ✅ Upload artifacts best-effort and publish structured summary
-- ✅ Optionally post PR failure comment (non-fork PRs only, opt-in)
-- ❌ Deep security scans (scheduled workflows handle this)
-- ❌ Deploy, publish, or release artifacts
+- ✅ Trigger on PR lifecycle events (open/reopen/push)
+- ✅ Skip docs-only changes to save compute
+- ✅ Pass PR context (number, base/head SHAs, fork detection)
+- ✅ Disable unsafe PR comments on fork PRs
+- ❌ Implement checks directly (delegated)
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `_reusable-pr-security.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-- `.github/actions/ps-task/*`
+**Dependencies**: `_reusable-pr-checks.yml`
 
-**Known Risks**:
-- Fork PRs have comments disabled for security
-- Sonar baseline is non-blocking and may fail silently
+---
+
+### PR Gates {#pr-gates}
+
+> **The reusable PR validation wrapper.** Called by other workflows via `workflow_call`.
+
+**Trigger**: `workflow_call` (internal reusable)
+
+**What it does**:
+```
+Another workflow calls pr-gates.yml
+              │
+              │  with configurable inputs:
+              │  • runner, node_version, fetch_depth
+              │  • artifact_paths, coverage_paths
+              │  • retention_days, platform_ref
+              │  • pr_number, pr_is_fork, etc.
+              ▼
+   ┌──────────────────┐
+   │  pr-gates.yml    │
+   └────────┬─────────┘
+            │
+            │  forwards all inputs
+            ▼
+   ┌──────────────────────────┐
+   │ _reusable-pr-gates.yml   │
+   │                          │
+   │  • Validate-CI (first)   │
+   │  • PR Security (parallel)│
+   │  • Quality gates:        │
+   │    - Lint                │
+   │    - Typecheck           │
+   │    - Tests               │
+   │    - Build               │
+   │  • Sonar (optional)      │
+   │  • Artifact upload       │
+   └──────────────────────────┘
+```
+
+**Scope**:
+- ✅ Forward caller inputs to reusable workflow
+- ✅ Full configurability (runtime, artifacts, PR context)
+- ✅ Secret passthrough (Node auth, Sonar tokens)
+- ❌ Listen to PR events directly (callers do this)
+
+**Dependencies**: `_reusable-pr-gates.yml`, `_reusable-validate-ci.yml`, `_reusable-pr-security.yml`
 
 **References**: [docs/testing-strategy.md](../../docs/testing-strategy.md), [docs/risk-decisions.md#rd-pr-comments](../../docs/risk-decisions.md#rd-pr-comments)
 
 ---
 
-### PR Checks {#pr-checks}
-
-**Purpose**: Orchestration layer that runs PR Gates and License Compliance workflows
-with explicit PR context.
-
-**Scope**:
-- ✅ Invoke PR Gates workflow for PR validation
-- ✅ Invoke License Compliance workflow for OSS policy enforcement
-- ✅ Pass PR context (number + base/head SHAs) to enable PR-scoped checks
-- ✅ Apply least-privilege permissions and prevent unsafe PR comments on forks
-- ❌ Implement lint/test/build logic directly (delegated to reusable workflows)
-- ❌ Modify repository contents, deploy, publish, or release
-
-**Dependencies**:
-- `_reusable-pr-gates.yml`
-- `_reusable-license-compliance.yml`
-
-**Known Risks**:
-- Fork PRs have comments disabled for security
-- Secrets are not inherited (explicit pass-through only)
-
-**References**: [docs/risk-decisions.md#rd-pr-comments](../../docs/risk-decisions.md#rd-pr-comments)
-
----
-
 ### PR Security {#pr-security}
 
-**Purpose**: Focused PR-scoped security checks as a separate reusable workflow.
-Follows the same design principles as PR Gates but narrows scope to security.
+> **Fast, PR-scoped security checks.** Runs secrets scanning and dependency review.
+
+**Trigger**: `workflow_call`
+
+**What it does**:
+```
+┌─────────────────────────────────────────┐
+│           pr-security.yml               │
+└──────────────────┬──────────────────────┘
+                   │
+    ┌──────────────┼──────────────┐
+    │              │              │
+    ▼              ▼              ▼
+┌────────┐   ┌──────────┐   ┌──────────┐
+│Gitleaks│   │Dependency│   │  Trivy   │
+│PR mode │   │  Review  │   │  Scan    │
+└────────┘   └──────────┘   └──────────┘
+    │              │              │
+    └──────────────┼──────────────┘
+                   ▼
+           ┌────────────┐
+           │   SARIF    │
+           │  Artifacts │
+           └────────────┘
+```
 
 **Scope**:
-- ✅ Enforce CI policy compliance via Validate-CI (blocking)
-- ✅ Run fast secrets scanning (Gitleaks PR mode)
-- ✅ Run dependency review for vulnerability detection
-- ✅ Run OpenSSF Scorecard, Trivy, and TruffleHog scans
-- ✅ Upload security artifacts and produce structured summary
-- ❌ Run lint, typecheck, tests, or build verification
-- ❌ Perform full-history security scans (scheduled workflow handles this)
+- ✅ Gitleaks secrets scanning (PR mode - fast)
+- ✅ Dependency review for vulnerabilities
+- ✅ Trivy filesystem scan
+- ✅ OpenSSF Scorecard
+- ❌ Full-history scans (scheduled workflow handles this)
+- ❌ Lint, tests, or builds
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-- `.github/actions/ps-task/secret-scan-pr`
-- `.github/actions/ps-task/security-dependency-review`
-- `.github/actions/ps-task/scorecard`
-- `.github/actions/ps-task/security-trivy`
-
-**Known Risks**:
-- Fork PRs may not have full dependency review context
-- Secrets scan may produce false positives requiring baseline configuration
+**Dependencies**: `_reusable-validate-ci.yml`, `ps-task/secret-scan-pr`, `ps-task/security-dependency-review`, `ps-task/security-trivy`
 
 **References**: [docs/security-ci-policy.md](../../docs/security-ci-policy.md), [configs/security/gitleaks.toml](../../configs/security/gitleaks.toml)
 
@@ -152,28 +367,47 @@ Follows the same design principles as PR Gates but narrows scope to security.
 
 ### Validate CI {#validate-ci}
 
-**Purpose**: Enforce CI policy compliance and publish evidence artifacts.
-This workflow is designed to run **FIRST** in all calling workflows as a policy gate.
+> **The policy gate.** Runs FIRST in all workflows. Blocks downstream jobs on failure.
+
+**Trigger**: `workflow_call`
+
+**What it does**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                     VALIDATE-CI GATE                            │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐         │
+│   │  Checkout   │───►│  Validate   │───►│  Evidence   │         │
+│   │  target +   │    │  CI Policy  │    │  Upload     │         │
+│   │  platform   │    │  Gate       │    │             │         │
+│   └─────────────┘    └──────┬──────┘    └─────────────┘         │
+│                             │                                   │
+│                      ┌──────┴──────┐                            │
+│                      │             │                            │
+│                      ▼             ▼                            │
+│                   ✅ PASS       ❌ FAIL                          │
+│                      │             │                            │
+│                      ▼             ▼                            │
+│               Downstream      ALL JOBS                          │
+│               jobs run        BLOCKED                           │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+
+Policy Checks:
+  • SHA pinning verification (all uses: must be 40-char SHAs)
+  • Permissions validation (least-privilege enforcement)
+  • Forbidden patterns (no curl-pipe-shell, no credential persist)
+  • Action allowlist verification
+```
 
 **Scope**:
-- ✅ Checkout target repository + platform repository (for shared scripts/config)
-- ✅ Optionally install dependencies in the target repo (for validation tooling)
-- ✅ Optionally install dependencies in the platform repo (for platform tooling)
-- ✅ Execute the Validate-CI policy gate
-- ✅ Upload reports/logs as CI evidence
-- ❌ Run lint/typecheck/tests/build
-- ❌ Perform deep security scans
-- ❌ Write to the repository or publish artifacts externally
+- ✅ Checkout target repo + platform repo (shared scripts/config)
+- ✅ Execute CI policy validation
+- ✅ Upload reports/logs as evidence
+- ❌ Run lint, tests, builds, or security scans
 
-**Dependencies**:
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-ci-validate`
-- `.github/actions/ps-upload-artifacts`
-- `tools/scripts/branding/print-section.sh`
-
-**Known Risks**:
-- Policy validation failure blocks all downstream jobs
-- Remote SHA verification requires network access
+**Dependencies**: `ps-bootstrap/ps-setup-standard`, `ps-ci-validate`, `ps-upload-artifacts`
 
 **References**: [configs/ci/policies/](../../configs/ci/policies/), [docs/ci-policy-governance.md](../../docs/ci-policy-governance.md)
 
@@ -181,35 +415,56 @@ This workflow is designed to run **FIRST** in all calling workflows as a policy 
 
 ### Security Scheduled {#security-scheduled}
 
-**Purpose**: Run scheduled, deep security scans and publish SARIF and supporting
-artifacts for long-term security posture monitoring.
+> **Deep security scans on schedule.** Runs comprehensive analysis nightly/weekly.
+
+**Trigger**: `schedule`, `workflow_dispatch`
+
+**What it does**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                  SCHEDULED SECURITY SCANS                       │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Daily/Weekly Schedule                                         │
+│          │                                                      │
+│          ▼                                                      │
+│   ┌──────────────┐                                              │
+│   │ Validate-CI  │ (blocking)                                   │
+│   └──────┬───────┘                                              │
+│          │                                                      │
+│   ┌──────┴──────────────────────────────────┐                   │
+│   │              │              │           │                   │
+│   ▼              ▼              ▼           ▼                   │
+│ ┌──────┐    ┌────────┐    ┌────────┐   ┌────────┐               │
+│ │CodeQL│    │Semgrep │    │Gitleaks│   │ Trivy  │               │
+│ │ SAST │    │  CE    │    │ (full) │   │  FS    │               │
+│ └──────┘    └────────┘    └────────┘   └────────┘               │
+│      │           │             │            │                   │
+│      └───────────┴──────┬──────┴────────────┘                   │
+│                         ▼                                       │
+│                  ┌────────────┐                                 │
+│                  │  OpenSSF   │                                 │
+│                  │ Scorecard  │                                 │
+│                  └──────┬─────┘                                 │
+│                         ▼                                       │
+│              ┌─────────────────────┐                            │
+│              │ SARIF → GitHub      │                            │
+│              │ Security Dashboard  │                            │
+│              └─────────────────────┘                            │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 **Scope**:
-- ✅ Enforce CI policy compliance (Validate-CI)
-- ✅ Run full-history secrets scanning
-- ✅ Run CodeQL static analysis
-- ✅ Run Semgrep CE analysis
-- ✅ Run OpenSSF Scorecard analysis
-- ✅ Run Trivy filesystem security scanning
-- ✅ Publish SARIF + evidence artifacts
-- ✅ Produce a machine-readable summary
-- ❌ Run tests or builds
-- ❌ Deploy or publish artifacts
+- ✅ Full-history secrets scanning
+- ✅ CodeQL static analysis (SAST)
+- ✅ Semgrep CE analysis
+- ✅ OpenSSF Scorecard
+- ✅ Trivy filesystem scanning
+- ✅ SARIF upload to GitHub Security
+- ❌ Tests, builds, or deployments
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-- `.github/actions/ps-task/security-codeql`
-- `.github/actions/ps-task/semgrep-cli`
-- `.github/actions/ps-task/secret-detection`
-- `.github/actions/ps-task/scorecard`
-- `.github/actions/ps-task/security-trivy`
-
-**Known Risks**:
-- Scheduled scans run on default branch only
-- CodeQL and Semgrep may have rate limits on public runners
-- Full-history scans can be slow on large repositories
+**Dependencies**: `_reusable-validate-ci.yml`, `ps-task/security-codeql`, `ps-task/semgrep-cli`, `ps-task/secret-detection`, `ps-task/scorecard`, `ps-task/security-trivy`
 
 **References**: [docs/security-ci-policy.md](../../docs/security-ci-policy.md), [configs/security/](../../configs/security/)
 
@@ -217,26 +472,17 @@ artifacts for long-term security posture monitoring.
 
 ### License Compliance {#license-compliance}
 
-**Purpose**: Enforce OSS license compliance using the platform policy file and
-repository lockfile evidence. Produces audit-friendly reports.
+> **OSS license policy enforcement.** Checks dependencies against allowed licenses.
+
+**Trigger**: `workflow_call`
 
 **Scope**:
-- ✅ Enforce CI policy compliance via Validate-CI
-- ✅ Run license compliance checks against a declared policy + lockfile
-- ✅ Upload reports/logs as evidence artifacts with controlled retention
-- ✅ Publish a structured summary JSON
-- ❌ Deploy, release, or publish packages
-- ❌ Mutate repository state
+- ✅ Validate-CI enforcement (blocking)
+- ✅ License compliance checks against policy + lockfile
+- ✅ Evidence artifact upload
+- ❌ Deploy, release, or publish
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-- `.github/actions/ps-task/license-check`
-
-**Known Risks**:
-- Policy misconfigurations can block legitimate licenses
-- Package transitive dependencies must be in lockfile
+**Dependencies**: `_reusable-validate-ci.yml`, `ps-task/license-check`
 
 **References**: [configs/security/license-policy.yml](../../configs/security/license-policy.yml)
 
@@ -244,27 +490,17 @@ repository lockfile evidence. Produces audit-friendly reports.
 
 ### Consumer Contract {#consumer-contract}
 
-**Purpose**: Validate consumer repositories against the platform contract policy
-and publish audit-friendly reports.
+> **Contract validation for consumer repos.** Ensures consumers follow platform requirements.
+
+**Trigger**: `workflow_call`
 
 **Scope**:
-- ✅ Enforce CI policy compliance via Validate-CI
-- ✅ Run contract checks against policy + exceptions
-- ✅ Upload reports/logs artifacts with controlled retention
-- ❌ Deploy, release, or publish artifacts
-- ❌ Modify repository state
-- ❌ Run tests or quality gates (handled by PR Gates)
+- ✅ Validate-CI enforcement (blocking)
+- ✅ Contract checks against policy + exceptions
+- ✅ Evidence artifact upload
+- ❌ Tests, builds, or quality gates (handled by PR Gates)
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-task/consumer-contract`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-- `tools/scripts/workflows/consumer/contract-check.sh`
-
-**Known Risks**:
-- Contract validation depends on correct manifest paths
-- Breaking changes in contract require coordinated deployment
+**Dependencies**: `_reusable-validate-ci.yml`, `ps-task/consumer-contract`, `tools/scripts/workflows/consumer/contract-check.sh`
 
 **References**: [docs/integration-guide.md](../../docs/integration-guide.md), [configs/consumer/contract.json](../../configs/consumer/contract.json)
 
@@ -272,28 +508,18 @@ and publish audit-friendly reports.
 
 ### Build Artifacts {#build-artifacts}
 
-**Purpose**: Build deterministic artifacts for consumer repositories and publish
-them as CI evidence with controlled retention.
+> **Deterministic builds.** Creates reproducible artifacts for release.
+
+**Trigger**: `workflow_call`
 
 **Scope**:
-- ✅ Enforce CI policy compliance via Validate-CI
-- ✅ Perform a deterministic build in a clean environment
-- ✅ Upload build artifacts with controlled retention
-- ✅ Publish a structured, machine-readable summary
-- ❌ Run tests or quality gates (handled by PR Gates)
-- ❌ Perform deep security scans
-- ❌ Publish packages or deploy artifacts
+- ✅ Validate-CI enforcement (blocking)
+- ✅ Deterministic build in clean environment
+- ✅ Artifact upload with controlled retention
+- ❌ Tests or security scans
+- ❌ Publish packages or deploy
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-task/build`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-- `tools/scripts/actions/ps-build/build.sh`
-
-**Known Risks**:
-- Artifact retention duration limits storage costs
-- Large artifacts can slow uploads/downloads
+**Dependencies**: `_reusable-validate-ci.yml`, `ps-task/build`, `tools/scripts/actions/ps-build/build.sh`
 
 **References**: [docs/security-ci-policy.md](../../docs/security-ci-policy.md)
 
@@ -301,29 +527,60 @@ them as CI evidence with controlled retention.
 
 ### Release {#release}
 
-**Purpose**: Create a Git tag and GitHub Release in a controlled, policy-aligned
-manner with dry-run mode support.
+> **Git tag and GitHub Release creation.** Supports dry-run mode for safe validation.
+
+**Trigger**: `workflow_dispatch`
+
+**What it does**:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                      RELEASE WORKFLOW                           │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│   Manual Trigger (workflow_dispatch)                            │
+│          │                                                      │
+│          ├── release_version: "1.2.3"                           │
+│          ├── dry_run: true/false                                │
+│          └── release_notes: "..."                               │
+│          │                                                      │
+│          ▼                                                      │
+│   ┌──────────────┐                                              │
+│   │ Validate-CI  │ (blocking)                                   │
+│   └──────┬───────┘                                              │
+│          │                                                      │
+│   ┌──────┴──────┐                                               │
+│   │             │                                               │
+│   ▼             ▼                                               │
+│ DRY RUN      PUBLISH                                            │
+│   │             │                                               │
+│   ▼             ▼                                               │
+│ ┌──────┐    ┌─────────────┐                                     │
+│ │Validate│   │Create tag   │                                    │
+│ │only    │   │v<version>   │                                    │
+│ └──────┘    └──────┬──────┘                                     │
+│                    ▼                                            │
+│              ┌─────────────┐                                    │
+│              │Create GitHub│                                    │
+│              │Release      │                                    │
+│              └──────┬──────┘                                    │
+│                     ▼                                           │
+│              ┌─────────────┐                                    │
+│              │Verify tag + │                                    │
+│              │release match│                                    │
+│              └─────────────┘                                    │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
 
 **Scope**:
-- ✅ Enforce CI policy compliance via Validate-CI (blocking)
-- ✅ Support safe DRY-RUN mode (validation + planning without mutation)
-- ✅ Create a SemVer tag `v<release_version>` at the chosen ref (publish mode)
-- ✅ Publish a GitHub Release (publish mode)
-- ✅ Support release notes customisation (inline or file-based)
-- ✅ Verify the published tag + release match the intended ref
-- ✅ Upload evidence artifacts and structured summary
-- ❌ Build artifacts, run tests, or publish packages/containers
+- ✅ Dry-run mode for safe validation
+- ✅ Create SemVer tag `v<version>`
+- ✅ Publish GitHub Release
+- ✅ Custom release notes (inline or file)
+- ❌ Build artifacts, tests, or container publishing
 - ❌ Deploy to environments
 
-**Dependencies**:
-- `_reusable-validate-ci.yml`
-- `.github/actions/ps-bootstrap/ps-setup-standard`
-- `.github/actions/ps-teardown/ps-finalize-workflow`
-
-**Known Risks**:
-- Accidental releases cannot be undone (use dry_run for validation)
-- Release permissions require contents: write (scope carefully)
-- Tag conflicts if manual tags exist
+**Dependencies**: `_reusable-validate-ci.yml`, `ps-bootstrap/ps-setup-standard`, `ps-teardown/ps-finalize-workflow`
 
 **References**: [docs/versioning.md](../../docs/versioning.md), [docs/risk-decisions.md#rd-release-permissions](../../docs/risk-decisions.md#rd-release-permissions)
 
@@ -331,125 +588,224 @@ manner with dry-run mode support.
 
 ## Mandatory Invariants
 
-All workflows **must** comply with the following:
+All workflows **must** comply with these non-negotiable rules:
 
-- **Reusable only**  
-  Workflows are triggered via `workflow_call` (schedule/dispatch only where documented).
-
-- **Validate-CI first**  
-  The Validate-CI gate **must run before any other job**.
-
-- **Least privilege**  
-  Every workflow and job must declare explicit permissions and stay within the
-  defined baseline unless a documented risk decision applies.
-
-- **Full SHA pinning**  
-  All `uses:` references must be pinned to full-length commit SHAs.
-
-- **No unsafe patterns**  
-  Disallowed workflow patterns (e.g. unsafe `pull_request_target` usage,
-  credential persistence, curl-pipe-to-shell) must be blocked.
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                           MANDATORY INVARIANTS                                       │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  1️⃣  REUSABLE ONLY                                                                   │
+│      Workflows trigger via workflow_call (schedule/dispatch only where documented)  │
+│                                                                                      │
+│  2️⃣  VALIDATE-CI FIRST                                                               │
+│      The policy gate MUST run before any other job                                  │
+│                                                                                      │
+│  3️⃣  LEAST PRIVILEGE                                                                 │
+│      Explicit permissions required; escalate only with documented risk decision    │
+│                                                                                      │
+│  4️⃣  FULL SHA PINNING                                                                │
+│      All uses: references must be 40-character commit SHAs                          │
+│      ❌ uses: actions/checkout@v4                                                    │
+│      ✅ uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683             │
+│                                                                                      │
+│  5️⃣  NO UNSAFE PATTERNS                                                              │
+│      Blocked: unsafe pull_request_target, credential persist, curl-pipe-shell      │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ---
 
 ## Design Principles
 
-- **Deterministic**: identical inputs produce identical outcomes
-- **Non-interactive**: no prompts or manual intervention
-- **Explainable**: clear, structured output and failure messages
-- **Composable**: workflows are built from composite actions
-- **Auditable**: behaviour is explicit and policy-validated
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                            DESIGN PRINCIPLES                                         │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   DETERMINISTIC        Identical inputs → identical outcomes                        │
+│   ─────────────        No flaky tests, no network-dependent defaults               │
+│                                                                                      │
+│   NON-INTERACTIVE      No prompts, no manual intervention                           │
+│   ───────────────      Fully automated from trigger to completion                   │
+│                                                                                      │
+│   EXPLAINABLE          Clear, structured output and failure messages                │
+│   ───────────          Easy to debug, easy to understand                            │
+│                                                                                      │
+│   COMPOSABLE           Workflows built from reusable composite actions              │
+│   ──────────           Mix and match components as needed                           │
+│                                                                                      │
+│   AUDITABLE            Behaviour is explicit and policy-validated                   │
+│   ─────────            Evidence artifacts for compliance review                     │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
 
----
-
-## AI-First Design Commitments
+### AI-First Design Commitments
 
 Workflows are written to be:
 
-- **Discoverable**: predictable naming and layout
-- **Readable**: linear jobs with clear intent
-- **Operable**: runnable in isolation with documented inputs
-- **Governable**: policy decisions live in config, not inline logic
+| Principle | Description |
+|-----------|-------------|
+| **Discoverable** | Predictable naming and layout for easy navigation |
+| **Readable** | Linear jobs with clear intent, well-commented |
+| **Operable** | Runnable in isolation with documented inputs |
+| **Governable** | Policy decisions live in config, not inline logic |
 
 ---
 
 ## Governance
 
-This directory is **platform-critical infrastructure**.
+> ⚠️ This directory is **platform-critical infrastructure**.
 
 Changes here affect all consuming repositories and must preserve:
 
-- security baselines
-- behavioural stability
-- determinism
-- local/CI alignment
+- 🔒 Security baselines
+- 🔄 Behavioural stability
+- 🎯 Determinism
+- 🏠 Local/CI alignment
 
-Risk-increasing changes require an explicit, documented decision.
+**Risk-increasing changes require an explicit, documented decision in [docs/risk-decisions.md](../../docs/risk-decisions.md).**
 
 ---
 
 ## Security Scanning Architecture
 
-```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        SECURITY SCANNING LAYERS                              │
-└─────────────────────────────────────────────────────────────────────────────┘
+The platform uses a **two-tier security model**: fast PR-time checks for immediate feedback, and comprehensive scheduled scans for deep analysis.
 
-  PR-TIME (Fast)                              SCHEDULED (Deep)
-  ──────────────                              ────────────────
-  
-  ┌─────────────────────┐                    ┌─────────────────────┐
-  │   pr-security.yml   │                    │ security-scheduled  │
-  └──────────┬──────────┘                    └──────────┬──────────┘
-             │                                          │
-    ┌────────┴────────┐                       ┌────────┴────────┐
-    │                 │                       │                 │
-    ▼                 ▼                       ▼                 ▼
-┌───────────┐  ┌──────────────┐       ┌──────────────┐  ┌──────────────┐
-│ Gitleaks  │  │  Dependency  │       │   CodeQL     │  │   Semgrep    │
-│ (PR mode) │  │    Review    │       │ (full repo)  │  │     CE       │
-└───────────┘  └──────────────┘       └──────────────┘  └──────────────┘
-                                              │                 │
-                                              ▼                 ▼
-                                      ┌──────────────┐  ┌──────────────┐
-                                      │  Scorecard   │  │    Trivy     │
-                                      │  (OpenSSF)   │  │ (filesystem) │
-                                      └──────────────┘  └──────────────┘
-                                              │                 │
-                                              ▼                 ▼
-                                      ┌─────────────────────────────┐
-                                      │  SARIF → GitHub Security    │
-                                      │      Alerts Dashboard       │
-                                      └─────────────────────────────┘
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                         SECURITY SCANNING TIERS                                      │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   TIER 1: PR-TIME (Fast)                    TIER 2: SCHEDULED (Deep)                │
+│   ──────────────────────                    ────────────────────────                │
+│                                                                                      │
+│   Purpose: Immediate feedback               Purpose: Comprehensive analysis          │
+│   Latency: < 5 minutes                      Latency: 15-60 minutes                  │
+│   Scope: Changed files only                 Scope: Full repository                  │
+│                                                                                      │
+│   ┌─────────────────────┐                  ┌─────────────────────┐                  │
+│   │   pr-security.yml   │                  │ security-scheduled  │                  │
+│   └──────────┬──────────┘                  └──────────┬──────────┘                  │
+│              │                                        │                              │
+│   ┌──────────┴──────────┐                  ┌─────────┴─────────────────┐            │
+│   │                     │                  │              │            │            │
+│   ▼                     ▼                  ▼              ▼            ▼            │
+│ ┌───────────┐    ┌──────────────┐    ┌──────────┐  ┌──────────┐ ┌──────────┐       │
+│ │ Gitleaks  │    │  Dependency  │    │  CodeQL  │  │ Semgrep  │ │ Gitleaks │       │
+│ │ (PR mode) │    │    Review    │    │  (SAST)  │  │   CE     │ │ (full)   │       │
+│ └───────────┘    └──────────────┘    └──────────┘  └──────────┘ └──────────┘       │
+│       │                │                   │            │            │              │
+│       │                │                   ▼            ▼            ▼              │
+│       │                │            ┌──────────┐  ┌──────────┐  ┌──────────┐       │
+│       │                │            │Scorecard │  │  Trivy   │  │TruffleHog│       │
+│       │                │            │(OpenSSF) │  │   FS     │  │          │       │
+│       │                │            └────┬─────┘  └────┬─────┘  └────┬─────┘       │
+│       │                │                 │             │             │              │
+│       └────────────────┴─────────────────┴─────────────┴─────────────┘              │
+│                                          │                                          │
+│                                          ▼                                          │
+│                              ┌─────────────────────────────┐                        │
+│                              │  SARIF → GitHub Security    │                        │
+│                              │      Alerts Dashboard       │                        │
+│                              └─────────────────────────────┘                        │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Permission Model
 
+The platform follows **least-privilege** with job-level escalation only when required.
+
 ```
-┌─────────────────────────────────────────────────────────────────────────────┐
-│                        PERMISSION ESCALATION FLOW                            │
-└─────────────────────────────────────────────────────────────────────────────┘
-
-  WORKFLOW LEVEL (default)     →     JOB LEVEL (escalated)
-  ────────────────────────           ─────────────────────
-  
-  permissions:                        permissions:
-    contents: read     ───────►         contents: read
-                                        pull-requests: write   ← Only for PR comments
-                                        security-events: write ← Only for SARIF upload
-                                        contents: write        ← Only for release.yml
-
-  ┌──────────────────────────────────────────────────────────────────────────┐
-  │  PRINCIPLE: Workflow defaults to read-only. Jobs escalate only when      │
-  │  required for a specific operation. Fork PRs never receive write tokens. │
-  └──────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                        PERMISSION ESCALATION MODEL                                   │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   WORKFLOW DEFAULT (read-only)          JOB ESCALATION (when required)              │
+│   ────────────────────────────          ──────────────────────────────              │
+│                                                                                      │
+│   permissions:                          permissions:                                 │
+│     contents: read ─────────────────►     contents: read                            │
+│                                           pull-requests: write  ◄── PR comments     │
+│                                           security-events: write ◄── SARIF upload  │
+│                                           contents: write ◄── release.yml only     │
+│                                                                                      │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   FORK PR SECURITY MODEL                                                             │
+│   ──────────────────────                                                             │
+│                                                                                      │
+│   ┌──────────────┐     ┌──────────────┐                                             │
+│   │  First-party │     │   Fork PR    │                                             │
+│   │     PR       │     │              │                                             │
+│   └──────┬───────┘     └──────┬───────┘                                             │
+│          │                    │                                                      │
+│          ▼                    ▼                                                      │
+│   ┌──────────────┐     ┌──────────────┐                                             │
+│   │ PR comments  │     │ PR comments  │                                             │
+│   │   ENABLED    │     │   DISABLED   │  ◄── Security: prevents token leakage      │
+│   └──────────────┘     └──────────────┘                                             │
+│                                                                                      │
+│   ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│   │  PRINCIPLE: Fork PRs never receive write tokens. This prevents malicious   │   │
+│   │  code from using PR context to exfiltrate secrets or modify the repo.      │   │
+│   └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Quickstart
+
+### Decision Tree: Which Workflow Do I Use?
+
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                          WORKFLOW SELECTION GUIDE                                    │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   What do you need?                                                                  │
+│         │                                                                            │
+│         ├── PR validation on pull_request events?                                   │
+│         │         │                                                                  │
+│         │         └──► pr-checks.yml (auto-triggers, fixed defaults)                │
+│         │                                                                            │
+│         ├── PR validation called from another workflow?                             │
+│         │         │                                                                  │
+│         │         └──► pr-gates.yml (workflow_call, full configurability)           │
+│         │                                                                            │
+│         ├── Just security checks (secrets, deps)?                                   │
+│         │         │                                                                  │
+│         │         └──► pr-security.yml (fast, PR-scoped)                            │
+│         │                                                                            │
+│         ├── Deep security scans on schedule?                                        │
+│         │         │                                                                  │
+│         │         └──► security-scheduled.yml (CodeQL, Semgrep, full repo)          │
+│         │                                                                            │
+│         ├── License compliance check?                                               │
+│         │         │                                                                  │
+│         │         └──► license-compliance.yml                                       │
+│         │                                                                            │
+│         ├── Contract validation for consumers?                                      │
+│         │         │                                                                  │
+│         │         └──► consumer-contract.yml                                        │
+│         │                                                                            │
+│         ├── Deterministic build artifacts?                                          │
+│         │         │                                                                  │
+│         │         └──► build-artifacts.yml                                          │
+│         │                                                                            │
+│         └── Create a release (tag + GitHub Release)?                                │
+│                   │                                                                  │
+│                   └──► release.yml (manual trigger)                                 │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
 
 ### Basic Consumer Integration
 
@@ -502,7 +858,6 @@ jobs:
 ## Inputs and Outputs
 
 Every workflow exposes explicit inputs and uploads structured artifacts.
-The default artifact paths include `reports/**` and `logs/**`.
 
 ### Common Inputs
 
@@ -511,39 +866,90 @@ The default artifact paths include `reports/**` and `logs/**`.
 | `runner` | string | `ubuntu-22.04` | GitHub Actions runner label |
 | `node_version` | string | `22` | Node.js major version |
 | `fetch_depth` | number | `1` | Git fetch depth (0 = full history) |
-| `cache` | string | `1` | Enable dependency caching |
+| `cache` | string | `1` | Enable dependency caching (1=on, 0=off) |
 | `platform_ref` | string | SHA | Platform repo ref for shared configs |
 | `retention_days` | number | `7` | Artifact retention in days |
+| `ps_full_scan` | string | `1` | Enable strict/full scan mode |
+
+### PR-Specific Inputs
+
+| Input | Type | Default | Description |
+|-------|------|---------|-------------|
+| `pr_number` | string | `""` | Pull request number |
+| `pr_is_fork` | string | `"false"` | Whether PR is from a fork |
+| `allow_pr_comments` | string | `"0"` | Allow PR failure comments |
+| `pr_base_ref` | string | `""` | PR base SHA for diff checks |
+| `pr_head_ref` | string | `""` | PR head SHA for diff checks |
 
 ### Artifact Outputs
 
-| Artifact | Content | Workflows |
-|----------|---------|-----------|
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                            ARTIFACT STRUCTURE                                        │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   reports/                          logs/                                            │
+│   ├── validate-ci/                  ├── lint/                                       │
+│   │   └── validate-ci.json          │   ├── summary.txt                             │
+│   ├── security/                     │   └── _steps                                  │
+│   │   └── gitleaks-pr.sarif         ├── security/                                   │
+│   ├── evasion/                      └── jscpd/                                      │
+│   │   └── evasion-scan.json             ├── jscpd-report.json                       │
+│   └── summary/                          └── html/                                   │
+│       └── test-summary.json                                                          │
+│                                                                                      │
+│   coverage/                         sarif/                                           │
+│   ├── lcov.info                     ├── codeql.sarif                                │
+│   └── coverage-summary.json         ├── semgrep.sarif                               │
+│                                     └── trivy.sarif                                 │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+| Artifact Path | Content | Workflows |
+|---------------|---------|-----------|
 | `reports/**` | Structured JSON/HTML reports | All |
 | `logs/**` | Execution logs and traces | All |
 | `coverage/**` | Test coverage reports | PR Gates |
-| `sarif/**` | Security scan results | Security workflows |
+| `sarif/**` | Security scan results (SARIF format) | Security workflows |
 
 ---
 
 ## Dependency Policy
 
-All external actions must be:
-
-- SHA‑pinned to full commit SHAs
-- Present in `configs/ci/exceptions/actions-allowlist.yml`
-- Validated by `validate-ci`
+All external actions must be SHA-pinned and allowlisted.
 
 ```
-External Action Verification:
-┌─────────────────────────────────────────────────────────────────────────────┐
-│  uses: actions/checkout@abc123...  ← Must be 40-char SHA, not tag/branch   │
-│                                                                              │
-│  Verified against:                                                           │
-│    1. configs/ci/exceptions/actions-allowlist.yml (allowed list)            │
-│    2. Remote GitHub API (SHA exists and matches)                            │
-│    3. Policy rules (no curl-pipe-shell, no credential persist)              │
-└─────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                      EXTERNAL ACTION VERIFICATION                                    │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   ❌ INVALID (tag/branch reference)                                                  │
+│   uses: actions/checkout@v4                                                          │
+│                                                                                      │
+│   ✅ VALID (40-char SHA)                                                             │
+│   uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683                   │
+│                                                                                      │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│   VERIFICATION PROCESS                                                               │
+│   ────────────────────                                                               │
+│                                                                                      │
+│   ┌─────────────┐    ┌─────────────────────┐    ┌─────────────────┐                 │
+│   │  Workflow   │───►│    validate-ci      │───►│  Policy Check   │                 │
+│   │  uses: ...  │    │    (policy gate)    │    │                 │                 │
+│   └─────────────┘    └──────────┬──────────┘    └────────┬────────┘                 │
+│                                 │                        │                          │
+│                      ┌──────────┼──────────┐             │                          │
+│                      ▼          ▼          ▼             ▼                          │
+│               ┌───────────┐ ┌────────┐ ┌────────┐ ┌────────────┐                    │
+│               │ Allowlist │ │SHA is  │ │No curl │ │No cred     │                    │
+│               │ check     │ │40-char │ │pipe sh │ │persist     │                    │
+│               └───────────┘ └────────┘ └────────┘ └────────────┘                    │
+│                                                                                      │
+│   Allowlist: configs/ci/exceptions/actions-allowlist.yml                            │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -552,9 +958,11 @@ External Action Verification:
 
 Workflows are validated by:
 
-- `actionlint` (syntax + semantics)
-- `validate-ci` (policy enforcement)
-- `tools/tests/actions.test.js` (action catalog consistency)
+| Tool | Purpose |
+|------|---------|
+| `actionlint` | Syntax and semantic validation |
+| `validate-ci` | Policy enforcement (SHA pinning, permissions, patterns) |
+| `tools/tests/actions.test.js` | Action catalog consistency |
 
 Run locally:
 
@@ -566,9 +974,15 @@ npm run lint
 
 ## Related Documentation
 
-- [Testing Strategy](../../docs/testing-strategy.md)
-- [Security CI Policy](../../docs/security-ci-policy.md)
-- [CI Policy Governance](../../docs/ci-policy-governance.md)
-- [Risk Decisions](../../docs/risk-decisions.md)
-- [Integration Guide](../../docs/integration-guide.md)
-- [Versioning](../../docs/versioning.md)
+| Document | Description |
+|----------|-------------|
+| [Testing Strategy](../../docs/testing-strategy.md) | Test philosophy and coverage goals |
+| [Security CI Policy](../../docs/security-ci-policy.md) | Security scanning requirements |
+| [CI Policy Governance](../../docs/ci-policy-governance.md) | Policy rules and enforcement |
+| [Risk Decisions](../../docs/risk-decisions.md) | Documented security trade-offs |
+| [Integration Guide](../../docs/integration-guide.md) | Consumer onboarding guide |
+| [Versioning](../../docs/versioning.md) | Release and tagging strategy |
+
+---
+
+> 📝 **Maintainer Note**: Keep this README in sync with workflow changes. Update diagrams when adding new workflows or modifying the execution flow.

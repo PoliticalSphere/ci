@@ -1,7 +1,17 @@
 # AI Governance Model
 
+> Part of the [Vision](./VISION.md) — Preventing "Self-Governance Bias" in AI-driven development.
+
 This repository is designed for AI-augmented engineering under strict
 human-in-the-loop control. The AI is a productivity tool, not an authority.
+
+## The Security Sandbox
+
+This repository implements **Structural Isolation** as defined in the Vision:
+
+- **Externalized Governance**: CI/CD logic is physically separated from the game's source code.
+- **Immutable Gates**: AI agents working on the simulation cannot bypass or modify the safety checks.
+- **Self-Governance Bias Prevention**: The AI cannot "greenlight" its own buggy code.
 
 ## Principles
 
@@ -18,10 +28,13 @@ human-in-the-loop control. The AI is a productivity tool, not an authority.
 
 ## AI Operating Constraints
 
-- Prefer composite actions and reusable workflows over duplicated logic.
-- Avoid clever logic; use linear, explicit scripts.
-- Document non-obvious decisions inline with intent-focused comments.
-- Do not introduce tools without a defined consumer.
+These constraints implement the Vision's **SOLID**, **DRY**, and **KISS** principles:
+
+- Prefer composite actions and reusable workflows over duplicated logic (DRY).
+- Avoid clever logic; use linear, explicit scripts (KISS).
+- Document non-obvious decisions inline with intent-focused comments (Cognitive Ergonomics).
+- Do not introduce tools without a defined consumer (YAGNI).
+- Extract complex logic into standalone, modular scripts (SRP).
 
 ## Auditability
 
@@ -33,3 +46,9 @@ human-in-the-loop control. The AI is a productivity tool, not an authority.
 
 - Any change to security, permissions, or validation must be reviewed.
 - Any relaxation of controls must include a risk decision entry.
+
+## Related Documentation
+
+- [Vision](./VISION.md) — Architectural philosophy
+- [Risk Decisions](./risk-decisions.md) — Change control log
+- [CI Policy Governance](./ci-policy-governance.md) — Policy enforcement

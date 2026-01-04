@@ -33,7 +33,7 @@
 #   - ps_print_section (from format.sh)
 #
 # Sourced by:
-#   - tools/scripts/gates/gate-common.sh
+#   - tools/scripts/gates/gate-runner-facade.sh
 # ==============================================================================
 [[ -n "${_PS_LINT_RUNNER_LOADED:-}" ]] && return 0
 _PS_LINT_RUNNER_LOADED=1
@@ -207,6 +207,7 @@ _lint_log_step_start() {
         "log_path=${log_file}"
     fi
   fi
+  return 0
 }
 
 # _lint_log_step_finish <id> <title> <status> <rc> <log_file> <start_ms>
@@ -231,6 +232,7 @@ _lint_log_step_finish() {
       "exit_code=${rc}" "log_path=${log_file}" \
       ${duration_ms:+"duration_ms=${duration_ms}"}
   fi
+  return 0
 }
 
 # ----------------------------

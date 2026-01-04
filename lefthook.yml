@@ -19,8 +19,8 @@
 # Governance:
 #   - DO NOT add additional commands in this file.
 #   - Extend or modify behaviour ONLY via the gate scripts:
-#       - tools/scripts/gates/gate-pre-commit.sh
-#       - tools/scripts/gates/gate-pre-push.sh
+#       - tools/scripts/gates/pre-commit.sh
+#       - tools/scripts/gates/pre-push.sh
 #   - Any policy/threshold changes must live in /configs (not hard-coded here).
 #
 # Notes:
@@ -39,7 +39,7 @@ pre-commit:
       #   - Print PS ASCII banner once at start
       #   - Fast checks only (lint/format/validate + quick secret scan)
       #   - Structured section headers + actionable failures
-      run: bash tools/scripts/gates/gate-pre-commit.sh
+      run: bash tools/scripts/gates/pre-commit.sh
 
 pre-push:
   parallel: false
@@ -51,4 +51,4 @@ pre-push:
       #   - Print PS ASCII banner once at start
       #   - Heavier checks (typecheck, tests, jscpd, build)
       #   - Mirrors CI quality gates as closely as practical
-      run: bash tools/scripts/gates/gate-pre-push.sh
+      run: bash tools/scripts/gates/pre-push.sh

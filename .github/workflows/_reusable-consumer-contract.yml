@@ -20,7 +20,7 @@ on:
   workflow_call:
 
     # ==========================================================================
-    # RUNTIME & TOOLING CONFIGURATION
+    # RUNTIME & ENVIRONMENT CONFIGURATION
     # ==========================================================================
     inputs:
       runner:
@@ -35,20 +35,20 @@ on:
         required: false
         default: "22"
 
+      fetch_depth:
+        description: "Git fetch depth (1 = shallow, 0 = full history)"
+        type: number
+        required: false
+        default: 1
+
       cache:
         description: "Enable Node dependency caching (1 = on, 0 = off)"
         type: string
         required: false
         default: "0"
 
-      fetch_depth:
-        description: "Git fetch depth for checkout (1 = shallow, 0 = full history)"
-        type: number
-        required: false
-        default: 1
-
       # ==========================================================================
-      # PLATFORM TRUST & SECURITY
+      # PLATFORM & SHARED TOOLING
       # ==========================================================================
       platform_repository:
         description: "Platform repository for shared configs"

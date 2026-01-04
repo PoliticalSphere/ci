@@ -2,69 +2,69 @@
 set -euo pipefail
 
 # ==============================================================================
-# Political Sphere — Yamllint (Deterministic)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Validate YAML files with the platform configuration.
+# Political Sphere — Yamllint Lint Runner
+# ==============================================================================
+# ps_header_v: 6
+#
+# IDENTITY
+# -----------------------------------------------------------------------------
+# meta:
+#   file_id: tools/scripts/runners/lint/yamllint.sh
+#   file_type: script
+#   language: bash
+#   version: 2.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# INTENT
+# -----------------------------------------------------------------------------
+# Run Yamllint YAML validation checks using repo configuration.
 #
 # Modes:
-#   - Default (local): staged YAML files only (fast)
-#   - CI / full scan: all YAML files when PS_FULL_SCAN=1 or CI=1
+#   - Fast local (pre-commit): staged YAML files only
+#   - PR mode: affected YAML files only
+#   - Full scan: PS_FULL_SCAN=1 (or CI without PR context)
+#
+# USAGE
+# -----------------------------------------------------------------------------
+#   bash tools/scripts/runners/lint/yamllint.sh
+#   PS_FULL_SCAN=1 bash tools/scripts/runners/lint/yamllint.sh
+#
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/runners/lint/common.sh
-. "${script_dir}/common.sh"
+# Load runner abstraction
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/scripts/core/runner-base.sh
+. "${_script_dir}/../../core/runner-base.sh"
 
-set_repo_root_and_git
-set_full_scan_flag
-PS_LOG_COMPONENT="lint.yamllint"
-lint_log_init "lint.yamllint" "YAMLLINT" "YAML validity and formatting" "$(lint_log_mode)"
+# Configuration
+readonly YAMLLINT_ID="lint.yamllint"
+readonly YAMLLINT_TITLE="YAMLLINT"
+readonly YAMLLINT_DESC="YAML validity and formatting"
+readonly YAMLLINT_CONFIG="configs/lint/yamllint.yml"
+readonly YAMLLINT_FILE_PATTERN="*.yml|*.yaml"
 
-config_path="${repo_root}/configs/lint/yamllint.yml"
-if [[ ! -f "${config_path}" ]]; then
-  lint_log_set_status "ERROR"
-  ps_error "yamllint config not found: ${config_path}"
-  exit 1
+# Initialize runner
+runner_init "${YAMLLINT_ID}" "${YAMLLINT_TITLE}" "${YAMLLINT_DESC}"
+
+# Require configuration and tool
+runner_require_config "${YAMLLINT_CONFIG}" "Yamllint config"
+runner_require_tool "yamllint" "" "0"
+
+# Collect YAML targets
+runner_collect_targets "${YAMLLINT_FILE_PATTERN}"
+
+# Skip if no targets
+if runner_skip_if_no_targets "No staged YAML files to check"; then
+  exit 0
 fi
 
-YAMLLINT_BIN="${YAMLLINT_BIN:-yamllint}"
-if ! command -v "${YAMLLINT_BIN}" >/dev/null 2>&1; then
-  lint_log_set_status "ERROR"
-  ps_error "yamllint is required but not found on PATH"
-  ps_detail_err "HINT: install yamllint (e.g. pipx install yamllint) or provide it via your tooling image."
-  exit 1
-fi
+# Execute yamllint
+runner_exec "${RUNNER_TOOL_BIN}" \
+  -c "${RUNNER_CONFIG}" \
+  "${RUNNER_TARGETS[@]}"
 
-YAMLLINT_ARGS=()
-if [[ "$#" -gt 0 ]]; then
-  YAMLLINT_ARGS=("$@")
-fi
+exit "${RUNNER_STATUS}"
 
-# Build targets
-targets=()
-if [[ "${full_scan}" == "1" ]]; then
-  # Correctly grouped OR expression
-  collect_targets_find \( -name "*.yml" -o -name "*.yaml" \)
-  if [[ "${#targets[@]}" -eq 0 ]]; then
-    lint_log_set_targets 0
-    lint_log_set_status "SKIPPED"
-    ps_detail "Yamllint: no YAML files found."
-    exit 0
-  fi
-else
-  collect_targets_staged "*.yml|*.yaml"
-  if [[ "${#targets[@]}" -eq 0 ]]; then
-    lint_log_set_targets 0
-    lint_log_set_status "SKIPPED"
-    ps_detail "Yamllint: no staged YAML files to check."
-    exit 0
-  fi
-fi
-lint_log_set_targets "${#targets[@]}"
-
-if [[ "${#YAMLLINT_ARGS[@]}" -gt 0 ]]; then
-  "${YAMLLINT_BIN}" -c "${config_path}" "${YAMLLINT_ARGS[@]}" "${targets[@]}"
-else
-  "${YAMLLINT_BIN}" -c "${config_path}" "${targets[@]}"
-fi

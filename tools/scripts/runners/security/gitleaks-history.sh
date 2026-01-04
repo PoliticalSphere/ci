@@ -2,88 +2,105 @@
 set -euo pipefail
 
 # ==============================================================================
-# Political Sphere — Secrets Scan (Full History)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Run a full-history secrets scan using gitleaks.
+# Political Sphere — Gitleaks History Scan
+# ==============================================================================
+# ps_header_v: 6
 #
-# Policy:
-#   - In CI, gitleaks and config are required; fail if missing.
+# IDENTITY
+# -----------------------------------------------------------------------------
+# meta:
+#   file_id: tools/scripts/runners/security/gitleaks-history.sh
+#   file_type: script
+#   language: bash
+#   version: 2.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# INTENT
+# -----------------------------------------------------------------------------
+# Run a full-history secrets scan using gitleaks.
+#
+# POLICY
+# -----------------------------------------------------------------------------
+# - In CI, gitleaks and config are required; fail if missing
+# - Supports baseline file for known/accepted findings
+# - Generates SARIF report for integration with security dashboards
+#
+# USAGE
+# -----------------------------------------------------------------------------
+#   bash tools/scripts/runners/security/gitleaks-history.sh
+#   PS_GITLEAKS_SINCE="2024-01-01" bash tools/scripts/runners/security/gitleaks-history.sh
+#
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/common.sh
-. "${script_dir}/../../core/base-helpers.sh"
-init_repo_context
+# -----------------------------------------------------------------------------
+# Bootstrap: Load security runner abstraction
+# -----------------------------------------------------------------------------
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/scripts/core/security-runner-base.sh
+. "${_script_dir}/../../core/security-runner-base.sh"
 
-if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  error "unable to determine repo root (are you in a git repo?)"
+# -----------------------------------------------------------------------------
+# Runner Configuration
+# -----------------------------------------------------------------------------
+readonly GITLEAKS_ID="security.gitleaks.history"
+readonly GITLEAKS_TITLE="GITLEAKS_HISTORY"
+readonly GITLEAKS_DESC="Full history secret detection scan"
+readonly GITLEAKS_CONFIG="configs/security/gitleaks.toml"
+readonly GITLEAKS_BASELINE=".gitleaksignore"
+
+# -----------------------------------------------------------------------------
+# Initialize Security Runner
+# -----------------------------------------------------------------------------
+security_runner_init "${GITLEAKS_ID}" "${GITLEAKS_TITLE}" "${GITLEAKS_DESC}"
+
+# Verify in git repo
+if ! ps_git_has_repo; then
+  log_error "Unable to determine repo root (are you in a git repo?)"
   exit 1
 fi
 
-config_path="${repo_root}/configs/security/gitleaks.toml"
-report_dir="${PS_REPORT_DIR:-${repo_root}/reports/security}"
-report_path="${report_dir}/gitleaks-history.sarif"
-baseline_path="${repo_root}/.gitleaksignore"
+# Require configuration
+runner_require_config "${GITLEAKS_CONFIG}" "gitleaks config"
 
-if [[ ! -f "${config_path}" ]]; then
-  error "gitleaks config missing at ${config_path}"
-  exit 1
+# Require tool (CI enforcement)
+security_require_in_ci "gitleaks"
+runner_require_tool "gitleaks" "" "1"
+
+# Set up baseline
+security_set_baseline "${GITLEAKS_BASELINE}"
+
+# Set up report
+security_set_report "gitleaks-history.sarif"
+
+# -----------------------------------------------------------------------------
+# Execute Gitleaks
+# -----------------------------------------------------------------------------
+# Build command arguments
+declare -a cmd_args=(
+  "detect"
+  "--source" "${PS_REPO_ROOT}"
+  "--config" "${RUNNER_CONFIG}"
+  "--report-format" "sarif"
+  "--report-path" "${SECURITY_REPORT_PATH}"
+  "--redact"
+)
+
+# Add baseline args if available
+if [[ "${#SECURITY_BASELINE_ARGS[@]:-0}" -gt 0 ]]; then
+  cmd_args+=("${SECURITY_BASELINE_ARGS[@]}")
+  log_info "Secrets scan (full history): baseline enabled (${SECURITY_BASELINE_PATH})"
 fi
 
-if ! command -v gitleaks >/dev/null 2>&1; then
-  error "gitleaks is required but not found on PATH"
-  exit 1
-fi
-
-mkdir -p "${report_dir}"
-
-baseline_args=()
-if [[ -f "${baseline_path}" ]]; then
-  baseline_args=(--baseline-path "${baseline_path}")
-  detail "Secrets scan (full history): baseline enabled (${baseline_path})."
-fi
-
-log_opts_args=()
+# Add log opts if specified (for partial history scan)
 if [[ -n "${PS_GITLEAKS_SINCE:-}" ]]; then
-  log_opts_args=(--log-opts="--since=${PS_GITLEAKS_SINCE}")
-  detail "Secrets scan (full history): log since ${PS_GITLEAKS_SINCE}."
+  cmd_args+=("--log-opts=--since=${PS_GITLEAKS_SINCE}")
+  log_info "Secrets scan (full history): log since ${PS_GITLEAKS_SINCE}"
 fi
 
-detail "Secrets scan (full history): running gitleaks..."
-gitleaks detect \
-  --source "${repo_root}" \
-  --config "${config_path}" \
-  --report-format sarif \
-  --report-path "${report_path}" \
-  --redact \
-  "${log_opts_args[@]}" \
-  "${baseline_args[@]}"
-if command -v python3 >/dev/null 2>&1 && [[ -f "${report_path}" ]]; then
-  python3 - <<'PY' "${report_path}"
-import json
-import sys
+log_info "Secrets scan (full history): running gitleaks..."
 
-path = sys.argv[1]
-with open(path, "r", encoding="utf-8") as f:
-    sarif = json.load(f)
-
-results = []
-for run in sarif.get("runs", []):
-    results.extend(run.get("results", []))
-
-files = set()
-for res in results:
-    for loc in res.get("locations", []):
-        uri = (
-            loc.get("physicalLocation", {})
-            .get("artifactLocation", {})
-            .get("uri")
-        )
-        if uri:
-            files.add(uri)
-
-print(f"PS.GITLEAKS: findings={len(results)} files={len(files)}")
-PY
-fi
-detail "Secrets scan (full history): OK"
+# Execute
+security_exec "${RUNNER_TOOL_BIN}" "${cmd_args[@]}"

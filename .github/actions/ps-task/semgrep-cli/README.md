@@ -7,11 +7,11 @@
 #
 # Dependencies:
 #   - ./.github/actions/ps-task/ps-run
-#   - tools/scripts/security/semgrep-cli.sh
-#   - tools/scripts/security/semgrep-validate-inputs.sh
-#   - tools/scripts/security/semgrep-install.sh
-#   - tools/scripts/security/semgrep-scan.sh
-#   - tools/scripts/security/semgrep-enforce.sh
+#   - tools/scripts/runners/security/semgrep/cli.sh
+#   - tools/scripts/runners/security/semgrep/validate-inputs.sh
+#   - tools/scripts/runners/security/semgrep/install.sh
+#   - tools/scripts/runners/security/semgrep/scan.sh
+#   - tools/scripts/runners/security/semgrep/enforce.sh
 #
 # Dependents:
 #   - ./.github/workflows/security-scheduled.yml

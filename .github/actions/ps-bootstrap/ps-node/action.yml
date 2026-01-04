@@ -71,9 +71,9 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-resolve-roots.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-node/ps-bootstrap-validate-node.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-setup-standard/ps-bootstrap-install-deps.sh]
+#   internal: [tools/scripts/actions/ps-bootstrap/ps-initialize-environment/resolve-roots.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-node/validate-inputs.sh,
+#     tools/scripts/actions/ps-bootstrap/ps-setup-standard/install-deps.sh]
 #   external: [bash, actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -111,9 +111,9 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # related:
 #   references:
-#     - tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-resolve-roots.sh
-#     - tools/scripts/actions/ps-bootstrap/ps-node/ps-bootstrap-validate-node.sh
-#     - tools/scripts/actions/ps-bootstrap/ps-setup-standard/ps-bootstrap-install-deps.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-initialize-environment/resolve-roots.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-node/validate-inputs.sh
+#     - tools/scripts/actions/ps-bootstrap/ps-setup-standard/install-deps.sh
 #
 # ==============================================================================
 
@@ -153,7 +153,7 @@ runs:
       run: |
         set -euo pipefail
         scripts_root="${PS_PLATFORM_ROOT:-${GITHUB_WORKSPACE}}"
-        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/ps-bootstrap-resolve-roots.sh"
+        bash "${scripts_root}/tools/scripts/actions/ps-bootstrap/ps-initialize-environment/resolve-roots.sh"
 
     - name: Validate inputs (PS)
       shell: bash
@@ -164,7 +164,7 @@ runs:
         PS_WORKING_DIR_INPUT: ${{ inputs.working_directory }}
       run: |
         set -euo pipefail
-        bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-node/ps-bootstrap-validate-node.sh"
+        bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-node/validate-inputs.sh"
 
     - name: Setup Node.js (cached)
       if: ${{ inputs.cache == '1' }}
@@ -188,7 +188,7 @@ runs:
       shell: bash
       run: |
         set -euo pipefail
-        bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-setup-standard/ps-bootstrap-install-deps.sh"
+        bash "${PS_SCRIPTS_ROOT}/tools/scripts/actions/ps-bootstrap/ps-setup-standard/install-deps.sh"
 
     - name: Complete (PS)
       shell: bash

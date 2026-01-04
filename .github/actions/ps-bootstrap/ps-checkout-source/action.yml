@@ -70,7 +70,7 @@
 # DEPENDENCIES
 # ─────────────────────────────────────────────────────────────────────────────
 # dependencies:
-#   internal: [tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh]
+#   internal: [tools/scripts/actions/ps-bootstrap/shared/checkout-validate-common.sh]
 #   external: [bash, actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8]
 #
 # ─────────────────────────────────────────────────────────────────────────────
@@ -109,7 +109,7 @@
 # related:
 #   references:
 #     - .github/actions/ps-bootstrap/ps-checkout-source/README.md
-#     - tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh
+#     - tools/scripts/actions/ps-bootstrap/shared/checkout-validate-common.sh
 #
 # ==============================================================================
 
@@ -158,7 +158,7 @@ runs:
         PS_LOG_PREFIX="PS.CHECKOUT.REPO" \
         PS_ENV_PREFIX="PS" \
           bash \
-          "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh"
+          "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/shared/checkout-validate-common.sh"
 
     - name: Checkout repository (PS)
       uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8

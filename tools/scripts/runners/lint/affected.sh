@@ -19,8 +19,8 @@ set -euo pipefail
 # ==============================================================================
 
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/runners/lint/common.sh
-. "${script_dir}/common.sh"
+# shellcheck source=tools/scripts/runners/lint/lint-runner-facade.sh
+. "${script_dir}/lint-runner-facade.sh"
 
 set_repo_root_and_git
 assert_lint_egress_allowed

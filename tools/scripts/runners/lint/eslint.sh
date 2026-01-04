@@ -2,117 +2,111 @@
 set -euo pipefail
 
 # ==============================================================================
-# Political Sphere — ESLint (Deterministic, Fast, Gate-Safe)
-# ------------------------------------------------------------------------------
-# Purpose:
-#   Run ESLint with the platform config for specialist JS/TS linting.
+# Political Sphere — ESLint
+# ==============================================================================
+# ps_header_v: 6
+#
+# IDENTITY
+# -----------------------------------------------------------------------------
+# meta:
+#   file_id: tools/scripts/runners/lint/eslint.sh
+#   file_type: script
+#   language: bash
+#   version: 2.0.0
+#   status: active
+#   classification: internal
+#   owner: political-sphere
+#   last_editor: codex
+#
+# INTENT
+# -----------------------------------------------------------------------------
+# Run ESLint with the platform config for specialist JS/TS linting.
 #
 # Modes:
-#   - Default (local): staged files only (fast)
-#   - CI / full scan: whole repo when PS_FULL_SCAN=1 or CI=1
+#   - Fast local (pre-commit): staged JS/TS files only
+#   - PR mode: affected files only
+#   - Full scan: PS_FULL_SCAN=1 (or CI without PR context)
 #
-# Notes:
-#   - Deterministic gates MUST prefer repo-local binaries (node_modules/.bin).
-#   - We intentionally do NOT fall back to `npx eslint` (non-deterministic).
+# NOTES
+# -----------------------------------------------------------------------------
+# - Deterministic gates MUST prefer repo-local binaries (node_modules/.bin)
+# - We intentionally do NOT fall back to `npx eslint` (non-deterministic)
+# - --max-warnings 0 ensures warnings fail the step (gate-quality)
+#
+# USAGE
+# -----------------------------------------------------------------------------
+#   bash tools/scripts/runners/lint/eslint.sh
+#   bash tools/scripts/runners/lint/eslint.sh --fix
+#   PS_FULL_SCAN=1 bash tools/scripts/runners/lint/eslint.sh
+#
 # ==============================================================================
 
-script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
-# shellcheck source=tools/scripts/runners/lint/common.sh
-. "${script_dir}/common.sh"
+# -----------------------------------------------------------------------------
+# Bootstrap: Load runner abstraction
+# -----------------------------------------------------------------------------
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=tools/scripts/core/runner-base.sh
+. "${_script_dir}/../../core/runner-base.sh"
 
-set_repo_root_and_git
-set_full_scan_flag
-PS_LOG_COMPONENT="lint.eslint"
-lint_log_init "lint.eslint" "ESLINT" "Specialist linting and TS-aware rules" "$(lint_log_mode)"
+# -----------------------------------------------------------------------------
+# Runner Configuration
+# -----------------------------------------------------------------------------
+readonly ESLINT_ID="lint.eslint"
+readonly ESLINT_TITLE="ESLINT"
+readonly ESLINT_DESC="Specialist linting and TS-aware rules"
+readonly ESLINT_CONFIG="configs/lint/eslint.config.mjs"
+readonly ESLINT_LOCAL_BIN="node_modules/.bin/eslint"
+readonly ESLINT_FILE_PATTERN="*.js|*.mjs|*.cjs|*.jsx|*.ts|*.mts|*.cts|*.tsx"
 
-if [[ -z "${repo_root:-}" ]]; then
-  repo_root="$(pwd)"
-fi
+# -----------------------------------------------------------------------------
+# Initialize Runner
+# -----------------------------------------------------------------------------
+runner_init "${ESLINT_ID}" "${ESLINT_TITLE}" "${ESLINT_DESC}"
 
-config_path="${repo_root}/configs/lint/eslint.config.mjs"
-if [[ ! -f "${config_path}" ]]; then
-  lint_log_set_status "ERROR"
-  ps_error "ESLint config not found: ${config_path}"
-  exit 1
-fi
+# Require configuration
+runner_require_config "${ESLINT_CONFIG}" "ESLint config"
 
-ESLINT_BIN="${repo_root}/node_modules/.bin/eslint"
-if [[ ! -x "${ESLINT_BIN}" ]]; then
-  lint_log_set_status "ERROR"
-  ps_error "ESLint not found at ${ESLINT_BIN}"
-  ps_detail "Fix: npm ci"
-  exit 1
-fi
+# Require tool (local only, no global fallback for determinism)
+runner_require_tool "eslint" "${ESLINT_LOCAL_BIN}" "0"
 
-# Pass-through args safely (e.g. --fix), skipping empty args.
-ESLINT_ARGS=()
-for arg in "$@"; do
-  [[ -n "${arg}" ]] && ESLINT_ARGS+=("${arg}")
-done
+# Parse pass-through arguments (e.g., --fix)
+runner_parse_args "$@"
 
-# Determine targets
-targets=()
-if [[ "${full_scan}" == "1" ]]; then
-  targets=("${repo_root}")
-else
-  collect_targets_staged "*.js|*.mjs|*.cjs|*.jsx|*.ts|*.mts|*.cts|*.tsx"
-  if [[ "${#targets[@]}" -eq 0 ]]; then
-    lint_log_set_targets 0
-    lint_log_set_status "SKIPPED"
-    ps_detail "ESLint: no staged JS/TS files to check."
-    exit 0
-  fi
-fi
+# -----------------------------------------------------------------------------
+# Collect Targets
+# -----------------------------------------------------------------------------
+runner_collect_targets "${ESLINT_FILE_PATTERN}"
 
-if [[ "${#targets[@]}" -eq 0 ]]; then
-  lint_log_set_targets 0
-  lint_log_set_status "SKIPPED"
-  ps_detail "ESLint: no targets to check."
+# Skip if no targets
+if runner_skip_if_no_targets "No staged JS/TS files to check"; then
   exit 0
 fi
 
-# Guard against empty target entries (ESLint rejects empty patterns).
-filtered_targets=()
-for target in "${targets[@]}"; do
-  [[ -n "${target}" ]] && filtered_targets+=("${target}")
-done
-targets=("${filtered_targets[@]}")
-
-if [[ "${#targets[@]}" -eq 0 ]]; then
-  lint_log_set_targets 0
-  lint_log_set_status "SKIPPED"
-  ps_detail "ESLint: no targets to check."
-  exit 0
-fi
-lint_log_set_targets "${#targets[@]}"
-
-# Run ESLint:
-# - --max-warnings 0 means warnings fail the step (gate-quality)
-# - --no-error-on-unmatched-pattern keeps staged targeting stable
-# - stream output (no giant command substitution)
-eslint_cmd=(
-  "${ESLINT_BIN}"
-  --config "${config_path}"
-  --max-warnings 0
-  --no-error-on-unmatched-pattern
+# -----------------------------------------------------------------------------
+# Execute ESLint
+# -----------------------------------------------------------------------------
+# Build command arguments
+declare -a cmd_args=(
+  "--config" "${RUNNER_CONFIG}"
+  "--max-warnings" "0"
+  "--no-error-on-unmatched-pattern"
 )
-if [[ "${#ESLINT_ARGS[@]}" -gt 0 ]]; then
-  eslint_cmd+=("${ESLINT_ARGS[@]}")
-fi
-eslint_cmd+=("${targets[@]}")
 
-set +e
-ESLINT_USE_FLAT_CONFIG=true "${eslint_cmd[@]}"
-rc=$?
-set -e
-
-if [[ "${rc}" -ne 0 ]]; then
-  lint_log_set_status "FAIL"
-  # Provide actionable guidance for common "missing plugin" / dependency issues.
-  # (ESLint prints these to stderr; we already streamed output.)
-  ps_error "ESLint failed (exit ${rc})."
-  ps_detail "If this is a dependency issue: run npm ci and retry."
-  exit "${rc}"
+# Add pass-through args if any
+if [[ "${#RUNNER_ARGS[@]:-0}" -gt 0 ]]; then
+  cmd_args+=("${RUNNER_ARGS[@]}")
 fi
 
-exit 0
+# Add targets
+if [[ "${RUNNER_MODE}" == "full" ]]; then
+  cmd_args+=("${PS_REPO_ROOT}")
+else
+  # Filter out any empty targets
+  for target in "${RUNNER_TARGETS[@]}"; do
+    [[ -n "${target}" ]] && cmd_args+=("${target}")
+  done
+fi
+
+# Execute with flat config enabled
+export ESLINT_USE_FLAT_CONFIG=true
+runner_exec "${RUNNER_TOOL_BIN}" "${cmd_args[@]}"

@@ -16,10 +16,10 @@ set -euo pipefail
 
 _formatted_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"
 # Gate helpers provide the run_lint_step + formatted summary
-# shellcheck source=tools/scripts/gates/gate-common.sh
-. "${_formatted_script_dir}/../../gates/gate-common.sh"
-# shellcheck source=tools/scripts/runners/lint/formatted-common.sh
-. "${_formatted_script_dir}/formatted-common.sh"
+# shellcheck source=tools/scripts/gates/gate-runner-facade.sh
+. "${_formatted_script_dir}/../../gates/gate-runner-facade.sh"
+# shellcheck source=tools/scripts/runners/lint/formatted-output-helpers.sh
+. "${_formatted_script_dir}/formatted-output-helpers.sh"
 
 GATE_NAME="Lint"
 export GATE_NAME

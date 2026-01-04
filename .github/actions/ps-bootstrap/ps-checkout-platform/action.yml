@@ -75,7 +75,7 @@
 #     tools/scripts/core/gha-helpers.sh,
 #     tools/scripts/core/path-validation.sh,
 #     tools/scripts/core/validation.sh,
-#     tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh,
+#     tools/scripts/actions/ps-bootstrap/shared/checkout-validate-common.sh,
 #     tools/scripts/branding/print-section.sh,
 #     tools/scripts/core/validation.sh,
 #     tools/scripts/workflows/ci/validate-ci/index.js, configs/ci/policies/validate-ci.yml]
@@ -121,7 +121,7 @@
 #     - tools/scripts/core/path-validation.sh
 #     - tools/scripts/core/validation.sh
 #     - tools/scripts/core/gha-helpers.sh
-#     - tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-validate-common.sh
+#     - tools/scripts/actions/ps-bootstrap/shared/checkout-validate-common.sh
 #     - tools/scripts/branding/print-section.sh
 #     - tools/scripts/core/validation.sh
 #
@@ -219,10 +219,10 @@ runs:
         PS_ALLOWED_REPOSITORIES_INPUT: ${{ inputs.allowed_repositories }}
       run: |
         set -euo pipefail
-        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-platform-validate-inputs.sh"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/validate-inputs.sh"
 
     - name: Clean platform path (optional)
-      if: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == 'true' }}
+      if: ${{ env.PS_PLATFORM_CLEAN_PATH_VALIDATED == '1' }}
       shell: bash
       run: |
         set -euo pipefail
@@ -251,7 +251,7 @@ runs:
           ${{ env.PS_PLATFORM_REQUIRE_PINNED_REF_VALIDATED }}
       run: |
         set -euo pipefail
-        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/ps-checkout-platform-verify-integrity.sh"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-checkout-platform/verify-integrity.sh"
 
     - name: Emit outputs (PS)
       id: ps_checkout_platform_outputs

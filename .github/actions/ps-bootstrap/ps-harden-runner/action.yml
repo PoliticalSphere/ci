@@ -145,21 +145,7 @@ runs:
         PS_EGRESS_POLICY_INPUT: ${{ inputs.egress_policy }}
       run: |
         set -euo pipefail
-
-        # shellcheck source=tools/scripts/core/gha-helpers.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/gha-helpers.sh"
-        # shellcheck source=tools/scripts/core/validation.sh
-        . "${GITHUB_WORKSPACE}/tools/scripts/core/validation.sh"
-
-        policy="$(require_enum "inputs.egress_policy" "${PS_EGRESS_POLICY_INPUT:-audit}" \
-          audit block)"
-
-        if type -t ps_detail >/dev/null 2>&1; then
-          ps_detail "PS.HARDEN: egress_policy=${policy}"
-        else
-          printf 'PS.HARDEN: egress_policy=%s\n' "${policy}"
-        fi
-        emit_env "PS_EGRESS_POLICY_VALIDATED" "${policy}"
+        bash "${GITHUB_WORKSPACE}/tools/scripts/actions/ps-bootstrap/ps-harden-runner/validate-inputs.sh"
 
     - name: Harden runner (PS)
       uses: step-security/harden-runner@20cf305ff2072d973412fa9b1e3a4f227bda3c76

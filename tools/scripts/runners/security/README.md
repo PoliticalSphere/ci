@@ -1,18 +1,76 @@
-# Security Scripts
+# Security Runners
 
 Security scanners used by local gates and scheduled CI workflows.
 
+## Architecture
+
+Security runners use the **security-runner-base abstraction**
+(`core/security-runner-base.sh`) which extends `runner-base.sh` with:
+
+- Baseline/allowlist support for known findings
+- SARIF report generation and summarization
+- Security-specific scan modes (history/PR/working-tree)
+- Platform config linking for consumers
+- CI enforcement (tools required, base ref required)
+
 ## Scripts
 
-- `secret-scan-pr.sh`: fast PR-oriented secret scan.
-- `gitleaks-history.sh`: full-history secret scan.
-- `semgrep-validate-inputs.sh`: validate Semgrep CLI inputs for action usage.
-- `semgrep-install.sh`: install pinned Semgrep in a virtual environment.
-- `semgrep-scan.sh`: run Semgrep and emit SARIF + exit code.
-- `semgrep-enforce.sh`: enforce Semgrep exit policy after SARIF upload.
-- `trivy-fs.sh`: filesystem scan for vuln/config findings (SARIF).
-- `license-check.sh`: dependency license compliance (policy-driven).
-- `evasion-scan.js`: detect lint-evasion patterns and complexity drift.
+| Script | Tool | Description |
+|--------|------|-------------|
+| `secret-scan-pr.sh` | gitleaks | Fast PR-oriented secret scan |
+| `gitleaks-history.sh` | gitleaks | Full-history secret scan |
+| `trivy-fs.sh` | Trivy | Filesystem vuln/config scan |
+| `license-check.sh` | custom | Dependency license compliance |
+| `evasion-scan.js` | Node.js | Lint-evasion pattern detection |
+| `sarif-upload.sh` | - | SARIF upload helper |
+
+### Semgrep Scripts
+
+| Script | Description |
+|--------|-------------|
+| `semgrep/validate-inputs.sh` | Validate Semgrep CLI inputs |
+| `semgrep/install.sh` | Install pinned Semgrep |
+| `semgrep/scan.sh` | Run Semgrep and emit SARIF |
+| `semgrep/enforce.sh` | Enforce exit policy after SARIF |
+
+## Creating a New Security Runner
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "${_script_dir}/../../core/security-runner-base.sh"
+
+# Initialize
+security_runner_init "security.scanner" "SCANNER" "Security scanning"
+
+# Config and tool
+runner_require_config "configs/security/scanner.toml"
+runner_require_tool "scanner" "" "1"
+
+# Baseline and report
+security_set_baseline ".scannerignore"
+security_set_report "scanner.sarif"
+
+# CI enforcement
+security_require_in_ci "scanner"
+security_require_base_ref
+
+# Execute
+security_exec "${RUNNER_TOOL_BIN}" scan \
+  --config "${RUNNER_CONFIG}" \
+  --report "${SECURITY_REPORT_PATH}" \
+  "${SECURITY_BASELINE_ARGS[@]}"
+```
+
+## Scan Modes
+
+| Mode | Variable | Behavior |
+|------|----------|----------|
+| `history` | `PS_FULL_HISTORY_SCAN=1` | Full git history |
+| `pr` | CI with base ref | Diff from base to HEAD |
+| `working-tree` | Default local | Current working tree only |
 
 ## Evasion Scanner
 
@@ -24,14 +82,19 @@ The evasion scanner (`evasion-scan.js`) detects patterns that bypass linting:
 - `shellcheck disable` directives
 - File-level complexity estimation
 
-Run: `npm run evasion-scan` or `node tools/scripts/security/evasion-scan.js`
+Run: `npm run evasion-scan` or `node tools/scripts/runners/security/evasion-scan.js`
 
 Output: `reports/evasion/evasion-scan.json`
 
-## Notes
+## Configuration
 
-These scripts require configuration from `configs/security/` and are designed
-for deterministic, non-interactive execution.
+All configs live in `configs/security/`. Runners support platform config
+linking for consumers that don't have their own configs.
 
-Secrets scans emit redacted SARIF reports under `reports/security/` for local
-review and artifact upload.
+## Reports
+
+SARIF reports are written to `reports/security/` for:
+- Local review
+- CI artifact upload
+- Security dashboard integration
+

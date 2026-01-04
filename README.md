@@ -1,8 +1,16 @@
 # Political Sphere CI/CD Platform
 
+[![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/PoliticalSphere/ci/badge)](https://scorecard.dev/viewer/?uri=github.com/PoliticalSphere/ci)
+[![License](https://img.shields.io/badge/license-Proprietary-red.svg)](LICENSE)
+
+> **The AI-Governed Control Plane** — Adversarially robust CI/CD infrastructure
+> for high-complexity game development with AI agents.
+
 This repository is the dedicated CI/CD, automation, and governance platform for Political Sphere (PS).
 It is not an application repository. It provides secure-by-default, free-tooling-only CI/CD building
 blocks that PS application repositories consume via reusable workflows and composite actions.
+
+**📖 [Read the Vision Document](docs/VISION.md)** — Architectural philosophy and guiding principles.
 
 ## Objectives
 
@@ -11,6 +19,21 @@ blocks that PS application repositories consume via reusable workflows and compo
 - Fast PR feedback with heavier scans scheduled.
 - Clear, structured outputs for humans and AI.
 - AI-first design: discoverable, readable, operable, governable, composable.
+
+## Architectural Philosophy
+
+This project is designed as an **externalized governance layer** that maintains
+a security boundary between AI development agents and the rules governing their work.
+
+| Principle | Implementation |
+|-----------|----------------|
+| **Structural Isolation** | CI/CD logic is decoupled from game source code ("Security Sandbox") |
+| **Immutable Gates** | Safety checks (linting, security, tests) cannot be bypassed by AI agents |
+| **SOLID/Clean Code** | Single Responsibility, Decoupling, Abstraction for cognitive ergonomics |
+| **DRY/POLS** | Single Source of Truth, no magic behavior, predictable execution |
+| **KISS/YAGNI** | Minimal abstractions, narrow mastery gap |
+
+See [docs/VISION.md](docs/VISION.md) for full details.
 
 ## Authoritative Sources (Decision Anchors)
 

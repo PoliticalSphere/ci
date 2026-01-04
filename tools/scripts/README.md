@@ -13,6 +13,26 @@ They are designed to be **deterministic, non-interactive, and safe for AI-driven
 
 ---
 
+## Architecture
+
+**See [`SEMANTIC_ARCHITECTURE.md`](./SEMANTIC_ARCHITECTURE.md) for comprehensive architecture documentation.**
+
+The scripts directory implements a **layered, intentional architecture**:
+
+- **Layer 0-1 (Core):** Foundation & Infrastructure - validation, logging, path handling
+- **Layer 2 (Abstractions):** High-level frameworks - `runner-base.sh`, `security-runner-base.sh`
+- **Layer 3 (Runners):** Tool-specific implementations - biome, eslint, gitleaks, etc.
+- **Layer 4 (Actions):** GitHub Actions composites - bootstrap, task, teardown
+- **Layer 5 (Gates/Workflows):** Orchestration - policy enforcement, CI workflows
+
+Key principles:
+- **Single source of truth** for each concern (validation, logging, path handling)
+- **No duplication** across 3+ files (consolidate to `core/`)
+- **Semantic naming** that reflects architectural layer and purpose
+- **Facade pattern only for migration** (temporary backward compatibility)
+
+---
+
 ## Purpose
 
 Scripts in this directory exist to:
@@ -21,54 +41,68 @@ Scripts in this directory exist to:
 - Ensure local behaviour mirrors CI behaviour as closely as practical
 - Provide predictable, structured outputs for humans and AI
 - Enforce platform policy through code, not convention
-- See `docs/terminal-output-standard.md` for the structured record format.
+- See `docs/terminal-output-standard.md` for the structured record format
 
 ---
 
 ## Structure
 
-- `/tools/scripts/branding`
-  - Output helpers (banner + section headers).
+```
+tools/scripts/
+├── core/                  # Shared modules (single source of truth)
+│   ├── bootstrap.sh       # Entry point - loads all core modules
+│   ├── runner-base.sh     # High-level runner abstraction
+│   ├── security-runner-base.sh  # Security scanner abstraction
+│   ├── logging.sh         # Standardized logging
+│   ├── validation.sh      # Input validation
+│   ├── path-resolution.sh # Repo root discovery
+│   └── ...                # See core/README.md for full list
+│
+├── branding/              # Output formatting and banners
+│
+├── actions/               # Composite action scripts
+│   ├── ps-bootstrap/      # Bootstrap action scripts
+│   ├── ps-task/           # Task runner scripts
+│   └── ps-teardown/       # Cleanup scripts
+│
+├── gates/                 # Git hook entrypoints (Lefthook)
+│   ├── common.sh          # Facade for gate helpers
+│   ├── pre-commit.sh      # Pre-commit gate
+│   └── pre-push.sh        # Pre-push gate
+│
+├── runners/               # Tool execution scripts
+│   ├── lint/              # Linting tools (biome, eslint, etc.)
+│   │   ├── common.sh      # Facade (delegates to core)
+│   │   ├── biome.sh       # Biome runner
+│   │   ├── eslint.sh      # ESLint runner
+│   │   └── ...
+│   └── security/          # Security scanners
+│       ├── secret-scan-pr.sh
+│       ├── gitleaks-history.sh
+│       └── ...
+│
+├── workflows/             # CI workflow scripts
+│   ├── ci/                # CI pipeline scripts
+│   ├── consumer/          # Consumer contract checks
+│   └── release/           # Release automation
+│
+└── naming/                # Naming policy enforcement
+```
 
-- `/tools/scripts/actions`
-  - Composite action helper scripts (validation + orchestration).
+### Key Directories
 
-- `/tools/scripts/gates`
-  - Lefthook gate entrypoints and shared gate helpers.
+- **core/** - Foundation modules. All reusable logic lives here.
+  Use `runner-base.sh` for new tool runners.
 
-- `/tools/scripts/lib`
-  - Shared Node.js helpers for script IO/CLI behavior (non-executable).
+- **runners/** - Tool execution scripts using the runner abstraction.
+  Each script wraps one tool (biome, eslint, gitleaks, etc.).
 
-- `/tools/scripts/lint`
-  - Linting and formatting runners (Biome, ESLint, markdownlint, yamllint, etc.)
-  - Each script is responsible for exactly one tool or gate.
+- **gates/** - Local development gates (pre-commit, pre-push).
+  Orchestrate runners and report results.
 
-- `/tools/scripts/tasks`
-  - Core build/test/typecheck/duplication tasks.
+- **actions/** - Scripts supporting GitHub composite actions.
 
-- `/tools/scripts/naming`
-  - Naming policy checks (script + JS validator).
-
-- `/tools/scripts/ci`
-  - CI policy validators (e.g. `validate-ci`)
-  - These scripts enforce workflow, permissions, and supply-chain rules.
-
-- `/tools/scripts/security`
-  - Security and integrity helpers (SAST, secret scanning, supply-chain checks)
-  - Used by both PR and scheduled workflows where applicable.
-
-- `/tools/scripts/consumer`
-  - Consumer contract checks for downstream repositories.
-
-- `/tools/scripts/release`
-  - Release automation helpers.
-
-Each subdirectory contains its own README describing:
-
-- Scope
-- Inputs
-- Outputs
-- Failure modes
+- **workflows/** - Scripts called directly from CI workflows.
 
 ---
 

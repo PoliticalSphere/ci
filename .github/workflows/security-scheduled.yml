@@ -48,27 +48,32 @@ name: Security Scheduled
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
         type: string
         required: false
         default: "ubuntu-22.04"
+
       node_version:
         description: "Node.js major version"
         type: string
         required: false
         default: "22"
+
       fetch_depth:
         description: "Git fetch depth (1 = shallow, 0 = full history)"
         type: number
         required: false
         default: 1
-      cache:
-        description: "Enable dependency caching (1 = on, 0 = off)"
-        type: string
-        required: false
-        default: "1"
+
+      # ==========================================================================
+      # PLATFORM & SHARED TOOLING
+      # ==========================================================================
       platform_ref:
         description: "Platform repository ref"
         type: string
@@ -81,6 +86,9 @@ on:
         required: false
         default: "true"
 
+      # ==========================================================================
+      # SECURITY TOOL CONFIGURATION
+      # ==========================================================================
       semgrep_version:
         description: "Pinned Semgrep version to install"
         type: string
@@ -98,6 +106,7 @@ on:
         type: string
         required: false
         default: "false"
+
       codeql_languages:
         description: "CodeQL languages (comma-separated)"
         type: string
@@ -128,7 +137,6 @@ jobs:
       runner: ${{ inputs.runner || 'ubuntu-22.04' }}
       node_version: ${{ inputs.node_version || '22' }}
       fetch_depth: ${{ inputs.fetch_depth || 1 }}
-      cache: ${{ inputs.cache || '1' }}
       platform_ref: ${{ inputs.platform_ref || 'f6eac5049f626a672c84f3899f0572a87af07ca1' }}
       platform_require_pinned_ref: ${{ inputs.platform_require_pinned_ref || 'true' }}
       semgrep_version: ${{ inputs.semgrep_version || '1.146.0' }}

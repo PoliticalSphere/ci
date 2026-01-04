@@ -52,87 +52,125 @@ name: Validate CI
 
 on:
   workflow_call:
+
+    # ==========================================================================
+    # RUNTIME & ENVIRONMENT CONFIGURATION
+    # ==========================================================================
     inputs:
       runner:
         description: "Runner label"
         type: string
         required: false
         default: "ubuntu-22.04"
+
       node_version:
         description: "Node.js major version"
         type: string
         required: false
         default: "22"
+
       fetch_depth:
         description: "Git fetch depth (1 = shallow, 0 = full history)"
         type: number
         required: false
         default: 1
+
       cache:
         description: "Enable dependency caching (1 = on, 0 = off)"
         type: string
         required: false
         default: "1"
+
       validate_timeout_minutes:
         description: "Timeout for Validate-CI job in minutes"
         type: number
         required: false
         default: 10
+
+      # ==========================================================================
+      # CHECKOUT TARGET
+      # ==========================================================================
       checkout_ref:
         description: "Optional git ref to validate (branch, tag, or SHA)"
         type: string
         required: false
         default: ""
+
+      # ==========================================================================
+      # PLATFORM & SHARED TOOLING
+      # ==========================================================================
       platform_ref:
         description: "Platform repo ref to checkout for shared scripts/configs"
         type: string
         required: false
         default: "f6eac5049f626a672c84f3899f0572a87af07ca1"
+
       platform_require_pinned_ref:
         description: "Require platform_ref to be a full 40-char commit SHA (true|false)"
         type: string
         required: false
         default: "true"
+
+      # ==========================================================================
+      # DEPENDENCY INSTALLATION CONTROLS
+      # ==========================================================================
       install_dependencies:
         description: "Install dependencies in the target repo (1 = on, 0 = off)"
         type: string
         required: false
         default: "0"
+
       install_platform_dependencies:
         description: "Install dependencies in the platform repo (1 = on, 0 = off)"
         type: string
         required: false
         default: "1"
+
+      # ==========================================================================
+      # VALIDATION BEHAVIOUR
+      # ==========================================================================
       verify_remote_shas:
         description: "Verify action SHAs against upstream remotes (1 = on, 0 = off)"
         type: string
         required: false
         default: "1"
+
       pr_only:
         description: "Validate only workflows/actions changed in the PR (1 = on, 0 = off)"
         type: string
         required: false
         default: "0"
+
       pr_base_ref:
         description: "PR base SHA for diff-based validation"
         type: string
         required: false
         default: ""
+
       pr_head_ref:
         description: "PR head SHA for diff-based validation"
         type: string
         required: false
         default: ""
+
+      # ==========================================================================
+      # ARTIFACT COLLECTION & RETENTION
+      # ==========================================================================
       artifact_name:
         description: "Artifact name for validate-ci outputs"
         type: string
         required: false
         default: "validate-ci"
+
       retention_days:
         description: "Artifact retention in days"
         type: number
         required: false
         default: 7
+
+    # ==========================================================================
+    # SECRETS (OPTIONAL, LEAST-PRIVILEGE)
+    # ==========================================================================
     secrets:
       NODE_AUTH_TOKEN:
         description: "Optional token for private registry installs"

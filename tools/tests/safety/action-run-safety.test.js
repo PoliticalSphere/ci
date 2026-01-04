@@ -1,0 +1,70 @@
+#!/usr/bin/env node
+
+// ==============================================================================
+// Political Sphere — Action Run Safety Tests
+// ------------------------------------------------------------------------------
+// Purpose:
+//   Ensure no run blocks interpolate inputs directly via '${{ inputs.* }}'.
+// ==============================================================================
+
+import path from 'node:path';
+import { listActionYmls, scanRunBlocks } from '../helpers/action-safety-test-helpers.js';
+import { fail, getRepoRoot, section } from '../helpers/test-helpers.js';
+
+const repoRoot = getRepoRoot();
+const { actionsRoot, files } = listActionYmls(repoRoot);
+
+section(
+  'safety',
+  'Action run-block input interpolation checks',
+  `Root: ${actionsRoot}`,
+);
+
+if (files.length === 0) {
+  // Nothing to do in bootstrap
+  process.exit(0);
+}
+
+const violations = [];
+
+for (const file of files) {
+  scanRunBlocks(file.lines, (line, lineNumber) => {
+    // detect input interpolation inside run blocks
+    if (/\{\{\s*inputs\./.test(line) || /\$\{\{\s*inputs\./.test(line)) {
+      violations.push({
+        file: file.path,
+        line: lineNumber,
+        text: line.trim(),
+        reason: 'inputs interpolation',
+      });
+      return;
+    }
+    // detect secrets interpolation (including github.token)
+    if (
+      /\{\{\s*secrets\./.test(line) ||
+      /\$\{\{\s*secrets\./.test(line) ||
+      /\{\{\s*github\.token\s*\}\}/.test(line) ||
+      /\$\{\{\s*github\.token\s*\}\}/.test(line)
+    ) {
+      violations.push({
+        file: file.path,
+        line: lineNumber,
+        text: line.trim(),
+        reason: 'secrets interpolation',
+      });
+    }
+  });
+}
+
+if (violations.length > 0) {
+  console.error('\nAction run-block input safety violations detected:');
+  for (const v of violations) {
+    console.error(`${path.relative(repoRoot, v.file)}:${v.line}: ${v.text}`);
+  }
+  fail(
+    'Found unsafe input interpolation inside run blocks of composite actions.',
+  );
+}
+
+console.log('OK: action run-block input interpolation checks passed');
+process.exit(0);

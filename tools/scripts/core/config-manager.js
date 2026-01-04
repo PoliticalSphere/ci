@@ -66,11 +66,19 @@ export class ConfigManager {
     if (this.isInitialized) return;
 
     // Discover all policies from the registry
-    for (const [policyName] of this.policyRegistry) {
+    for (const [policyName, metadata] of this.policyRegistry) {
+      // Skip js-module types as they must be imported directly
+      if (metadata.type === 'js-module') {
+        continue;
+      }
       try {
         this.getPolicy(policyName);
       } catch (err) {
-        // Skip policies that can't be loaded (e.g., optional configs)
+        // If a policy fails to load but is not required, continue
+        if (!metadata.required) {
+          continue;
+        }
+        throw err;
       }
     }
 
@@ -165,7 +173,7 @@ export class ConfigManager {
       category: 'lint',
     });
     registry.set('biome', {
-      path: 'biome.json',
+      path: '../biome.json', // Biome config at repo root, not in configs/
       type: 'json',
       required: true,
       category: 'lint',
@@ -220,7 +228,7 @@ export class ConfigManager {
     });
     registry.set('tsconfig', {
       path: 'lint/tsconfig.base.json',
-      type: 'json',
+      type: 'jsonc',
       required: true,
       category: 'lint',
     });
@@ -289,15 +297,19 @@ export class ConfigManager {
       return null; // Optional policy not found
     }
 
-    const content = this._loadConfigFile(filePath, metadata.type);
-    this.cache.set(name, content);
-    this.metadata.set(name, {
-      path: filePath,
-      type: metadata.type,
-      timestamp: new Date(),
-    });
+    try {
+      const content = this._loadConfigFile(filePath, metadata.type);
+      this.cache.set(name, content);
+      this.metadata.set(name, {
+        path: filePath,
+        type: metadata.type,
+        timestamp: new Date(),
+      });
 
-    return content;
+      return content;
+    } catch (err) {
+      throw new Error(`Failed to load policy '${name}' from ${filePath}: ${err.message}`);
+    }
   }
 
   /**
@@ -314,8 +326,8 @@ export class ConfigManager {
       case 'jsonc': {
         // Remove comments from JSON5-like syntax
         const cleaned = content
-          .replace(/\/\*[\s\S]*?\*\//g, '') // Block comments
-          .replace(/\/\/.*$/gm, ''); // Line comments
+          .replaceAll(/\/\*[\s\S]*?\*\//g, '') // Block comments
+          .replaceAll(/\/\/.*$/gm, ''); // Line comments
         return JSON.parse(cleaned);
       }
       case 'env':
@@ -357,6 +369,21 @@ export class ConfigManager {
    * Parse basic TOML file (simplified, only for gitleaks config)
    * For full TOML support, consider a dedicated library
    */
+  _parseTomlValue(valueStr) {
+    if (valueStr === 'true') return true;
+    if (valueStr === 'false') return false;
+    if (!Number.isNaN(Number(valueStr))) return Number(valueStr);
+    if (valueStr.startsWith('"') && valueStr.endsWith('"'))
+      return valueStr.slice(1, -1);
+    if (valueStr.startsWith('[') && valueStr.endsWith(']')) {
+      return valueStr
+        .slice(1, -1)
+        .split(',')
+        .map((v) => v.trim());
+    }
+    return valueStr;
+  }
+
   _parseTomlFile(content) {
     const result = {};
     let currentSection = null;
@@ -379,21 +406,7 @@ export class ConfigManager {
 
       const key = trimmed.slice(0, eqIndex).trim();
       const valueStr = trimmed.slice(eqIndex + 1).trim();
-
-      // Parse TOML values (simple version)
-      let value;
-      if (valueStr === 'true') value = true;
-      else if (valueStr === 'false') value = false;
-      else if (!Number.isNaN(Number(valueStr))) value = Number(valueStr);
-      else if (valueStr.startsWith('"') && valueStr.endsWith('"'))
-        value = valueStr.slice(1, -1);
-      else if (valueStr.startsWith('[') && valueStr.endsWith(']')) {
-        // Simple array parsing
-        value = valueStr
-          .slice(1, -1)
-          .split(',')
-          .map((v) => v.trim());
-      } else value = valueStr;
+      const value = this._parseTomlValue(valueStr);
 
       if (currentSection) {
         result[currentSection][key] = value;
@@ -513,14 +526,12 @@ export class ConfigManager {
       return errors;
     }
 
-    switch (name) {
-      case 'license-policy':
-        if (!config.allowlist && !config.denylist) {
-          errors.push(
-            "'license-policy' must have 'allowlist' or 'denylist' section",
-          );
-        }
-        break;
+    if (name === 'license-policy') {
+      if (!config.allowlist && !config.denylist) {
+        errors.push(
+          "'license-policy' must have 'allowlist' or 'denylist' section",
+        );
+      }
     }
 
     return errors;
@@ -567,8 +578,7 @@ export class ConfigManager {
     const result = [];
 
     for (const dep of deps) {
-      result.push(dep);
-      result.push(...this.resolveDependencies(dep, new Set(visited)));
+      result.push(dep, ...this.resolveDependencies(dep, new Set(visited)));
     }
 
     // Remove duplicates while preserving order
