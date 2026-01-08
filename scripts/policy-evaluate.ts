@@ -88,13 +88,18 @@ export function main(): number {
   const summaryMdPath = path.resolve(process.cwd(), 'policy.summary.md');
 
   safeWriteUtf8(decisionJsonPath, serializeToJSON(out.result));
-  safeWriteUtf8(
-    summaryMdPath,
-    generateMarkdownSummary(out.result, out.classification.reasons, out.classification.paths),
+  const summary = generateMarkdownSummary(
+    out.result,
+    out.classification.reasons,
+    out.classification.paths,
   );
+
+  safeWriteUtf8(summaryMdPath, summary);
 
   if (out.result.decision === 'deny') {
     console.error('Policy decision: DENY');
+    console.error('Policy summary (markdown):');
+    console.error(summary);
     return 1;
   }
 
