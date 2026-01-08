@@ -10,7 +10,7 @@ import {
   enableIncrementalExecution,
   getGlobalTracker,
   IncrementalExecutionTracker,
-} from './incremental.js';
+} from './incremental';
 
 vi.mock('node:child_process');
 vi.mock('node:crypto', () => {
