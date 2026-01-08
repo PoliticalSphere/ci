@@ -26,6 +26,9 @@ jobs:
     name: Test setup-node-env (defaults)
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -75,6 +78,9 @@ jobs:
     name: Test setup-node-env (full history)
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
         with:
@@ -103,6 +109,9 @@ jobs:
     name: Test npm caching behavior
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment (first time)
         uses: ./.github/actions/setup-node-env
 
@@ -133,6 +142,9 @@ jobs:
     name: Test integration with real commands
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 

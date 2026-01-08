@@ -57,6 +57,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -72,6 +75,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -84,6 +90,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -96,6 +105,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -108,6 +120,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -120,6 +135,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -141,6 +159,9 @@ jobs:
     permissions:
       contents: read
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
@@ -156,6 +177,9 @@ jobs:
       pull-requests: read  # Read PR body for attestation
     if: ${{ !inputs.skip-policy }}
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
         with:
@@ -191,6 +215,9 @@ jobs:
       - policy
     if: always()
     steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
       - name: Setup Node.js environment
         uses: ./.github/actions/setup-node-env
 
