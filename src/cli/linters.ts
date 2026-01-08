@@ -1,8 +1,7 @@
 /**
  * Political Sphere — Linter Registry
  *
- * Role:
-    versionProbe: { binary: 'sh', args: ['-c', 'shellcheck --version'] },
+ * Role: Authoritative registry of supported linters.
  *
  * This file is:
  *   - A single source of truth
