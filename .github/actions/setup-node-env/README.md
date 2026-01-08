@@ -31,16 +31,6 @@ steps:
       fetch-depth: 0  # Full history for all branches and tags
 ```
 
-### With custom Node.js version
-
-```yaml
-steps:
-  - name: Setup Node.js environment
-    uses: ./.github/actions/setup-node-env
-    with:
-      node-version: '20'
-```
-
 ## Inputs
 
 | Input          | Description                                     | Required | Default |
