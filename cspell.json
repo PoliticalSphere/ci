@@ -1,0 +1,113 @@
+{
+  "$schema": "https://raw.githubusercontent.com/streetsidesoftware/cspell/main/cspell.schema.json",
+
+  "version": "0.2",
+  "language": "en",
+
+  "words": [
+    "bghp",
+    "biomejs",
+    "behaviour",
+    "cant",
+    "centralising",
+    "codeql",
+    "commitlint",
+    "cspell",
+    "custombin",
+    "customshell",
+    "dependabot",
+    "devcontainer",
+    "dockerignore",
+    "Dockerfiles",
+    "dogfooding",
+    "Dogfooding",
+    "dont",
+    "editorconfig",
+    "emptively",
+    "eslintcache",
+    "fakebin",
+    "fo",
+    "gitleaks",
+    "hadolint",
+    "hte",
+    "inspectable",
+    "jsonc",
+    "knip",
+    "kniprc",
+    "lockfiles",
+    "markdownlint",
+    "markdownlintrc",
+    "Microbenchmarks",
+    "noEmit",
+    "nodePlugin",
+    "notreal",
+    "slowkill",
+    "nopid",
+    "nokill",
+    "Operationalization",
+    "ossf",
+    "politicalsphere",
+    "pnpm",
+    "pathish",
+    "precommit",
+    "prioritises",
+    "Refactorability",
+    "scorecard",
+    "dirents",
+    "taskkill",
+    "shellcheck",
+    "sonarcloud",
+    "sonarjs",
+    "srcdir",
+    "teh",
+    "Traceparent",
+    "traceparent",
+    "tsbuildinfo",
+    "tsconfig",
+    "tseslint",
+    "unparseable",
+    "Unusedish",
+    "wont",
+    "yamllint",
+    "semgrep",
+    "Semgrep",
+    "unstub",
+    "pathspec"
+  ],
+
+  "flagWords": [],
+
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/.git/**",
+    "**/.ps-platform/**",
+
+    "**/dist/**",
+    "**/build/**",
+    "**/coverage/**",
+    "**/html/**",
+
+    "**/package-lock.json",
+    "**/pnpm-lock.yaml",
+    "**/yarn.lock",
+
+    "**/*.min.js",
+    "**/*.bundle.js",
+    "**/*.map"
+  ],
+
+  "ignoreRegExpList": [
+    "\\b[A-Fa-f0-9]{40}\\b",
+    "\\b[A-Za-z0-9+/=]{40,}\\b",
+    "\\bsha256:[A-Fa-f0-9]{64}\\b",
+    "\\bghp_[A-Za-z0-9]{36,}\\b"
+  ],
+
+  "dictionaries": ["en_US", "typescript", "node", "npm", "bash"],
+
+  "import": ["@cspell/dict-typescript/cspell-ext.json"],
+
+  "useGitignore": true,
+
+  "enableFiletypes": ["shellscript", "dockerfile"]
+}

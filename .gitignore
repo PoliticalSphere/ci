@@ -1,0 +1,130 @@
+# ==============================================================================
+# Political Sphere — .gitignore
+# Purpose:
+#   Exclude generated artefacts, local state, and sensitive material from
+#   version control while preserving authoritative configuration and policy.
+#
+# Principles:
+#   - Single source of truth
+#   - Determinism over convenience
+#   - Fail closed for secrets
+#   - CI is authoritative
+# ==============================================================================
+
+
+# ------------------------------------------------------------------------------
+# Dependencies & package manager state
+# ------------------------------------------------------------------------------
+node_modules/
+.pnpm-store/
+
+
+# ------------------------------------------------------------------------------
+# Build & compilation outputs
+# ------------------------------------------------------------------------------
+dist/
+build/
+out/
+*.tsbuildinfo
+
+
+# ------------------------------------------------------------------------------
+# Test artefacts & coverage
+# ------------------------------------------------------------------------------
+coverage/
+html/
+.nyc_output/
+*.lcov
+
+
+# ------------------------------------------------------------------------------
+# IDEs & editors (keep shared config, ignore local state)
+# ------------------------------------------------------------------------------
+.idea/
+
+# Ignore all local Visual Studio Code state; do not track workspace settings here
+.vscode/
+.vscode/*
+
+*.sublime-*
+*.swp
+*.swo
+*~
+
+
+# ------------------------------------------------------------------------------
+# Operating system files
+# ------------------------------------------------------------------------------
+.DS_Store
+Thumbs.db
+
+
+# ------------------------------------------------------------------------------
+# Logs & debug output
+# ------------------------------------------------------------------------------
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+
+# ------------------------------------------------------------------------------
+# Runtime environment & local configuration
+# ------------------------------------------------------------------------------
+.env
+.env.*
+!.env.example
+
+
+# ------------------------------------------------------------------------------
+# Tooling caches
+# ------------------------------------------------------------------------------
+.eslintcache
+.cache/
+*.cache
+.turbo/
+.nx/
+.qodo
+
+
+# ------------------------------------------------------------------------------
+# Temporary files
+# ------------------------------------------------------------------------------
+tmp/
+temp/
+*.tmp
+*.temp
+
+
+
+
+# ------------------------------------------------------------------------------
+# Package manager lockfiles
+# Policy: exactly one lockfile should be committed per repository.
+# Uncomment the chosen lockfile and leave the others ignored.
+# ------------------------------------------------------------------------------
+# package-lock.json
+# pnpm-lock.yaml
+# yarn.lock
+
+
+# ------------------------------------------------------------------------------
+# Secrets & credentials (belt-and-suspenders with Gitleaks)
+# These must never be committed, even accidentally.
+# ------------------------------------------------------------------------------
+*.pem
+*.key
+*.p12
+*.pfx
+
+secrets/
+.secrets/
+
+
+# ------------------------------------------------------------------------------
+# CI / platform artefacts
+# ------------------------------------------------------------------------------
+.ps-platform/
+reports/

@@ -1,0 +1,120 @@
+# yamllint configuration
+# Tier 4: YAML correctness (orthogonal to Biome)
+# Purpose: Enforce syntactic correctness, safety, and readability
+# Scope: Authoritative YAML only (CI, governance, configuration)
+
+extends: default
+
+yaml-files:
+  - '*.yaml'
+  - '*.yml'
+  - '.yamllint'
+
+ignore:
+  - node_modules/
+  - dist/
+  - build/
+  - coverage/
+  - html/
+  - .git/
+  - .ps-platform/
+
+rules:
+  # ───────────────────────────────────────────────────────────
+  # Structural correctness
+  # ───────────────────────────────────────────────────────────
+
+  key-duplicates: enable
+
+  empty-values:
+    forbid-in-block-mappings: false
+    forbid-in-flow-mappings: true
+
+  octal-values:
+    forbid-implicit-octal: true
+    forbid-explicit-octal: false
+
+  float-values:
+    forbid-inf: false
+    forbid-nan: false
+    forbid-scientific-notation: false
+    require-numeral-before-decimal: true
+
+  truthy:
+    # GitHub Actions compatibility (e.g. `on:`)
+    allowed-values: ['true', 'false', 'on', 'off', 'yes', 'no']
+    check-keys: false
+
+  # ───────────────────────────────────────────────────────────
+  # Whitespace & formatting (clarity, not aesthetics)
+  # ───────────────────────────────────────────────────────────
+
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  hyphens:
+    max-spaces-after: 1
+
+  colons:
+    max-spaces-before: 0
+    max-spaces-after: 1
+
+  commas:
+    max-spaces-before: 0
+    min-spaces-after: 1
+    max-spaces-after: 1
+
+  braces:
+    min-spaces-inside: 0
+    max-spaces-inside: 1
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  brackets:
+    min-spaces-inside: 0
+    max-spaces-inside: 0
+    min-spaces-inside-empty: 0
+    max-spaces-inside-empty: 0
+
+  # ───────────────────────────────────────────────────────────
+  # Line handling (CI + GitHub ergonomics)
+  # ───────────────────────────────────────────────────────────
+
+  line-length:
+    max: 120
+    allow-non-breakable-words: true
+    allow-non-breakable-inline-mappings: true
+
+  new-lines:
+    type: unix
+
+  new-line-at-end-of-file: enable
+
+  trailing-spaces: enable
+
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 1
+
+  # ───────────────────────────────────────────────────────────
+  # Comments (documentation quality)
+  # ───────────────────────────────────────────────────────────
+
+  comments:
+    require-starting-space: true
+    ignore-shebangs: true
+    min-spaces-from-content: 1
+
+  comments-indentation: enable
+
+  # ───────────────────────────────────────────────────────────
+  # Explicitly relaxed rules (intentional)
+  # ───────────────────────────────────────────────────────────
+
+  document-start: disable   # `---` is noisy and rarely useful in CI YAML
+  document-end: disable     # `...` adds no value here
+
+  key-ordering: disable     # Avoid bikeshedding & AI churn

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/index.ts"],
+  "project": ["src/**/*.{ts,tsx}"],
+  "workspaces": {
+    "root": {
+      "entry": ["src/index.ts"],
+      "project": ["src/**/*.{ts,tsx}"]
+    },
+    "scripts": {
+      "entry": ["scripts/**/*.ts"],
+      "project": ["scripts/**/*.{ts,tsx}"]
+    }
+  },
+  "ignore": ["**/*.d.ts", "**/fixtures/**", "**/test-data/**", "src/__test-utils__/**", "html/**"],
+  "ignoreBinaries": ["security"],
+  "ignoreDependencies": ["actionlint", "yamllint-js", "cspell", "jscpd", "markdownlint-cli2"],
+  "rules": {
+    "files": "error",
+    "dependencies": "error",
+    "devDependencies": "error",
+    "optionalPeerDependencies": "warn",
+    "unlisted": "error",
+    "binaries": "error",
+    "unresolved": "error",
+    "exports": "error",
+    "types": "error",
+    "duplicates": "error",
+    "enumMembers": "warn",
+    "classMembers": "warn"
+  }
+}

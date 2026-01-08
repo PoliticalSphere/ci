@@ -1,0 +1,9 @@
+node_modules
+coverage
+html
+dist
+build
+logs
+reports
+.git
+.ps-platform

@@ -1,0 +1,9 @@
+rules:
+  - id: no-eval-untrusted-input
+    message: Do not use eval with untrusted input.
+    severity: ERROR
+    languages:
+      - javascript
+      - typescript
+    patterns:
+      - pattern: eval($X)

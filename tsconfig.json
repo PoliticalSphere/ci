@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json.schemastore.org/tsconfig",
+
+  // ============================================================================
+  // Political Sphere — TypeScript Configuration
+  // Role:
+  //   Authoritative type-checking and semantic validation for CI and local linting.
+  //
+  // Authority:
+  //   - This config is for validation only (no JS emit).
+  //   - Runtime behaviour is defined by Node.js, not the compiler.
+  //   - Formatting is owned by Biome.
+  // ============================================================================
+
+  "compilerOptions": {
+    /* ------------------------------------------------------------------------
+     * Language & Runtime Environment
+     * --------------------------------------------------------------------- */
+    "target": "ES2024",
+    "lib": ["ES2024"],
+
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+
+    /* JSX Support for Ink (React for Terminal) */
+    "jsx": "react",
+    "jsxFactory": "React.createElement",
+    "jsxFragmentFactory": "React.Fragment",
+
+    /* ------------------------------------------------------------------------
+     * Emit Strategy
+     * Lint / validation only — CI is authoritative.
+     * --------------------------------------------------------------------- */
+    "noEmit": true,
+
+    /* ------------------------------------------------------------------------
+     * Strictness & Type Safety (maximum signal, no ambiguity)
+     * --------------------------------------------------------------------- */
+    "strict": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+
+    /* ------------------------------------------------------------------------
+     * Additional Correctness Checks
+     * --------------------------------------------------------------------- */
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+
+    /* ------------------------------------------------------------------------
+     * Module & Interop Semantics
+     * Node.js is authoritative — avoid compiler magic.
+     * --------------------------------------------------------------------- */
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+
+    "verbatimModuleSyntax": true,
+    "isolatedModules": true,
+
+    "forceConsistentCasingInFileNames": true,
+
+    /* ------------------------------------------------------------------------
+     * Module Resolution & Assets
+     * --------------------------------------------------------------------- */
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+
+    /* ------------------------------------------------------------------------
+     * Maps & Metadata
+     * Enabled for diagnostics only (no JS output).
+     * --------------------------------------------------------------------- */
+    "sourceMap": true,
+    "declaration": false,
+    "declarationMap": false,
+
+    /* ------------------------------------------------------------------------
+     * Performance
+     * Node typings are trusted; CI handles correctness.
+     * --------------------------------------------------------------------- */
+    "skipLibCheck": true
+  },
+
+  /* --------------------------------------------------------------------------
+   * Project Scope
+   * ----------------------------------------------------------------------- */
+  "include": ["src/**/*", "scripts/**/*", "*.ts", "*.mts", "*.js", "*.mjs"],
+
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "html",
+    "**/*.test.ts",
+    "**/*.test.tsx",
+    "**/*.spec.ts",
+    "**/*.spec.tsx",
+    "**/__tests__/**"
+  ]
+}

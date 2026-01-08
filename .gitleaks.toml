@@ -1,0 +1,60 @@
+# Gitleaks configuration
+# Tier 5: Secret scanning (policy linting)
+
+title = "PoliticalSphere Gitleaks Config"
+
+[extend]
+# Use the default gitleaks config as base
+useDefault = true
+
+[allowlist]
+description = "Global allowlist"
+paths = [
+  '''node_modules''',
+  '''\.git''',
+  '''dist''',
+  '''build''',
+  '''coverage''',
+  '''package-lock\.json''',
+  '''pnpm-lock\.yaml''',
+]
+regexTarget = "match"
+
+# Example placeholder patterns to ignore
+regexes = [
+  '''EXAMPLE_.*''',
+  '''PLACEHOLDER_.*''',
+  '''your-.*-here''',
+  '''<your-.*>''',
+]
+
+# Commits to ignore (if any known false positives)
+commits = []
+
+# Stop words that indicate test/example data
+stopwords = [
+  "example",
+  "sample",
+  "test",
+  "dummy",
+  "placeholder",
+  "changeme",
+  "redacted",
+]
+
+[[rules]]
+id = "ps-internal-token"
+description = "PoliticalSphere internal token pattern"
+regex = '''(?i)ps[_-]?token[_-]?[=:]\s*['"]?[a-zA-Z0-9]{32,}['"]?'''
+tags = ["token", "internal"]
+
+[[rules]]
+id = "hardcoded-password"
+description = "Hardcoded password in assignment"
+regex = '''(?i)(password|passwd|pwd)\s*[=:]\s*['"][^'"]{8,}['"]'''
+tags = ["password"]
+[rules.allowlist]
+regexes = [
+  '''(?i)password\s*[=:]\s*['"]?\$\{.*\}['"]?''',
+  '''(?i)password\s*[=:]\s*['"]?process\.env\..*['"]?''',
+]
