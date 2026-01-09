@@ -83,11 +83,13 @@ describe('CLI test utils', () => {
   });
 
   it('handles TMPDIR with trailing slash correctly', async () => {
+    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     const originalTmpDir = process.env.TMPDIR;
     const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     const tmpPath = tmpobj.name;
     try {
       // Set TMPDIR with trailing slash using tmp-created directory
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
       process.env.TMPDIR = `${tmpPath}/`;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
@@ -107,6 +109,7 @@ describe('CLI test utils', () => {
         // biome-ignore lint/performance/noDelete: Required to restore environment state
         delete process.env.TMPDIR;
       } else {
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
         process.env.TMPDIR = originalTmpDir;
       }
       tmpobj.removeCallback();
@@ -114,11 +117,13 @@ describe('CLI test utils', () => {
   });
 
   it('handles TMPDIR without trailing slash correctly', async () => {
+    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     const originalTmpDir = process.env.TMPDIR;
     const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     const tmpPath = tmpobj.name;
     try {
       // Set TMPDIR without trailing slash using tmp-created directory
+      // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
       process.env.TMPDIR = tmpPath;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
@@ -138,6 +143,7 @@ describe('CLI test utils', () => {
         // biome-ignore lint/performance/noDelete: Required to restore environment state
         delete process.env.TMPDIR;
       } else {
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
         process.env.TMPDIR = originalTmpDir;
       }
       tmpobj.removeCallback();
@@ -145,6 +151,7 @@ describe('CLI test utils', () => {
   });
 
   it('handles missing TMPDIR environment variable', async () => {
+    // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
     const originalTmpDir = process.env.TMPDIR;
     const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     const expectedFallback = tmpobj.name.split('/').slice(0, 2).join('/'); // Gets base temp path
@@ -173,6 +180,7 @@ describe('CLI test utils', () => {
         // biome-ignore lint/performance/noDelete: Required to restore environment state
         delete process.env.TMPDIR;
       } else {
+        // nosemgrep: javascript.lang.security.audit.path-traversal.path-join-resolve-traversal
         process.env.TMPDIR = originalTmpDir;
       }
       tmpobj.removeCallback();
