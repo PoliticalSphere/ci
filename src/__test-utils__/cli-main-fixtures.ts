@@ -70,8 +70,12 @@ function createCalculateSummaryFn(): ReturnType<typeof vi.fn> {
 }
 
 function createAcquireExecutionLockFn(): ReturnType<typeof vi.fn> {
+  // Use system temp directory with unique test identifier for security
+  // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
+  const tmpDirRaw = process.env['TMPDIR'] ?? '/tmp';
+  const tmpDir = tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
   return vi.fn().mockResolvedValue({
-    lockPath: '/tmp/ps-parallel-lint.lock',
+    lockPath: `${tmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
     release: vi.fn().mockResolvedValue(void 0),
   });
 }
@@ -81,9 +85,13 @@ function buildOptions(
   deps: Omit<TestDeps, 'options'>,
   injectedConsole?: unknown,
 ): Record<string, unknown> {
+  // Use system temp directory for test isolation
+  // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
+  const tmpDirRaw = process.env['TMPDIR'] ?? '/tmp';
+  const tmpDir = tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
   const options: Record<string, unknown> & { console?: unknown } = {
     argv,
-    cwd: '/tmp/project',
+    cwd: `${tmpDir}/ps-test-project-${process.pid}`,
     mkdirFn: deps.mkdirFn,
     renderDashboardFn: deps.renderDashboardFn,
     renderWaitingHeaderFn: deps.renderWaitingHeaderFn,

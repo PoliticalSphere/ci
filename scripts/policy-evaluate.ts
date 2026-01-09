@@ -311,13 +311,12 @@ export async function main(): Promise<number> {
 
 /* c8 ignore start */
 if (import.meta.url === `file://${process.argv[1]}`) {
-  main()
-    .then((code) => {
-      process.exitCode = code;
-    })
-    .catch((error) => {
-      console.error('Policy evaluator error:', error);
-      process.exitCode = 1;
-    });
+  try {
+    const code = await main();
+    process.exitCode = code;
+  } catch (error) {
+    console.error('Policy evaluator error:', error);
+    process.exitCode = 1;
+  }
 }
 /* c8 ignore stop */

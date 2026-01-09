@@ -6,7 +6,7 @@
  * deterministically across risk tiers.
  */
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   __test__extractCheckedTexts,
   __test__levenshtein,
@@ -550,39 +550,41 @@ describe('Levenshtein — branch coverage', () => {
 
   it('falls back when map entries or code points are missing', async () => {
     const { __test__levenshtein } = await import('./attestation.ts');
-    const originalGet = Object.getOwnPropertyDescriptor(Map.prototype, 'get')?.value as
-      | ((this: Map<number, number>, key: number) => number | undefined)
-      | undefined;
-    const originalCodePointAt = Object.getOwnPropertyDescriptor(String.prototype, 'codePointAt')
-      ?.value as ((this: string, pos: number) => number | undefined) | undefined;
     const targetKey = 'ac'.length;
     let codePointCalls = 0;
 
-    Map.prototype.get = function (key: number): number | undefined {
+    // Store original methods safely
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const originalMapGet = Map.prototype.get;
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const originalStringCodePointAt = String.prototype.codePointAt;
+
+    const mapGetSpy = vi.spyOn(Map.prototype, 'get').mockImplementation(function (
+      this: Map<number, number>,
+      key: number,
+    ) {
       if (key === targetKey || key === targetKey - 1) {
         return undefined;
       }
-      return originalGet.call(this, key);
-    };
+      return originalMapGet.call(this, key);
+    });
 
-    String.prototype.codePointAt = function (pos: number): number | undefined {
-      codePointCalls += 1;
-      if (codePointCalls <= 2) {
-        return undefined;
-      }
-      return originalCodePointAt.call(this, pos);
-    };
+    const stringCodePointSpy = vi
+      .spyOn(String.prototype, 'codePointAt')
+      .mockImplementation(function (this: string, pos: number) {
+        codePointCalls += 1;
+        if (codePointCalls <= 2) {
+          return undefined;
+        }
+        return originalStringCodePointAt.call(this, pos);
+      });
 
     try {
       const dist = __test__levenshtein('ab', 'ac');
       expect(dist).toBeGreaterThanOrEqual(0);
     } finally {
-      if (originalGet) {
-        Map.prototype.get = originalGet as (key: number) => number | undefined;
-      }
-      if (originalCodePointAt) {
-        String.prototype.codePointAt = originalCodePointAt as (pos: number) => number | undefined;
-      }
+      mapGetSpy.mockRestore();
+      stringCodePointSpy.mockRestore();
     }
   });
 });
@@ -707,20 +709,24 @@ describe('Helper branches & nullish handling', () => {
   it('findNearMatchesForKeys handles Map.get returning undefined', () => {
     // This test covers the defensive guard at line 167: if (label === undefined)
     // We'll spy on Map.prototype.get to force it to return undefined once
-    // eslint-disable-next-line @typescript-eslint/unbound-method
-    const originalGet = Map.prototype.get;
     let callCount = 0;
 
-    // @ts-expect-error - Mocking Map.prototype.get
-    Map.prototype.get = function (this: Map<string, string>, key: string) {
+    // Store original method safely
+    // eslint-disable-next-line @typescript-eslint/unbound-method
+    const originalMapGet = Map.prototype.get;
+
+    const mapGetSpy = vi.spyOn(Map.prototype, 'get').mockImplementation(function (
+      this: Map<string, string>,
+      key: string,
+    ) {
       callCount++;
       // Force undefined on first call to cover the branch
       if (callCount === 1) {
         return undefined;
       }
       // Use bind to avoid unbound-method eslint error
-      return originalGet.bind(this)(key);
-    };
+      return originalMapGet.bind(this)(key);
+    });
 
     try {
       const body = `
@@ -730,7 +736,7 @@ describe('Helper branches & nullish handling', () => {
       // Should not crash and should continue processing
       expect(Array.isArray(near)).toBe(true);
     } finally {
-      Map.prototype.get = originalGet;
+      mapGetSpy.mockRestore();
     }
   });
 });

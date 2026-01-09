@@ -280,7 +280,7 @@ function assertValidRegistry(registry: readonly LinterConfig[]): void {
       );
     }
 
-    if (linter.expectedVersion !== undefined && linter.expectedVersion.trim().length === 0) {
+    if (linter.expectedVersion?.trim().length === 0) {
       throw new CliError(
         'CLI_INVALID_ARGUMENT',
         `expectedVersion must be non-empty when specified for: ${linter.id}`,

@@ -19,7 +19,7 @@ import { pathToFileURL } from 'node:url';
 
 import { Box, render, Text } from 'ink';
 import Spinner from 'ink-spinner';
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import type { LinterStatus } from './executor.ts';
 import type { LinterConfig } from './linters.ts';
 
@@ -454,13 +454,16 @@ const Dashboard: React.FC<DashboardProps> = ({ linters, logDir, subscribe, onCom
   const [done, setDone] = useState(false);
   const [duration, setDuration] = useState(0);
 
+  // Helper to handle subscription updates
+  const handleStatusUpdate = useCallback((id: string, status: TerminalStatus) => {
+    setStates((prev) =>
+      prev.map((s) => (s.id === id && s.status !== status ? { ...s, status } : s)),
+    );
+  }, []);
+
   useEffect(() => {
-    subscribe((id, status) => {
-      setStates((prev) =>
-        prev.map((s) => (s.id === id && s.status !== status ? { ...s, status } : s)),
-      );
-    });
-  }, [subscribe]);
+    subscribe(handleStatusUpdate);
+  }, [subscribe, handleStatusUpdate]);
 
   useEffect(() => {
     if (!done && states.every((s) => ['PASS', 'FAIL', 'ERROR', 'SKIPPED'].includes(s.status))) {

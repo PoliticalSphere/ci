@@ -195,6 +195,9 @@ function collectCheckboxFormatViolations(
 /* Core decision function                                                     */
 /* -------------------------------------------------------------------------- */
 
+// Note: This pure function accepts 10 parameters to maintain explicit, deterministic
+// policy evaluation. Each parameter represents a distinct policy input. Grouping them
+// into an object would obscure the intentional separation of concerns.
 export function makeDecision(
   riskTier: RiskTier,
   riskPaths: readonly string[],
@@ -336,8 +339,16 @@ export function generateMarkdownSummary(
 
   const lines: string[] = ['# Policy Evaluation Summary\n'];
 
-  // eslint-disable-next-line unicorn/no-nested-ternary -- Biome formatter conflict
-  const emoji = decision === 'allow' ? '✅' : decision === 'warn' ? '⚠️' : '❌';
+  // Determine emoji based on decision
+  let emoji: string;
+  if (decision === 'allow') {
+    emoji = '✅';
+  } else if (decision === 'warn') {
+    emoji = '⚠️';
+  } else {
+    emoji = '❌';
+  }
+
   lines.push(
     `**Decision**: ${emoji} ${decision.toUpperCase()}\n`,
     '## Risk Assessment\n',
@@ -348,14 +359,14 @@ export function generateMarkdownSummary(
   );
 
   const pushRiskReasons = (reasons: readonly string[]) => {
-    const sortedReasons = [...reasons].toSorted();
+    const sortedReasons = [...reasons].toSorted((a, b) => a.localeCompare(b));
     if (sortedReasons.length > 0) {
       lines.push('### Risk Classification Reasons\n', ...sortedReasons.map((r) => `- ${r}`), '');
     }
   };
 
   const pushSortedPaths = (paths: readonly string[]) => {
-    const sorted = [...paths].toSorted();
+    const sorted = [...paths].toSorted((a, b) => a.localeCompare(b));
     if (sorted.length > 0) {
       lines.push('### Elevated-Risk Paths\n', ...sorted.map((p) => `- \`${p}\``), '');
     }

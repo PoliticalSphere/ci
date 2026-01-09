@@ -27,7 +27,14 @@ describe('CLI test utils', () => {
 
     expect(options.console).toBeUndefined();
 
-    await mkdirFn('/tmp/logs', { recursive: true });
+    // Helper to normalize temp directory
+    const getTmpDir = () => {
+      const tmpDir = process.env.TMPDIR || '/tmp';
+      return tmpDir.endsWith('/') ? tmpDir.slice(0, -1) : tmpDir;
+    };
+
+    const tmpDir = getTmpDir();
+    await mkdirFn(`${tmpDir}/logs`, { recursive: true });
 
     const dashboard = renderDashboardFn();
     dashboard.updateStatus('running');
@@ -42,8 +49,9 @@ describe('CLI test utils', () => {
     const lock = await acquireExecutionLockFn();
     await lock.release();
 
-    const results = await executeLintersFn([], { logDir: '/tmp/logs' });
-    expect(results[0]?.logPath).toBe('/tmp/logs/eslint.log');
+    const testLogDir = `${tmpDir}/test-logs`;
+    const results = await executeLintersFn([], { logDir: testLogDir });
+    expect(results[0]?.logPath).toBe(`${testLogDir}/eslint.log`);
   });
 
   it('includes injected console and lock helpers', async () => {
@@ -53,7 +61,35 @@ describe('CLI test utils', () => {
     expect(options.console).toBe(fakeConsole);
 
     const lock = await acquireExecutionLockFn();
-    expect(lock.lockPath).toBe('/tmp/ps-parallel-lint.lock');
+    // Helper to normalize temp directory
+    const getTmpDir = () => {
+      const tmpDir = process.env.TMPDIR || '/tmp';
+      return tmpDir.endsWith('/') ? tmpDir.slice(0, -1) : tmpDir;
+    };
+    expect(lock.lockPath).toBe(`${getTmpDir()}/ps-parallel-lint-test-${process.pid}.lock`);
     await lock.release();
+  });
+
+  it('falls back to /tmp when TMPDIR is not set', async () => {
+    const originalTmpdir = process.env.TMPDIR;
+    // biome-ignore lint/performance/noDelete: Need to actually unset env var, not set to string "undefined"
+    delete process.env.TMPDIR;
+
+    try {
+      const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
+
+      // Verify options.cwd uses /tmp fallback
+      expect(options.cwd).toBe(`/tmp/ps-test-project-${process.pid}`);
+
+      // Verify lock path uses /tmp fallback
+      const lock = await acquireExecutionLockFn();
+      expect(lock.lockPath).toBe(`/tmp/ps-parallel-lint-test-${process.pid}.lock`);
+      await lock.release();
+    } finally {
+      // Restore original TMPDIR
+      if (originalTmpdir !== undefined) {
+        process.env.TMPDIR = originalTmpdir;
+      }
+    }
   });
 });

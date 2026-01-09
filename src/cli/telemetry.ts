@@ -46,7 +46,7 @@ export interface TelemetryStats {
  * Telemetry collector for tracking linter execution metrics.
  */
 export class TelemetryCollector {
-  private metrics: Map<string, LinterMetrics> = new Map();
+  private readonly metrics: Map<string, LinterMetrics> = new Map();
   private readonly enabled: boolean;
 
   constructor(enabled = true) {
@@ -203,9 +203,7 @@ let globalCollector: TelemetryCollector | null = null;
  * Get or create the global telemetry collector.
  */
 export function getGlobalTelemetry(enabled = true): TelemetryCollector {
-  if (!globalCollector) {
-    globalCollector = new TelemetryCollector(enabled);
-  }
+  globalCollector ??= new TelemetryCollector(enabled);
   return globalCollector;
 }
 

@@ -31,16 +31,22 @@ describe('validate-action-pinning', () => {
   });
 
   // Shared HTTPS mock helpers for tests that need to stub GitHub API responses
+  const handleMockEvent = (event: string, handler: (...args: unknown[]) => void, data: string) => {
+    if (event === 'data') {
+      handler(data);
+    } else if (event === 'end') {
+      handler();
+    }
+  };
+
   const createMockResponse = (data: string) => ({
     on: (event: string, handler: (...args: unknown[]) => void) => {
-      if (event === 'data') {
-        handler(data);
-      } else if (event === 'end') {
-        handler();
-      }
+      handleMockEvent(event, handler, data);
       return createMockResponse(data);
     },
   });
+
+  const createMockRequest = () => ({ on: () => ({ on: () => ({}) }) });
 
   const mockHttpsGetWithData = (data: string) =>
     vi.spyOn(https, 'get').mockImplementation((_url, _options, callback) => {
@@ -48,8 +54,7 @@ describe('validate-action-pinning', () => {
         const response = createMockResponse(data);
         callback(response as never);
       }
-      const request = { on: () => ({ on: () => ({}) }) };
-      return request as never;
+      return createMockRequest() as never;
     });
 
   const mockHttpsGetWithSha = (sha: string) => mockHttpsGetWithData(JSON.stringify({ sha }));
@@ -61,8 +66,7 @@ describe('validate-action-pinning', () => {
         const response = createMockResponse(JSON.stringify({ sha }));
         callback(response as never);
       }
-      const request = { on: () => ({ on: () => ({}) }) };
-      return request as never;
+      return createMockRequest() as never;
     });
 
   describe('isValidSha', () => {

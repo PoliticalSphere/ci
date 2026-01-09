@@ -69,8 +69,9 @@ afterEach(async () => {
 describe('Political Sphere - CLI integration', () => {
   it('runs a linter end-to-end and writes the log', async () => {
     const { main } = await loadMain();
+    const tmpDir = process.env.TMPDIR || '/tmp';
     const acquireExecutionLockFn = vi.fn().mockResolvedValue({
-      lockPath: '/tmp/ps-parallel-lint.lock',
+      lockPath: `${tmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
       release: vi.fn().mockResolvedValue(undefined),
     });
 
@@ -109,8 +110,9 @@ describe('Political Sphere - CLI integration', () => {
     // by simulating a high-risk PR with missing attestations
 
     const { main } = await loadMain();
+    const tmpDir = process.env.TMPDIR || '/tmp';
     const acquireExecutionLockFn = vi.fn().mockResolvedValue({
-      lockPath: '/tmp/ps-parallel-lint.lock',
+      lockPath: `${tmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
       release: vi.fn().mockResolvedValue(undefined),
     });
 

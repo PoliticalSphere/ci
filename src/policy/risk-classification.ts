@@ -183,19 +183,32 @@ const MEDIUM_RISK_PATTERNS = MEDIUM_RISK_RULES.map((r) => r.pattern) as readonly
  * Risk Classification Internals
  * ============================================
  */
+/**
+ * Compare function for locale-aware alphabetical sorting
+ */
+function localeCompare(a: string, b: string): number {
+  return a.localeCompare(b);
+}
+
+/**
+ * Builds a classification result with sorted reasons and paths.
+ */
 function buildClassificationResult(
   tier: RiskTier,
   highRiskPaths: Set<string>,
   mediumRiskPaths: Set<string>,
   reasons: Set<string>,
 ): RiskClassification {
-  const outReasons = [...reasons].toSorted();
-  const outPaths =
-    tier === 'high'
-      ? [...highRiskPaths].toSorted()
-      : tier === 'medium' // eslint-disable-line unicorn/no-nested-ternary -- Biome formatter conflict
-        ? [...mediumRiskPaths].toSorted()
-        : [];
+  const outReasons = [...reasons].toSorted(localeCompare);
+
+  let outPaths: readonly string[];
+  if (tier === 'high') {
+    outPaths = [...highRiskPaths].toSorted(localeCompare);
+  } else if (tier === 'medium') {
+    outPaths = [...mediumRiskPaths].toSorted(localeCompare);
+  } else {
+    outPaths = [];
+  }
 
   return { tier, reasons: outReasons, paths: outPaths };
 }
@@ -235,8 +248,14 @@ export function classifyRisk(changedFiles: readonly string[]): RiskClassificatio
   }
 
   // Determine overall tier
-  const tier: RiskTier =
-    highRiskPaths.size > 0 ? 'high' : mediumRiskPaths.size > 0 ? 'medium' : 'low'; // eslint-disable-line unicorn/no-nested-ternary -- Biome formatter conflict
+  let tier: RiskTier;
+  if (highRiskPaths.size > 0) {
+    tier = 'high';
+  } else if (mediumRiskPaths.size > 0) {
+    tier = 'medium';
+  } else {
+    tier = 'low';
+  }
 
   // Low-risk summary reason
   if (tier === 'low') {
@@ -323,8 +342,14 @@ export function classifyRiskWithConfig(
     }
   }
 
-  const tier: RiskTier =
-    highRiskPaths.size > 0 ? 'high' : mediumRiskPaths.size > 0 ? 'medium' : 'low'; // eslint-disable-line unicorn/no-nested-ternary -- Biome formatter conflict
+  let tier: RiskTier;
+  if (highRiskPaths.size > 0) {
+    tier = 'high';
+  } else if (mediumRiskPaths.size > 0) {
+    tier = 'medium';
+  } else {
+    tier = 'low';
+  }
 
   if (tier === 'low') {
     reasons.add('All changed files are low-risk (application code or documentation)');

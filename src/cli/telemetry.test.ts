@@ -136,6 +136,9 @@ describe('Political Sphere — Telemetry', () => {
     });
 
     describe('calculateStats', () => {
+      // Helper filter function for testing filter parameter
+      const isEslintMetric = (m: { linterId: string }) => m.linterId === 'eslint';
+
       it('returns zero stats for empty metrics', () => {
         const stats = collector.calculateStats();
         expect(stats.totalExecutions).toBe(0);
@@ -212,7 +215,7 @@ describe('Political Sphere — Telemetry', () => {
         collector.recordExecution(exec1, 100, true);
         collector.recordExecution(exec2, 200, true);
 
-        const eslintStats = collector.calculateStats((m) => m.linterId === 'eslint');
+        const eslintStats = collector.calculateStats(isEslintMetric);
 
         expect(eslintStats.totalExecutions).toBe(1);
         expect(eslintStats.totalOutputBytes).toBe(100);

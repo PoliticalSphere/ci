@@ -32,11 +32,28 @@ afterEach(async () => {
 });
 
 describe('Political Sphere — Logger', () => {
+  // Helper to mock fs with write failures
+  async function mockFsWithWriteFailure() {
+    const actual = await vi.importActual('node:fs');
+    return {
+      ...actual,
+      createWriteStream: vi.fn(() => ({
+        write: (_data: string, cb: (error?: Error | null) => void) => {
+          cb(new Error('write failed'));
+          return true;
+        },
+        end: vi.fn(),
+      })),
+    };
+  }
+
   it('builds LogOptions with provided optional values', () => {
     const traceContext = createTraceContext();
+    const tmpDir = process.env.TMPDIR || '/tmp';
+    const logDir = `${tmpDir}/test-logs-${process.pid}`;
 
     const built = makeLogOptions({
-      logDir: '/tmp/logs',
+      logDir,
       linterId: 'lint-a',
       verifyMode: true,
       structured: true,
@@ -45,7 +62,7 @@ describe('Political Sphere — Logger', () => {
     });
 
     expect(built).toEqual({
-      logDir: '/tmp/logs',
+      logDir,
       linterId: 'lint-a',
       verifyMode: true,
       structured: true,
@@ -55,14 +72,17 @@ describe('Political Sphere — Logger', () => {
   });
 
   it('omits optional fields when not provided to makeLogOptions', () => {
+    const tmpDir = process.env.TMPDIR || '/tmp';
+    const logDir = `${tmpDir}/test-logs-${process.pid}`;
+
     const built = makeLogOptions({
-      logDir: '/tmp/logs',
+      logDir,
       linterId: 'lint-b',
       verifyMode: false,
     });
 
     expect(built).toEqual({
-      logDir: '/tmp/logs',
+      logDir,
       linterId: 'lint-b',
       verifyMode: false,
     });
@@ -154,19 +174,7 @@ describe('Political Sphere — Logger', () => {
 
   it('surfaces write failures when appending', async () => {
     vi.resetModules();
-    vi.doMock('node:fs', async () => {
-      const actual = await vi.importActual('node:fs');
-      return {
-        ...actual,
-        createWriteStream: vi.fn(() => ({
-          write: (_data: string, cb: (error?: Error | null) => void) => {
-            cb(new Error('write failed'));
-            return true;
-          },
-          end: vi.fn(),
-        })),
-      };
-    });
+    vi.doMock('node:fs', mockFsWithWriteFailure);
 
     try {
       const { appendToLog: appendToLogWithError } = await import('./logger.ts');

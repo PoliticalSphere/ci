@@ -45,6 +45,30 @@ const _createDeferred = <T>() => {
 // Keep a non-underscored alias for tests that reference `createDeferred`.
 const createDeferred = _createDeferred;
 
+// Helper functions to reduce nesting in mock setups
+const createParseError = (message: string, code: string, option?: string) => {
+  const err = new Error(message);
+  (err as { code?: string }).code = code;
+  if (option) {
+    (err as { code?: string; option?: string }).option = option;
+  }
+  return err;
+};
+
+const createParseArgsMock = (errorFactory: () => Error) => {
+  return () => {
+    throw errorFactory();
+  };
+};
+
+const mockNodeUtil = async (parseArgsFn: () => never) => {
+  const actual = await vi.importActual<typeof import('node:util')>('node:util');
+  return {
+    ...actual,
+    parseArgs: parseArgsFn,
+  };
+};
+
 describe('Political Sphere — CLI', () => {
   describe('parseCliArgs', () => {
     it('parses defaults when no argv provided', () => {
@@ -113,17 +137,11 @@ describe('Political Sphere — CLI', () => {
     it('handles parse error with no option extracted (generic fallback)', async () => {
       vi.resetModules();
 
-      vi.doMock('node:util', async () => {
-        const actual = await vi.importActual<typeof import('node:util')>('node:util');
-        return {
-          ...actual,
-          parseArgs: () => {
-            const err = new Error('Generic parse error');
-            (err as { code?: string }).code = 'ERR_PARSE_ARGS_UNKNOWN_OPTION';
-            throw err;
-          },
-        };
-      });
+      const parseArgsFn = createParseArgsMock(() =>
+        createParseError('Generic parse error', 'ERR_PARSE_ARGS_UNKNOWN_OPTION'),
+      );
+
+      vi.doMock('node:util', () => mockNodeUtil(parseArgsFn));
 
       try {
         const { parseCliArgs: parseWithMock } = await import('./index.ts');
@@ -137,17 +155,11 @@ describe('Political Sphere — CLI', () => {
     it('re-throws error with unrecognized error code', async () => {
       vi.resetModules();
 
-      vi.doMock('node:util', async () => {
-        const actual = await vi.importActual<typeof import('node:util')>('node:util');
-        return {
-          ...actual,
-          parseArgs: () => {
-            const err = new Error('Unhandled error');
-            (err as { code?: string }).code = 'ERR_SOME_UNHANDLED_CODE';
-            throw err;
-          },
-        };
-      });
+      const parseArgsFn = createParseArgsMock(() =>
+        createParseError('Unhandled error', 'ERR_SOME_UNHANDLED_CODE'),
+      );
+
+      vi.doMock('node:util', () => mockNodeUtil(parseArgsFn));
 
       try {
         const { parseCliArgs: parseWithMock } = await import('./index.ts');
@@ -161,18 +173,15 @@ describe('Political Sphere — CLI', () => {
     it('re-throws error for unrecognized option in missing value error', async () => {
       vi.resetModules();
 
-      vi.doMock('node:util', async () => {
-        const actual = await vi.importActual<typeof import('node:util')>('node:util');
-        return {
-          ...actual,
-          parseArgs: () => {
-            const err = new Error("Option '--unknown' requires a value");
-            (err as { code?: string; option?: string }).code = 'ERR_PARSE_ARGS_MISSING_VALUE';
-            (err as { code?: string; option?: string }).option = '--unknown';
-            throw err;
-          },
-        };
-      });
+      const parseArgsFn = createParseArgsMock(() =>
+        createParseError(
+          "Option '--unknown' requires a value",
+          'ERR_PARSE_ARGS_MISSING_VALUE',
+          '--unknown',
+        ),
+      );
+
+      vi.doMock('node:util', () => mockNodeUtil(parseArgsFn));
 
       try {
         const { parseCliArgs: parseWithMock } = await import('./index.ts');
@@ -186,18 +195,15 @@ describe('Political Sphere — CLI', () => {
     it('maps log-dir missing value error', async () => {
       vi.resetModules();
 
-      vi.doMock('node:util', async () => {
-        const actual = await vi.importActual<typeof import('node:util')>('node:util');
-        return {
-          ...actual,
-          parseArgs: () => {
-            const err = new Error("Option '--log-dir' requires argument");
-            (err as { code?: string; option?: string }).code = 'ERR_PARSE_ARGS_MISSING_VALUE';
-            (err as { code?: string; option?: string }).option = '--log-dir';
-            throw err;
-          },
-        };
-      });
+      const parseArgsFn = createParseArgsMock(() =>
+        createParseError(
+          "Option '--log-dir' requires argument",
+          'ERR_PARSE_ARGS_MISSING_VALUE',
+          '--log-dir',
+        ),
+      );
+
+      vi.doMock('node:util', () => mockNodeUtil(parseArgsFn));
 
       try {
         const { parseCliArgs: parseWithMock } = await import('./index.ts');
@@ -211,17 +217,11 @@ describe('Political Sphere — CLI', () => {
     it('handles unknown option error without extractable option from message', async () => {
       vi.resetModules();
 
-      vi.doMock('node:util', async () => {
-        const actual = await vi.importActual<typeof import('node:util')>('node:util');
-        return {
-          ...actual,
-          parseArgs: () => {
-            const err = new Error('Some parse error without option syntax');
-            (err as { code?: string }).code = 'ERR_PARSE_ARGS_UNKNOWN_OPTION';
-            throw err;
-          },
-        };
-      });
+      const parseArgsFn = createParseArgsMock(() =>
+        createParseError('Some parse error without option syntax', 'ERR_PARSE_ARGS_UNKNOWN_OPTION'),
+      );
+
+      vi.doMock('node:util', () => mockNodeUtil(parseArgsFn));
 
       try {
         const { parseCliArgs: parseWithMock } = await import('./index.ts');
@@ -237,18 +237,15 @@ describe('Political Sphere — CLI', () => {
     it('maps linters missing value error', async () => {
       vi.resetModules();
 
-      vi.doMock('node:util', async () => {
-        const actual = await vi.importActual<typeof import('node:util')>('node:util');
-        return {
-          ...actual,
-          parseArgs: () => {
-            const err = new Error("Option '--linters' requires argument");
-            (err as { code?: string; option?: string }).code = 'ERR_PARSE_ARGS_MISSING_VALUE';
-            (err as { code?: string; option?: string }).option = '--linters';
-            throw err;
-          },
-        };
-      });
+      const parseArgsFn = createParseArgsMock(() =>
+        createParseError(
+          "Option '--linters' requires argument",
+          'ERR_PARSE_ARGS_MISSING_VALUE',
+          '--linters',
+        ),
+      );
+
+      vi.doMock('node:util', () => mockNodeUtil(parseArgsFn));
 
       try {
         const { parseCliArgs: parseWithMock } = await import('./index.ts');
@@ -332,6 +329,12 @@ describe('Political Sphere — CLI', () => {
   });
 
   describe('main', () => {
+    // Helper to get temp directory without trailing slash
+    const getTmpDir = () => {
+      const tmpDir = process.env.TMPDIR || '/tmp';
+      return tmpDir.endsWith('/') ? tmpDir.slice(0, -1) : tmpDir;
+    };
+
     const baseDeps = () => ({
       mkdirFn: vi.fn().mockResolvedValue(undefined),
       renderDashboardFn: vi.fn(() => ({
@@ -342,7 +345,7 @@ describe('Political Sphere — CLI', () => {
         unmount: vi.fn(),
       })),
       acquireExecutionLockFn: vi.fn().mockResolvedValue({
-        lockPath: '/tmp/ps-parallel-lint.lock',
+        lockPath: `${getTmpDir()}/ps-parallel-lint-test-${process.pid}.lock`,
         release: vi.fn().mockResolvedValue(undefined),
       }),
     });
@@ -383,7 +386,7 @@ describe('Political Sphere — CLI', () => {
         unmount: vi.fn(),
       }));
       const acquireExecutionLockFn = vi.fn().mockResolvedValue({
-        lockPath: '/tmp/ps-parallel-lint.lock',
+        lockPath: `${getTmpDir()}/ps-parallel-lint-test-${process.pid}.lock`,
         release: vi.fn().mockResolvedValue(undefined),
       });
 
@@ -406,9 +409,10 @@ describe('Political Sphere — CLI', () => {
         duration: 5,
       }));
 
+      const testCwd = `${getTmpDir()}/ps-test-project-${process.pid}`;
       const result = await main({
         argv: [],
-        cwd: '/tmp/project',
+        cwd: testCwd,
         mkdirFn,
         writeFileFn,
         renderDashboardFn,
@@ -428,7 +432,7 @@ describe('Political Sphere — CLI', () => {
       expect(result.summary?.passed).toBe(1);
       expect(consoleSpies.log).toHaveBeenCalledWith('\n✅ All linters passed');
       expect(consoleSpies.error).not.toHaveBeenCalled();
-      expect(mkdirFn).toHaveBeenCalledWith('/tmp/project/logs', { recursive: true });
+      expect(mkdirFn).toHaveBeenCalledWith(`${testCwd}/logs`, { recursive: true });
       expect(renderDashboardFn).toHaveBeenCalled();
       expect(executeLintersFn).toHaveBeenCalled();
       expect(updateStatusMock).toHaveBeenCalledWith('eslint', 'RUNNING');
@@ -460,19 +464,27 @@ describe('Political Sphere — CLI', () => {
         lockPath: string;
         release: () => Promise<void>;
       }>();
-      const acquireExecutionLockFn = vi.fn(
-        ({ onWaitStart, onWaitEnd }: { onWaitStart?: () => void; onWaitEnd?: () => void }) => {
-          onWaitStart?.();
-          return lockDeferred.promise.then((lock) => {
-            onWaitEnd?.();
-            return lock;
-          });
-        },
-      );
+
+      // Extract lock handler to reduce nesting
+      const handleLockAcquisition = ({
+        onWaitStart,
+        onWaitEnd,
+      }: {
+        onWaitStart?: () => void;
+        onWaitEnd?: () => void;
+      }) => {
+        onWaitStart?.();
+        return lockDeferred.promise.then((lock) => {
+          onWaitEnd?.();
+          return lock;
+        });
+      };
+
+      const acquireExecutionLockFn = vi.fn(handleLockAcquisition);
 
       const mainPromise = main({
         argv: [],
-        cwd: '/tmp/project',
+        cwd: `${getTmpDir()}/ps-test-project-${process.pid}`,
         mkdirFn,
         renderDashboardFn,
         renderWaitingHeaderFn,
@@ -491,7 +503,10 @@ describe('Political Sphere — CLI', () => {
       expect(executeLintersFn).not.toHaveBeenCalled();
 
       const release = vi.fn().mockResolvedValue(undefined);
-      lockDeferred.resolve({ lockPath: '/tmp/ps-parallel-lint.lock', release });
+      lockDeferred.resolve({
+        lockPath: `${getTmpDir()}/ps-parallel-lint-test-${process.pid}.lock`,
+        release,
+      });
 
       const result = await mainPromise;
       expect(result.exitCode).toBe(0);
@@ -504,7 +519,7 @@ describe('Political Sphere — CLI', () => {
       const consoleSpies = fakeConsole();
       const release = vi.fn().mockResolvedValue(undefined);
       const acquireExecutionLockFn = vi.fn().mockResolvedValue({
-        lockPath: '/tmp/ps-parallel-lint.lock',
+        lockPath: `${getTmpDir()}/ps-parallel-lint-test-${process.pid}.lock`,
         release,
       });
       const renderDashboardFn = vi.fn(() => ({
@@ -517,7 +532,7 @@ describe('Political Sphere — CLI', () => {
 
       const result = await main({
         argv: [],
-        cwd: '/tmp/project',
+        cwd: `${getTmpDir()}/ps-test-project-${process.pid}`,
         mkdirFn: vi.fn().mockResolvedValue(undefined),
         renderDashboardFn,
         renderWaitingHeaderFn,
@@ -548,7 +563,10 @@ describe('Political Sphere — CLI', () => {
 
       expect(result.exitCode).toBe(0);
       expect(consoleSpies.log).toHaveBeenCalledWith('Verbose mode: ENABLED');
-      expect(consoleSpies.log).toHaveBeenCalledWith('Working directory: /tmp/project');
+      // Match dynamic temp directory pattern with process ID
+      expect(consoleSpies.log).toHaveBeenCalledWith(
+        expect.stringMatching(/^Working directory: .*\/ps-test-project-\d+$/),
+      );
       expect(consoleSpies.log).toHaveBeenCalledWith('Requested linters: all');
     });
 
@@ -568,7 +586,7 @@ describe('Political Sphere — CLI', () => {
 
       const result = await main({
         argv: [],
-        cwd: '/tmp/project',
+        cwd: `${getTmpDir()}/ps-test-project-${process.pid}`,
         ...deps,
         executeLintersFn,
         calculateSummaryFn,

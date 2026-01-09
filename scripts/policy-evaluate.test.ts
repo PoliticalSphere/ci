@@ -231,7 +231,8 @@ async function setupTestScenario(opts: TestSetupOpts = {}) {
   const consoleLogs = vi.spyOn(console, 'log').mockImplementation(() => {});
   const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => {});
 
-  vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
+  // Use a secure temp path that's not world-writable (mocked filesystem)
+  vi.stubEnv('GITHUB_EVENT_PATH', '/secure/github-event.json');
   if (withToken) {
     vi.stubEnv('GITHUB_TOKEN', 'fake-token');
   }
@@ -272,7 +273,7 @@ describe('scripts/policy-evaluate.ts', () => {
 
   it('fails closed when base/head SHAs are missing', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
+    vi.stubEnv('GITHUB_EVENT_PATH', '/secure/github-event.json');
     const { fs } = await getMocks();
     vi.mocked(fs.readFileSync).mockReturnValueOnce(
       JSON.stringify({ pull_request: { body: 'x', base: { sha: null }, head: { sha: null } } }),
@@ -302,7 +303,7 @@ describe('scripts/policy-evaluate.ts', () => {
 
   it('fails closed when the GitHub event file cannot be read', async () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
+    vi.stubEnv('GITHUB_EVENT_PATH', '/secure/github-event.json');
     const { fs } = await getMocks();
     vi.mocked(fs.readFileSync).mockImplementationOnce(() => {
       throw new Error('read failed');

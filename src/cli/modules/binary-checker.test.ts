@@ -26,6 +26,33 @@ const buildProc = () =>
     kill: vi.fn(),
   }) as unknown as ReturnType<typeof spawn>;
 
+// Helper to reduce nesting in spawn mocks
+const emitProcData = (proc: ReturnType<typeof buildProc>, data: string) => {
+  proc.stdout.emit('data', Buffer.from(data));
+  proc.emit('close', 0);
+};
+
+const createSpawnMockWithOutput = (output: string) => {
+  return (_cmd: string, _args?: readonly string[]) => {
+    const proc = buildProc();
+    queueMicrotask(() => emitProcData(proc, output));
+    return proc;
+  };
+};
+
+const createSpawnMockWithOptionalOutput = (output: string | null) => {
+  return (_cmd: string, _args?: readonly string[]) => {
+    const proc = buildProc();
+    queueMicrotask(() => {
+      if (output !== null) {
+        proc.stdout.emit('data', Buffer.from(output));
+      }
+      proc.emit('close', 0);
+    });
+    return proc;
+  };
+};
+
 describe('Binary Checker Module', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -234,14 +261,7 @@ describe('Binary Checker Module', () => {
 
     it('returns null when version matches', async () => {
       vi.mocked(access).mockResolvedValue(undefined);
-      vi.mocked(spawn).mockImplementation((_cmd: string, _args?: readonly string[]) => {
-        const proc = buildProc();
-        queueMicrotask(() => {
-          proc.stdout.emit('data', Buffer.from('9.0.0\n'));
-          proc.emit('close', 0);
-        });
-        return proc;
-      });
+      vi.mocked(spawn).mockImplementation(createSpawnMockWithOutput('9.0.0\n'));
 
       const result = await verifyLinterVersion({
         id: 'eslint',
@@ -254,16 +274,7 @@ describe('Binary Checker Module', () => {
 
     const runVersionProbe = async (output: string | null): Promise<string | null> => {
       vi.mocked(access).mockResolvedValue(undefined);
-      vi.mocked(spawn).mockImplementation((_cmd: string, _args?: readonly string[]) => {
-        const proc = buildProc();
-        queueMicrotask(() => {
-          if (output !== null) {
-            proc.stdout.emit('data', Buffer.from(output));
-          }
-          proc.emit('close', 0);
-        });
-        return proc;
-      });
+      vi.mocked(spawn).mockImplementation(createSpawnMockWithOptionalOutput(output));
 
       return verifyLinterVersion({
         id: 'eslint',

@@ -114,7 +114,7 @@ function levenshtein(a: string, b: string): number {
   return dp.get(n) ?? 0;
 }
 
-function findNearMatchesInChecked(body = '', expected: string, maxDistance = 3): string[] {
+function findNearMatchesInChecked(expected: string, body = '', maxDistance = 3): string[] {
   const want = normalizeText(expected);
   const checked = extractCheckedTexts(body);
   const near: string[] = [];
@@ -166,7 +166,7 @@ function findNearMatchesForKeys<
     if (label === undefined) {
       continue;
     }
-    const near = findNearMatchesInChecked(prBody, label, maxDistance);
+    const near = findNearMatchesInChecked(label, prBody, maxDistance);
     if (near.length > 0) {
       out.push(key);
     }

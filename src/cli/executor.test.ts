@@ -50,8 +50,9 @@ describe('Executor Module', () => {
   });
 
   describe('executeLinter', () => {
+    const tmpDir = process.env.TMPDIR || '/tmp';
     const mockOptions = {
-      logDir: '/tmp/logs',
+      logDir: `${tmpDir}/test-logs-${process.pid}`,
       verifyMode: false,
       onStatusChange: vi.fn(),
     };
