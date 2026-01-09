@@ -402,6 +402,12 @@ describe('Political Sphere — Logger', () => {
   });
 
   describe('trace context support', () => {
+    async function parseFirstStructuredLog(linterId: string) {
+      const out = await readLog(linterId);
+      const lines = out.trim().split('\n');
+      return JSON.parse(lines[0]);
+    }
+
     it('includes trace ID in normalizing mode', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(fixedDate);
@@ -457,9 +463,7 @@ describe('Political Sphere — Logger', () => {
 
       await logger(Readable.from(['test output\n']));
 
-      const out = await readLog('eslint');
-      const lines = out.trim().split('\n');
-      const parsed = JSON.parse(lines[0]);
+      const parsed = await parseFirstStructuredLog('eslint');
 
       expect(parsed).toHaveProperty('traceId', traceContext.traceId);
       expect(parsed).toHaveProperty('spanId', traceContext.spanId);
@@ -479,9 +483,7 @@ describe('Political Sphere — Logger', () => {
 
       await logger(Readable.from(['test output\n']));
 
-      const out = await readLog('eslint');
-      const lines = out.trim().split('\n');
-      const parsed = JSON.parse(lines[0]);
+      const parsed = await parseFirstStructuredLog('eslint');
 
       expect(parsed).not.toHaveProperty('traceId');
       expect(parsed).not.toHaveProperty('spanId');
@@ -504,8 +506,7 @@ describe('Political Sphere — Logger', () => {
 
       await logger(Readable.from(['buffered-structured']));
 
-      const out = await readLog('structured-flush-trace');
-      const parsed = JSON.parse(out.trim());
+      const parsed = await parseFirstStructuredLog('structured-flush-trace');
 
       expect(parsed).toMatchObject({
         traceId: traceContext.traceId,
@@ -532,9 +533,7 @@ describe('Political Sphere — Logger', () => {
 
       await logger(Readable.from(['test output\n']));
 
-      const out = await readLog('eslint');
-      const lines = out.trim().split('\n');
-      const parsed = JSON.parse(lines[0]);
+      const parsed = await parseFirstStructuredLog('eslint');
 
       expect(parsed).toHaveProperty('parentSpanId', traceContext.parentSpanId);
     });

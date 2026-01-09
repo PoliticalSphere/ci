@@ -198,9 +198,12 @@ function mockHttpsRequestResult(httpsMock: typeof import('node:https'), statusCo
 }
 
 /** Setup standard policy mocks for allow/warn/deny */
+
+type Decision = 'allow' | 'warn' | 'deny';
+
 function setupPolicyMocks(
   policy: Awaited<ReturnType<typeof getMocks>>['policy'],
-  decision: 'allow' | 'warn' | 'deny',
+  decision: Decision,
   changedCount = 1,
 ) {
   const out = makePolicyOutput(decision, changedCount);
@@ -213,7 +216,7 @@ function setupPolicyMocks(
 interface TestSetupOpts {
   prEvent?: string;
   changedFiles?: string;
-  decision?: 'allow' | 'warn' | 'deny';
+  decision?: Decision;
   withToken?: boolean;
   gitFails?: boolean;
 }
@@ -396,21 +399,33 @@ describe('scripts/policy-evaluate.ts', () => {
     cleanup();
   });
 
-  it('handles GitHub API errors gracefully', async () => {
-    const { https, policy, consoleErrors, cleanup } = await setupTestScenario({ withToken: true });
+  async function runCiFetchFailureScenario(
+    testName: string,
+    setupMock: (httpsMock: typeof import('node:https')) => void,
+  ) {
+    // eslint-disable-next-line vitest/valid-title
+    it(testName, async () => {
+      const { https, policy, consoleErrors, cleanup } = await setupTestScenario({
+        withToken: true,
+      });
 
-    mockHttpsGetError(https, true);
+      setupMock(https);
 
-    const { main } = await import('./policy-evaluate.ts');
-    expect(await main()).toBe(0);
-    expect(consoleErrors).toHaveBeenCalledWith('Failed to fetch CI checks:', expect.any(Error));
-    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
-      prBody: 'test body',
-      changedFiles: ['src/file.ts'],
-      failedCIChecks: [],
+      const { main } = await import('./policy-evaluate.ts');
+      expect(await main()).toBe(0);
+      expect(consoleErrors).toHaveBeenCalledWith('Failed to fetch CI checks:', expect.any(Error));
+      expect(policy.evaluatePolicy).toHaveBeenCalledWith({
+        prBody: 'test body',
+        changedFiles: ['src/file.ts'],
+        failedCIChecks: [],
+      });
+
+      cleanup();
     });
+  }
 
-    cleanup();
+  runCiFetchFailureScenario('handles GitHub API errors gracefully', (https) => {
+    mockHttpsGetError(https, true);
   });
 
   it('successfully fetches failed CI checks from GitHub API', async () => {
@@ -444,21 +459,8 @@ describe('scripts/policy-evaluate.ts', () => {
     cleanup();
   });
 
-  it('handles non-200 GitHub API status codes gracefully', async () => {
-    const { https, policy, consoleErrors, cleanup } = await setupTestScenario({ withToken: true });
-
+  runCiFetchFailureScenario('handles non-200 GitHub API status codes gracefully', (https) => {
     mockHttpsGetNon200(https, 404);
-
-    const { main } = await import('./policy-evaluate.ts');
-    expect(await main()).toBe(0);
-    expect(consoleErrors).toHaveBeenCalledWith('Failed to fetch CI checks:', expect.any(Error));
-    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
-      prBody: 'test body',
-      changedFiles: ['src/file.ts'],
-      failedCIChecks: [],
-    });
-
-    cleanup();
   });
 
   it('posts comment to PR on successful comment posting', async () => {
@@ -522,52 +524,62 @@ describe('scripts/policy-evaluate.ts', () => {
     expect(body).toContain('# Summary');
   });
 
-  it('generateCommentBody formats deny decision without remediations', async () => {
+  async function runGenerateCommentBodyTest(
+    decision: 'allow' | 'warn' | 'deny',
+    violations: Array<{ code: string; message: string; severity: string }>,
+    summary: string,
+    shouldContain: string[],
+    shouldNotContain: string[] = [],
+  ) {
     const { generateCommentBody } = await import('./policy-evaluate.ts');
+    const body = generateCommentBody(decision, violations, summary);
 
-    const violations = [
-      {
-        code: 'NO_REMEDY',
-        message: 'Issue without fix',
-        severity: 'error',
-      },
-    ];
+    for (const s of shouldContain) {
+      expect(body).toContain(s);
+    }
+    for (const s of shouldNotContain) {
+      expect(body).not.toContain(s);
+    }
+  }
 
-    const body = generateCommentBody('deny', violations, '# Summary');
-
-    expect(body).toContain('❌');
-    expect(body).toContain('Policy Decision: DENY');
-    expect(body).toContain('NO_REMEDY');
-    expect(body).not.toContain('### Remediation');
+  it('generateCommentBody formats deny decision without remediations', async () => {
+    await runGenerateCommentBodyTest(
+      'deny',
+      [
+        {
+          code: 'NO_REMEDY',
+          message: 'Issue without fix',
+          severity: 'error',
+        },
+      ],
+      '# Summary',
+      ['❌', 'Policy Decision: DENY', 'NO_REMEDY'],
+      ['### Remediation'],
+    );
   });
 
   it('generateCommentBody formats allow decision', async () => {
-    const { generateCommentBody } = await import('./policy-evaluate.ts');
-
-    const body = generateCommentBody('allow', [], '# All good');
-
-    expect(body).toContain('✅');
-    expect(body).toContain('Policy Decision: ALLOW');
-    expect(body).not.toContain('### Reasons');
-    expect(body).toContain('# All good');
+    await runGenerateCommentBodyTest(
+      'allow',
+      [],
+      '# All good',
+      ['✅', 'Policy Decision: ALLOW', '# All good'],
+      ['### Reasons'],
+    );
   });
 
   it('generateCommentBody formats warn decision with violations', async () => {
-    const { generateCommentBody } = await import('./policy-evaluate.ts');
-
-    const violations = [
-      {
-        code: 'WARN_CODE',
-        message: 'Warning issue',
-        severity: 'warning',
-      },
-    ];
-
-    const body = generateCommentBody('warn', violations, '# Warning');
-
-    expect(body).toContain('⚠️');
-    expect(body).toContain('Policy Decision: WARN');
-    expect(body).toContain('WARN_CODE');
-    expect(body).toContain('Warning issue');
+    await runGenerateCommentBodyTest(
+      'warn',
+      [
+        {
+          code: 'WARN_CODE',
+          message: 'Warning issue',
+          severity: 'warning',
+        },
+      ],
+      '# Warning',
+      ['⚠️', 'Policy Decision: WARN', 'WARN_CODE', 'Warning issue'],
+    );
   });
 });

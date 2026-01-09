@@ -8,6 +8,18 @@ import { getGlobalTelemetry, resetGlobalTelemetry, TelemetryCollector } from './
 import { createTraceContext } from './tracing.ts';
 
 describe('Political Sphere — Telemetry', () => {
+  function recordOneMetric(
+    collector: TelemetryCollector,
+    linter = 'eslint',
+    bytes = 1,
+    success = true,
+  ) {
+    const ctx = createTraceContext();
+    const exec = collector.startExecution(linter, ctx);
+    collector.recordExecution(exec, bytes, success);
+    return ctx;
+  }
+
   describe('TelemetryCollector', () => {
     let collector: TelemetryCollector;
 
@@ -36,9 +48,7 @@ describe('Political Sphere — Telemetry', () => {
 
     describe('recordExecution', () => {
       it('stores execution metrics', () => {
-        const ctx = createTraceContext();
-        const execution = collector.startExecution('eslint', ctx);
-        collector.recordExecution(execution, 1024, true);
+        const ctx = recordOneMetric(collector, 'eslint', 1024, true);
 
         const metric = collector.getMetric(ctx.traceId);
         expect(metric).toBeDefined();
@@ -76,9 +86,7 @@ describe('Political Sphere — Telemetry', () => {
 
       it('respects enabled flag', () => {
         const disabledCollector = new TelemetryCollector(false);
-        const ctx = createTraceContext();
-        const execution = disabledCollector.startExecution('eslint', ctx);
-        disabledCollector.recordExecution(execution, 1024, true);
+        const ctx = recordOneMetric(disabledCollector, 'eslint', 1024, true);
 
         const metric = disabledCollector.getMetric(ctx.traceId);
         expect(metric).toBeUndefined();
@@ -92,9 +100,7 @@ describe('Political Sphere — Telemetry', () => {
       });
 
       it('retrieves recorded metrics', () => {
-        const ctx = createTraceContext();
-        const execution = collector.startExecution('eslint', ctx);
-        collector.recordExecution(execution, 2048, true);
+        const ctx = recordOneMetric(collector, 'eslint', 2048, true);
 
         const metric = collector.getMetric(ctx.traceId);
         expect(metric?.traceId).toBe(ctx.traceId);
@@ -109,14 +115,8 @@ describe('Political Sphere — Telemetry', () => {
       });
 
       it('returns all recorded metrics', () => {
-        const ctx1 = createTraceContext();
-        const ctx2 = createTraceContext();
-
-        const exec1 = collector.startExecution('eslint', ctx1);
-        const exec2 = collector.startExecution('prettier', ctx2);
-
-        collector.recordExecution(exec1, 1024, true);
-        collector.recordExecution(exec2, 512, true);
+        recordOneMetric(collector, 'eslint', 1024, true);
+        recordOneMetric(collector, 'prettier', 512, true);
 
         const metrics = collector.getAllMetrics();
         expect(metrics).toHaveLength(2);
@@ -206,14 +206,8 @@ describe('Political Sphere — Telemetry', () => {
       });
 
       it('applies filter function', () => {
-        const ctx1 = createTraceContext();
-        const ctx2 = createTraceContext();
-
-        const exec1 = collector.startExecution('eslint', ctx1);
-        const exec2 = collector.startExecution('prettier', ctx2);
-
-        collector.recordExecution(exec1, 100, true);
-        collector.recordExecution(exec2, 200, true);
+        recordOneMetric(collector, 'eslint', 100, true);
+        recordOneMetric(collector, 'prettier', 200, true);
 
         const eslintStats = collector.calculateStats(isEslintMetric);
 
@@ -224,9 +218,7 @@ describe('Political Sphere — Telemetry', () => {
 
     describe('export', () => {
       it('exports metrics in JSON format', () => {
-        const ctx = createTraceContext();
-        const execution = collector.startExecution('eslint', ctx);
-        collector.recordExecution(execution, 1024, true);
+        recordOneMetric(collector, 'eslint', 1024, true);
 
         const exported = collector.export() as Record<string, unknown>;
         expect(exported.version).toBe('1.0');
@@ -238,14 +230,8 @@ describe('Political Sphere — Telemetry', () => {
 
     describe('exportByLinter', () => {
       it('exports metrics for specific linter', () => {
-        const ctx1 = createTraceContext();
-        const ctx2 = createTraceContext();
-
-        const exec1 = collector.startExecution('eslint', ctx1);
-        const exec2 = collector.startExecution('prettier', ctx2);
-
-        collector.recordExecution(exec1, 100, true);
-        collector.recordExecution(exec2, 200, true);
+        recordOneMetric(collector, 'eslint', 100, true);
+        recordOneMetric(collector, 'prettier', 200, true);
 
         const exported = collector.exportByLinter('eslint') as Record<string, unknown>;
         const metrics = exported.metrics as unknown[];
@@ -270,9 +256,7 @@ describe('Political Sphere — Telemetry', () => {
       it('respects enabled parameter on first initialization', () => {
         // Create a new TelemetryCollector with disabled state
         const disabledCollector = new TelemetryCollector(false);
-        const ctx = createTraceContext();
-        const execution = disabledCollector.startExecution('eslint', ctx);
-        disabledCollector.recordExecution(execution, 100, true);
+        const ctx = recordOneMetric(disabledCollector, 'eslint', 100, true);
         expect(disabledCollector.getMetric(ctx.traceId)).toBeUndefined();
       });
     });
@@ -280,9 +264,7 @@ describe('Political Sphere — Telemetry', () => {
     describe('resetGlobalTelemetry', () => {
       it('clears global telemetry', () => {
         const telemetry = getGlobalTelemetry();
-        const ctx = createTraceContext();
-        const execution = telemetry.startExecution('eslint', ctx);
-        telemetry.recordExecution(execution, 100, true);
+        recordOneMetric(telemetry, 'eslint', 100, true);
 
         resetGlobalTelemetry();
         expect(telemetry.getAllMetrics()).toHaveLength(0);
@@ -298,9 +280,7 @@ describe('Political Sphere — Telemetry', () => {
 
         // Now initialize and ensure it still creates a collector cleanly
         const telemetry = mod.getGlobalTelemetry();
-        const ctx = createTraceContext();
-        const execution = telemetry.startExecution('eslint', ctx);
-        telemetry.recordExecution(execution, 1, true);
+        recordOneMetric(telemetry, 'eslint', 1, true);
         expect(telemetry.getAllMetrics()).toHaveLength(1);
       });
     });

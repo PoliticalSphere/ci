@@ -269,9 +269,19 @@ describe('Process Manager Module', () => {
       await expect(runPromise).rejects.toBe(logError);
     }, 10_000);
 
-    it('propagates process errors and tolerates log failures', async () => {
+    const runSpawnErrorScenario = async (
+      emitted: unknown,
+      createLoggerRejects = false,
+      assertFn: (p: Promise<unknown>, emittedArg?: unknown) => Promise<void> | void = async (p) =>
+        p,
+    ) => {
       vi.useFakeTimers();
-      vi.mocked(createLogger).mockResolvedValue(vi.fn().mockRejectedValue(new Error('log fail')));
+
+      if (createLoggerRejects) {
+        vi.mocked(createLogger).mockResolvedValue(vi.fn().mockRejectedValue(new Error('log fail')));
+      } else {
+        vi.mocked(createLogger).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
+      }
 
       const proc = buildProc();
       vi.mocked(spawn).mockReturnValue(proc);
@@ -283,71 +293,37 @@ describe('Process Manager Module', () => {
 
       // Emit error before timeout
       await vi.advanceTimersByTimeAsync(10);
-      const procError = new Error('spawn failed');
-      proc.emit('error', procError);
+      proc.emit('error', emitted);
 
-      await expect(runPromise).rejects.toThrow('Process spawn failed: spawn failed');
+      await assertFn(runPromise, emitted);
+    };
+
+    it('propagates process errors and tolerates log failures', async () => {
+      await runSpawnErrorScenario(new Error('spawn failed'), true, async (p) => {
+        await expect(p).rejects.toThrow('Process spawn failed: spawn failed');
+      });
     });
 
     it('attaches the original error as cause on spawn failure', async () => {
-      vi.useFakeTimers();
-      vi.mocked(createLogger).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
-
-      const proc = buildProc();
-      vi.mocked(spawn).mockReturnValue(proc);
-
-      const linter = buildLinter('direct', 50);
-      const runPromise = processManager.runProcess(linter, 'logs', false);
-      // Suppress unhandled rejection during fake timer handling
-      runPromise.catch(() => {});
-
-      // Emit error before timeout
-      await vi.advanceTimersByTimeAsync(10);
       const orig = new Error('underlying spawn failure');
-      proc.emit('error', orig);
-
-      await runPromise.catch((err) => {
-        expect(err).toBeInstanceOf(ProcessError);
-        expect((err as ProcessError).cause).toBe(orig);
+      await runSpawnErrorScenario(orig, false, async (p, _emitted) => {
+        await p.catch((err) => {
+          expect(err).toBeInstanceOf(ProcessError);
+          expect((err as ProcessError).cause).toBe(orig);
+        });
       });
     });
 
     it('stringifies non-Error process errors', async () => {
-      vi.useFakeTimers();
-      vi.mocked(createLogger).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
-
-      const proc = buildProc();
-      vi.mocked(spawn).mockReturnValue(proc);
-
-      const linter = buildLinter('direct', 50);
-      const runPromise = processManager.runProcess(linter, 'logs', false);
-      // Suppress unhandled rejection during fake timer handling
-      runPromise.catch(() => {});
-
-      // Emit error before timeout
-      await vi.advanceTimersByTimeAsync(10);
-      proc.emit('error', 'non-error failure');
-
-      await expect(runPromise).rejects.toThrow('Process spawn failed: non-error failure');
+      await runSpawnErrorScenario('non-error failure', false, async (p) => {
+        await expect(p).rejects.toThrow('Process spawn failed: non-error failure');
+      });
     });
 
     it('stringifies object process errors', async () => {
-      vi.useFakeTimers();
-      vi.mocked(createLogger).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
-
-      const proc = buildProc();
-      vi.mocked(spawn).mockReturnValue(proc);
-
-      const linter = buildLinter('direct', 50);
-      const runPromise = processManager.runProcess(linter, 'logs', false);
-      // Suppress unhandled rejection during fake timer handling
-      runPromise.catch(() => {});
-
-      // Emit error before timeout
-      await vi.advanceTimersByTimeAsync(10);
-      proc.emit('error', { message: 'obj error' } as unknown as string);
-
-      await expect(runPromise).rejects.toThrow('Process spawn failed: [object Object]');
+      await runSpawnErrorScenario({ message: 'obj error' }, false, async (p) => {
+        await expect(p).rejects.toThrow('Process spawn failed: [object Object]');
+      });
     });
   });
 

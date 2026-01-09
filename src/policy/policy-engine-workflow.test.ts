@@ -99,6 +99,64 @@ function setupHighRiskAIWorkflow(
   return { riskClassification, aiValidation, highRiskValidation, decision };
 }
 
+// Generic helper used to reduce test scaffolding duplication across scenarios
+function runDecision(changedFiles: readonly string[], pullRequestBody = '') {
+  const riskClassification = classifyRisk(changedFiles);
+  const aiAttestation = parseAIAttestation(pullRequestBody);
+  const aiValidation = validateAttestation(aiAttestation, riskClassification.tier);
+  const highRiskAttestation = parseHighRiskAttestation(pullRequestBody);
+  const highRiskValidation = validateHighRiskAttestation(
+    highRiskAttestation,
+    riskClassification.paths.length > 0,
+  );
+
+  const attestationValid = aiAttestation.declared ? aiValidation.valid : true;
+  const attestationMissing = aiAttestation.declared ? aiValidation.missing : [];
+
+  const highRiskAttestationRequired = riskClassification.paths.length > 0;
+  let highRiskAttestationValid: boolean;
+  let highRiskAttestationMissing: readonly string[];
+  if (highRiskAttestation.declared) {
+    highRiskAttestationValid = highRiskValidation.valid;
+    highRiskAttestationMissing = highRiskValidation.missing;
+  } else if (highRiskAttestationRequired) {
+    // High-risk paths are present but no governance attestation declared — treat as missing
+    highRiskAttestationValid = false;
+    highRiskAttestationMissing = highRiskValidation.missing;
+  } else {
+    highRiskAttestationValid = true;
+    highRiskAttestationMissing = [];
+  }
+
+  const decision = makeDecision({
+    riskTier: riskClassification.tier,
+    riskPaths: riskClassification.paths,
+    attestationValid,
+    attestationMissing,
+    highRiskAttestationValid,
+    highRiskAttestationMissing,
+    aiAssisted: aiAttestation.declared,
+    changedFiles,
+    timestamp: fixedTimestamp,
+  });
+
+  const markdown = generateMarkdownSummary(
+    decision,
+    riskClassification.reasons,
+    riskClassification.paths,
+  );
+
+  return {
+    riskClassification,
+    aiAttestation,
+    aiValidation,
+    highRiskAttestation,
+    highRiskValidation,
+    decision,
+    markdown,
+  };
+}
+
 /**
  * ============================================
  * Realistic Pull Request Scenarios
@@ -176,26 +234,12 @@ describe('Policy Engine Workflow', () => {
       const changedFiles = ['src/utils/helpers.ts', 'src/components/Button.tsx', 'README.md'];
       const pullRequestBody = prWithApplicationCodeOnly;
 
-      // Classify risk
-      const riskClassification = classifyRisk(changedFiles);
-      expect(riskClassification.tier).toBe('low');
-
-      // Parse attestations
-      const aiAttestation = parseAIAttestation(pullRequestBody);
-      expect(aiAttestation.declared).toBe(false);
-
-      // Make decision
-      const decision = makeDecision({
-        riskTier: riskClassification.tier,
-        riskPaths: riskClassification.paths,
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: false,
+      const { riskClassification, aiAttestation, decision } = runDecision(
         changedFiles,
-        timestamp: fixedTimestamp,
-      });
+        pullRequestBody,
+      );
+      expect(riskClassification.tier).toBe('low');
+      expect(aiAttestation.declared).toBe(false);
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
     });
@@ -232,31 +276,15 @@ describe('Policy Engine Workflow', () => {
       const changedFiles = ['biome.json', 'tsconfig.json', 'src/app.ts'];
       const pullRequestBody = prWithApplicationCodeOnly;
 
-      const riskClassification = classifyRisk(changedFiles);
-      expect(riskClassification.tier).toBe('medium');
-
-      const aiAttestation = parseAIAttestation(pullRequestBody);
-      expect(aiAttestation.declared).toBe(false);
-
-      const decision = makeDecision({
-        riskTier: riskClassification.tier,
-        riskPaths: riskClassification.paths,
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: false,
+      const { riskClassification, aiAttestation, decision, markdown } = runDecision(
         changedFiles,
-        timestamp: fixedTimestamp,
-      });
+        pullRequestBody,
+      );
+      expect(riskClassification.tier).toBe('medium');
+      expect(aiAttestation.declared).toBe(false);
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
 
-      const markdown = generateMarkdownSummary(
-        decision,
-        riskClassification.reasons,
-        riskClassification.paths,
-      );
       expect(markdown).toContain('## Governance Requirements');
       expect(markdown).toContain('PR required');
     });
@@ -273,26 +301,12 @@ describe('Policy Engine Workflow', () => {
       const changedFiles = ['src/helpers/format.ts', 'src/helpers/parse.ts'];
       const pullRequestBody = prWithAIAssistanceAndCompleteAttestations;
 
-      const riskClassification = classifyRisk(changedFiles);
-      expect(riskClassification.tier).toBe('low');
-
-      const aiAttestation = parseAIAttestation(pullRequestBody);
-      expect(aiAttestation.declared).toBe(true);
-
-      const aiValidation = validateAttestation(aiAttestation, riskClassification.tier);
-      expect(aiValidation.valid).toBe(true);
-
-      const decision = makeDecision({
-        riskTier: riskClassification.tier,
-        riskPaths: riskClassification.paths,
-        attestationValid: aiValidation.valid,
-        attestationMissing: aiValidation.missing,
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
+      const { riskClassification, aiValidation, decision } = runDecision(
         changedFiles,
-        timestamp: fixedTimestamp,
-      });
+        pullRequestBody,
+      );
+      expect(riskClassification.tier).toBe('low');
+      expect(aiValidation.valid).toBe(true);
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
       expect(decision.metadata.aiAssisted).toBe(true);
@@ -310,24 +324,8 @@ describe('Policy Engine Workflow', () => {
       const changedFiles = ['src/utils/calc.ts'];
       const pullRequestBody = prWithAIAssistanceAndMissingAttestations;
 
-      const riskClassification = classifyRisk(changedFiles);
-      const aiAttestation = parseAIAttestation(pullRequestBody);
-      expect(aiAttestation.declared).toBe(true);
-
-      const aiValidation = validateAttestation(aiAttestation, riskClassification.tier);
+      const { aiValidation, decision } = runDecision(changedFiles, pullRequestBody);
       expect(aiValidation.valid).toBe(false);
-
-      const decision = makeDecision({
-        riskTier: riskClassification.tier,
-        riskPaths: riskClassification.paths,
-        attestationValid: aiValidation.valid,
-        attestationMissing: aiValidation.missing,
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
-        changedFiles,
-        timestamp: fixedTimestamp,
-      });
       expect(decision.decision).toBe('deny');
       expect(decision.violations.length).toBeGreaterThan(0);
       expect(decision.violations.every((v) => v.code === VIOLATION_AI_ATTESTATION_MISSING)).toBe(
@@ -347,29 +345,7 @@ describe('Policy Engine Workflow', () => {
       const changedFiles = ['.github/workflows/ci.yml', 'package.json', 'src/app.ts'];
       const pullRequestBody = prWithHighRiskPathsButNoAttestations;
 
-      const riskClassification = classifyRisk(changedFiles);
-      expect(riskClassification.tier).toBe('high');
-
-      const highRiskAttestation = parseHighRiskAttestation(pullRequestBody);
-      expect(highRiskAttestation.declared).toBe(false);
-
-      const highRiskValidation = validateHighRiskAttestation(
-        highRiskAttestation,
-        riskClassification.paths.length > 0,
-      );
-      expect(highRiskValidation.valid).toBe(false);
-
-      const decision = makeDecision({
-        riskTier: riskClassification.tier,
-        riskPaths: riskClassification.paths,
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: highRiskValidation.valid,
-        highRiskAttestationMissing: highRiskValidation.missing,
-        aiAssisted: false,
-        changedFiles,
-        timestamp: fixedTimestamp,
-      });
+      const { decision } = runDecision(changedFiles, pullRequestBody);
       expect(decision.decision).toBe('deny');
       expect(
         decision.violations.some((v) => v.code === VIOLATION_HIGH_RISK_GOVERNANCE_MISSING),
@@ -398,26 +374,7 @@ describe('Policy Engine Workflow', () => {
       const changedFiles = ['.github/workflows/ci.yml', '.github/dependabot.yml'];
       const pullRequestBody = prWithHighRiskPathsAndCompleteGovernanceAttestations;
 
-      const riskClassification = classifyRisk(changedFiles);
-      expect(riskClassification.tier).toBe('high');
-
-      const highRiskAttestation = parseHighRiskAttestation(pullRequestBody);
-      expect(highRiskAttestation.declared).toBe(true);
-
-      const highRiskValidation = validateHighRiskAttestation(highRiskAttestation, true);
-      expect(highRiskValidation.valid).toBe(true);
-
-      const decision = makeDecision({
-        riskTier: riskClassification.tier,
-        riskPaths: riskClassification.paths,
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: highRiskValidation.valid,
-        highRiskAttestationMissing: highRiskValidation.missing,
-        aiAssisted: false,
-        changedFiles,
-        timestamp: fixedTimestamp,
-      });
+      const { decision } = runDecision(changedFiles, pullRequestBody);
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
     });

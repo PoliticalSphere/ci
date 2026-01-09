@@ -34,6 +34,18 @@ function expectAllFalse(result: Record<string, boolean>): void {
   }
 }
 
+// Shared helper to assert that a declared attestation has all confirmations unchecked
+function expectDeclaredButAllUnchecked<T extends { declared: boolean }>(
+  result: T,
+  expectedFalseFields: Array<keyof T>,
+) {
+  expect(result.declared).toBe(true);
+  for (const key of expectedFalseFields) {
+    // @ts-expect-error runtime keys validated in tests
+    expect(result[key]).toBe(false);
+  }
+}
+
 /**
  * ======================================================
  * PR BODY FIXTURES
@@ -220,11 +232,12 @@ describe('AI Attestation — Parsing', () => {
 `;
     const result = parseAIAttestation(body);
 
-    expect(result.declared).toBe(true);
-    expect(result.reviewed).toBe(false);
-    expect(result.noSecrets).toBe(false);
-    expect(result.alignsWithStandards).toBe(false);
-    expect(result.locallyTested).toBe(false);
+    expectDeclaredButAllUnchecked(result, [
+      'reviewed',
+      'noSecrets',
+      'alignsWithStandards',
+      'locallyTested',
+    ]);
   });
 
   it('parses when body is empty string', () => {
@@ -363,13 +376,14 @@ describe('High-Risk Attestation — Parsing', () => {
 `;
     const result = parseHighRiskAttestation(body);
 
-    expect(result.declared).toBe(true);
-    expect(result.understood).toBe(false);
-    expect(result.securityReviewed).toBe(false);
-    expect(result.noPrivilegeEscalation).toBe(false);
-    expect(result.documented).toBe(false);
-    expect(result.rollbackPlan).toBe(false);
-    expect(result.monitoringCommitment).toBe(false);
+    expectDeclaredButAllUnchecked(result, [
+      'understood',
+      'securityReviewed',
+      'noPrivilegeEscalation',
+      'documented',
+      'rollbackPlan',
+      'monitoringCommitment',
+    ]);
   });
 
   it('handles empty high-risk body gracefully', () => {

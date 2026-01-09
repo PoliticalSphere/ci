@@ -36,45 +36,26 @@ const snapshotConsole = () => ({
 });
 
 describe('Console capture', () => {
-  it('captures console.log output', () => {
-    const restore = startCapture();
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    console.log('test message');
-    expect(getLogs()).toContain('test message');
-    restore();
-  });
+  function runBasicCaptureTest(
+    testName: string,
+    method: 'log' | 'error' | 'warn' | 'info',
+    message: string,
+    accessor: () => string[],
+  ) {
+    // eslint-disable-next-line vitest/valid-title
+    it(testName, () => {
+      const restore = startCapture();
+      // Use a properly-typed console accessor to avoid `any` and suppression warnings
+      const typedConsole = console as {
+        [k in 'log' | 'error' | 'warn' | 'info']: (m: string) => void;
+      };
+      typedConsole[method](message);
+      expect(accessor()).toContain(message);
+      restore();
+    });
+  }
 
-  it('captures console.error output', () => {
-    const restore = startCapture();
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    console.error('error message');
-    expect(getErrors()).toContain('error message');
-    restore();
-  });
-
-  it('captures console.warn output', () => {
-    const restore = startCapture();
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    console.warn('warning message');
-    expect(getWarnings()).toContain('warning message');
-    restore();
-  });
-
-  it('captures console.info output', () => {
-    const restore = startCapture();
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    console.info('info message');
-    expect(getInfos()).toContain('info message');
-    restore();
-  });
-
-  it('restores original console methods', () => {
-    const original = snapshotConsole();
-    const restore = startCapture();
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    console.log('captured');
-    restore();
-
+  function expectConsoleRestored(original: ReturnType<typeof snapshotConsole>) {
     // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
     expect(console.log).toBe(original.log);
     // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
@@ -83,6 +64,21 @@ describe('Console capture', () => {
     expect(console.warn).toBe(original.warn);
     // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
     expect(console.info).toBe(original.info);
+  }
+
+  runBasicCaptureTest('captures console.log output', 'log', 'test message', getLogs);
+  runBasicCaptureTest('captures console.error output', 'error', 'error message', getErrors);
+  runBasicCaptureTest('captures console.warn output', 'warn', 'warning message', getWarnings);
+  runBasicCaptureTest('captures console.info output', 'info', 'info message', getInfos);
+
+  it('restores original console methods', () => {
+    const original = snapshotConsole();
+    const restore = startCapture();
+    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
+    console.log('captured');
+    restore();
+
+    expectConsoleRestored(original);
   });
 
   it('captures multiple log messages', () => {
@@ -167,14 +163,7 @@ describe('Console capture', () => {
     // Calling restoreLogs without captureLogs should not throw or change console
     restoreLogs();
 
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.log).toBe(original.log);
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.error).toBe(original.error);
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.warn).toBe(original.warn);
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.info).toBe(original.info);
+    expectConsoleRestored(original);
   });
 
   it('captures multiple arguments and joins them with spaces', () => {

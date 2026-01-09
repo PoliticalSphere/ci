@@ -49,6 +49,28 @@ const makeDenyDecision = (missingAttestations: string[], aiAssisted = true) =>
     timestamp: fixedTimestamp,
   });
 
+// Helper to reduce duplication in tests: builds a canonical high-risk input with optional overrides
+function makeHighRiskInput(overrides: Partial<MakeDecisionInput> = {}): MakeDecisionInput {
+  return {
+    riskTier: 'high',
+    riskPaths: ['.github/workflows/ci.yml'],
+    attestationValid: true,
+    attestationMissing: [],
+    highRiskAttestationValid: true,
+    highRiskAttestationMissing: [],
+    aiAssisted: false,
+    changedFiles: ['.github/workflows/ci.yml'],
+    timestamp: fixedTimestamp,
+    ...overrides,
+  };
+}
+
+function expectDenyWithTwoErrors(result: PolicyResult) {
+  expect(result.decision).toBe('deny');
+  expect(result.violations).toHaveLength(2);
+  expect(result.violations.every((v) => v.severity === 'error')).toBe(true);
+}
+
 describe('Policy Decision Engine', () => {
   describe('makeDecision', () => {
     it('allows low-risk non-AI changes', () => {
@@ -63,9 +85,7 @@ describe('Policy Decision Engine', () => {
     it('denies AI-assisted changes with missing attestations', () => {
       const result = makeDenyDecision(['AI review', 'No-secrets confirmation']);
 
-      expect(result.decision).toBe('deny');
-      expect(result.violations).toHaveLength(2);
-      expect(result.violations.every((v) => v.severity === 'error')).toBe(true);
+      expectDenyWithTwoErrors(result);
       expect(result.violations.every((v) => v.category === 'attestation')).toBe(true);
       expect(result.decisionTrail).toHaveLength(1);
     });
@@ -91,17 +111,12 @@ describe('Policy Decision Engine', () => {
     });
 
     it('denies high-risk changes with missing governance attestations', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: false,
-        highRiskAttestationMissing: ['Security review', 'Rollback plan'],
-        aiAssisted: false,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(
+        makeHighRiskInput({
+          highRiskAttestationValid: false,
+          highRiskAttestationMissing: ['Security review', 'Rollback plan'],
+        }),
+      );
 
       expect(result.decision).toBe('deny');
       expect(result.violations).toHaveLength(2);
@@ -109,17 +124,7 @@ describe('Policy Decision Engine', () => {
     });
 
     it('uses a fallback summary when high-risk governance missing list is empty', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: false,
-        highRiskAttestationMissing: [],
-        aiAssisted: false,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(makeHighRiskInput({ highRiskAttestationValid: false }));
 
       expect(result.decision).toBe('deny');
       expect(result.decisionTrail).toHaveLength(1);
@@ -129,17 +134,7 @@ describe('Policy Decision Engine', () => {
     });
 
     it('warns (but does not deny) on high-risk AI-assisted changes with valid attestations', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(makeHighRiskInput({ aiAssisted: true }));
 
       expect(result.decision).toBe('warn');
       expect(result.violations).toHaveLength(1);
@@ -149,17 +144,13 @@ describe('Policy Decision Engine', () => {
     });
 
     it('enforces decision precedence: deny overrides warn', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: false,
-        attestationMissing: ['AI attestation missing'],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(
+        makeHighRiskInput({
+          aiAssisted: true,
+          attestationValid: false,
+          attestationMissing: ['AI attestation missing'],
+        }),
+      );
 
       expect(result.decision).toBe('deny');
     });
@@ -200,17 +191,12 @@ describe('Policy Decision Engine', () => {
 
     it('formats governance attestation missing summary with multiple items (line 137)', () => {
       // Test line 137: true branch of ternary (highRiskAttestationMissing.length > 0)
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: false,
-        highRiskAttestationMissing: ['Security review', 'Rollback plan'],
-        aiAssisted: false,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(
+        makeHighRiskInput({
+          highRiskAttestationValid: false,
+          highRiskAttestationMissing: ['Security review', 'Rollback plan'],
+        }),
+      );
 
       expect(result.decision).toBe('deny');
       // Verify violations exist for multiple missing governance attestations
@@ -232,9 +218,7 @@ describe('Policy Decision Engine', () => {
         failedCIChecks: ['SonarQube', 'CodeQL'],
       });
 
-      expect(result.decision).toBe('deny');
-      expect(result.violations).toHaveLength(2);
-      expect(result.violations.every((v) => v.severity === 'error')).toBe(true);
+      expectDenyWithTwoErrors(result);
       expect(result.violations.every((v) => v.category === 'governance')).toBe(true);
       expect(result.violations[0]?.message).toContain('SonarQube');
       expect(result.violations[1]?.message).toContain('CodeQL');
@@ -342,17 +326,7 @@ describe('Policy Decision Engine', () => {
     });
 
     it('renders warn decision with warning emoji', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(makeHighRiskInput({ aiAssisted: true }));
 
       const markdown = generateMarkdownSummary(
         result,
@@ -368,17 +342,7 @@ describe('Policy Decision Engine', () => {
     });
 
     it('renders decision explanation details', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(makeHighRiskInput({ aiAssisted: true }));
 
       const markdown = generateMarkdownSummary(result, [], ['.github/workflows/ci.yml']);
 
@@ -430,17 +394,7 @@ describe('Policy Decision Engine', () => {
     });
 
     it('includes governance requirements for high-risk decisions', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: true,
-        attestationMissing: [],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: false,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(makeHighRiskInput());
 
       const markdown = generateMarkdownSummary(
         result,
@@ -485,17 +439,13 @@ describe('Policy Decision Engine', () => {
     });
 
     it('handles violations with error severity', () => {
-      const result = makeDecision({
-        riskTier: 'high',
-        riskPaths: ['.github/workflows/ci.yml'],
-        attestationValid: false,
-        attestationMissing: ['AI attestation missing'],
-        highRiskAttestationValid: true,
-        highRiskAttestationMissing: [],
-        aiAssisted: true,
-        changedFiles: ['.github/workflows/ci.yml'],
-        timestamp: fixedTimestamp,
-      });
+      const result = makeDecision(
+        makeHighRiskInput({
+          aiAssisted: true,
+          attestationValid: false,
+          attestationMissing: ['AI attestation missing'],
+        }),
+      );
 
       const markdown = generateMarkdownSummary(result, [], ['.github/workflows/ci.yml']);
 

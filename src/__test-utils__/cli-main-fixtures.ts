@@ -34,6 +34,33 @@ const sampleResults = (logDir: string): readonly LinterResult[] => [
   },
 ];
 
+/**
+ * Abstract TMPDIR access behind a function so tests can mock it
+ * without mutating process.env (security + compliance).
+ */
+export type TmpDirGetter = () => string | undefined;
+
+let tmpDirGetter: TmpDirGetter = () => {
+  // Default behaviour: read the platform env var if present
+  // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
+  return process.env['TMPDIR'];
+};
+
+export function setTmpDirGetter(getter: TmpDirGetter): void {
+  tmpDirGetter = getter;
+}
+
+export function resetTmpDirGetter(): void {
+  tmpDirGetter = () => {
+    // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
+    return process.env['TMPDIR'];
+  };
+}
+
+export function getTmpDir(): string | undefined {
+  return tmpDirGetter();
+}
+
 function createMkdirFn(): ReturnType<typeof vi.fn> {
   // eslint-disable-next-line unicorn/no-useless-undefined
   return vi.fn().mockResolvedValue(undefined);
@@ -69,11 +96,14 @@ function createCalculateSummaryFn(): ReturnType<typeof vi.fn> {
   }));
 }
 
+export function normaliseTmpDir(tmpDirRaw: string): string {
+  return tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
+}
+
 function createAcquireExecutionLockFn(): ReturnType<typeof vi.fn> {
-  // Use system temp directory with unique test identifier for security
-  // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
-  const tmpDirRaw = process.env['TMPDIR'] ?? '/tmp';
-  const tmpDir = tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
+  const tmpDirRaw = getTmpDir() ?? '/tmp';
+  const tmpDir = normaliseTmpDir(tmpDirRaw);
+
   return vi.fn().mockResolvedValue({
     lockPath: `${tmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
     release: vi.fn().mockResolvedValue(void 0),
@@ -85,10 +115,9 @@ function buildOptions(
   deps: Omit<TestDeps, 'options'>,
   injectedConsole?: unknown,
 ): Record<string, unknown> {
-  // Use system temp directory for test isolation
-  // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
-  const tmpDirRaw = process.env['TMPDIR'] ?? '/tmp';
-  const tmpDir = tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
+  const tmpDirRaw = getTmpDir() ?? '/tmp';
+  const tmpDir = normaliseTmpDir(tmpDirRaw);
+
   const options: Record<string, unknown> & { console?: unknown } = {
     argv,
     cwd: `${tmpDir}/ps-test-project-${process.pid}`,

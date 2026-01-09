@@ -74,6 +74,17 @@ describe('Executor Module', () => {
       expectedVersion: undefined,
     };
 
+    // Helper to set up a successful run path (reduce duplication)
+    async function setupPassRun(modsParam?: Awaited<ReturnType<typeof getMockedModules>>) {
+      const mods = modsParam ?? (await getMockedModules());
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
+      mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
+      mods.determineStatus.mockResolvedValueOnce('PASS');
+      return mods;
+    }
+
     it('returns SKIPPED when linter should be skipped (line 56-62)', async () => {
       const mods = await getMockedModules();
       mods.shouldSkipLinter.mockResolvedValueOnce({
@@ -167,11 +178,7 @@ describe('Executor Module', () => {
       const tracker = createTrackerMock(true);
       incremental.getGlobalTracker.mockReturnValue(tracker as never);
 
-      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
-      mods.checkBinaryExists.mockResolvedValueOnce(true);
-      mods.verifyLinterVersion.mockResolvedValueOnce(null);
-      mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
-      mods.determineStatus.mockResolvedValueOnce('PASS');
+      await setupPassRun(mods);
 
       const result = await executeLinter(mockLinter, { ...mockOptions, incremental: true });
 
@@ -213,11 +220,7 @@ describe('Executor Module', () => {
 
     it('executes process and returns status (line 103-112)', async () => {
       const mods = await getMockedModules();
-      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
-      mods.checkBinaryExists.mockResolvedValueOnce(true);
-      mods.verifyLinterVersion.mockResolvedValueOnce(null);
-      mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
-      mods.determineStatus.mockResolvedValueOnce('PASS');
+      await setupPassRun(mods);
 
       const result = await executeLinter(mockLinter, mockOptions);
 

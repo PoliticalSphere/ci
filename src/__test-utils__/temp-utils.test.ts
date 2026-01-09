@@ -98,54 +98,65 @@ describe('temp utils', () => {
     expect(result.endsWith('/')).toBe(false);
   });
 
-  it('getTempDir handles both ternary branches', () => {
-    // Test the exact logic from getTempDir by simulating both inputs
-    const tmpobj1 = tmp.dirSync({ unsafeCleanup: true }); // Compliant
-    const testCasesWithSlash = `${tmpobj1.name}/`;
-    const resultWithSlash = testCasesWithSlash.endsWith('/')
-      ? testCasesWithSlash.slice(0, -1)
-      : testCasesWithSlash;
-    expect(resultWithSlash).toBe(tmpobj1.name);
-    tmpobj1.removeCallback();
+  // Helper to create a temporary directory and ensure cleanup
+  async function withTmpDir<T>(
+    fn: (tmpobj: { name: string; removeCallback: () => void }) => T | Promise<T>,
+  ) {
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true });
+    try {
+      return await fn(tmpobj);
+    } finally {
+      tmpobj.removeCallback();
+    }
+  }
 
-    const tmpobj2 = tmp.dirSync({ unsafeCleanup: true }); // Compliant
-    const testCasesNoSlash = tmpobj2.name;
-    const resultNoSlash = testCasesNoSlash.endsWith('/')
-      ? testCasesNoSlash.slice(0, -1)
-      : testCasesNoSlash;
-    expect(resultNoSlash).toBe(tmpobj2.name);
-    tmpobj2.removeCallback();
+  it('getTempDir handles both ternary branches', async () => {
+    await withTmpDir(async (tmpobj1) => {
+      const testCasesWithSlash = `${tmpobj1.name}/`;
+      const resultWithSlash = testCasesWithSlash.endsWith('/')
+        ? testCasesWithSlash.slice(0, -1)
+        : testCasesWithSlash;
+      expect(resultWithSlash).toBe(tmpobj1.name);
+    });
+
+    await withTmpDir(async (tmpobj2) => {
+      const testCasesNoSlash = tmpobj2.name;
+      const resultNoSlash = testCasesNoSlash.endsWith('/')
+        ? testCasesNoSlash.slice(0, -1)
+        : testCasesNoSlash;
+      expect(resultNoSlash).toBe(tmpobj2.name);
+    });
   });
 
   it('getTempDir normalizes path with trailing slash', async () => {
-    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
-    // Mock os.tmpdir to return path with trailing slash
-    vi.doMock('node:os', () => ({
-      tmpdir: () => `${tmpobj.name}/`,
-    }));
+    await withTmpDir(async (tmpobj) => {
+      // Mock os.tmpdir to return path with trailing slash
+      vi.doMock('node:os', () => ({
+        tmpdir: () => `${tmpobj.name}/`,
+      }));
 
-    // Re-import the function with mocked tmpdir
-    const { getTempDir: getTempDirMocked } = await import('./temp-utils.ts');
-    const result = getTempDirMocked();
+      // Re-import the function with mocked tmpdir
+      const { getTempDir: getTempDirMocked } = await import('./temp-utils.ts');
+      const result = getTempDirMocked();
 
-    expect(result).toBe(tmpobj.name);
-    expect(result.endsWith('/')).toBe(false);
-    tmpobj.removeCallback();
+      expect(result).toBe(tmpobj.name);
+      expect(result.endsWith('/')).toBe(false);
+    });
   });
 
   it('getTempDir preserves path without trailing slash', async () => {
-    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
-    // Mock os.tmpdir to return path without trailing slash
-    vi.doMock('node:os', () => ({
-      tmpdir: () => tmpobj.name,
-    }));
+    await withTmpDir(async (tmpobj) => {
+      // Mock os.tmpdir to return path without trailing slash
+      vi.doMock('node:os', () => ({
+        tmpdir: () => tmpobj.name,
+      }));
 
-    // Re-import the function with mocked tmpdir
-    const { getTempDir: getTempDirMocked } = await import('./temp-utils.ts');
-    const result = getTempDirMocked();
+      // Re-import the function with mocked tmpdir
+      const { getTempDir: getTempDirMocked } = await import('./temp-utils.ts');
+      const result = getTempDirMocked();
 
-    expect(result).toBe(tmpobj.name);
-    expect(result.endsWith('/')).toBe(false);
-    tmpobj.removeCallback();
+      expect(result).toBe(tmpobj.name);
+      expect(result.endsWith('/')).toBe(false);
+    });
   });
 });

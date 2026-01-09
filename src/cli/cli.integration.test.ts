@@ -51,6 +51,14 @@ async function loadMain() {
   return import('./index.ts');
 }
 
+function createAcquireExecutionLockFn() {
+  const testTmpDir = tmpdir().replace(/\/$/, '');
+  return vi.fn().mockResolvedValue({
+    lockPath: `${testTmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
+    release: vi.fn().mockResolvedValue(undefined),
+  });
+}
+
 let tempDir = '';
 
 beforeEach(async () => {
@@ -70,11 +78,7 @@ afterEach(async () => {
 describe('Political Sphere - CLI integration', () => {
   it('runs a linter end-to-end and writes the log', async () => {
     const { main } = await loadMain();
-    const testTmpDir = tmpdir().replace(/\/$/, '');
-    const acquireExecutionLockFn = vi.fn().mockResolvedValue({
-      lockPath: `${testTmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
-      release: vi.fn().mockResolvedValue(undefined),
-    });
+    const acquireExecutionLockFn = createAcquireExecutionLockFn();
 
     const statuses: [string, LinterStatus][] = [];
     const renderDashboardFn = () => ({
@@ -111,11 +115,7 @@ describe('Political Sphere - CLI integration', () => {
     // by simulating a high-risk PR with missing attestations
 
     const { main } = await loadMain();
-    const testTmpDir = tmpdir().replace(/\/$/, '');
-    const acquireExecutionLockFn = vi.fn().mockResolvedValue({
-      lockPath: `${testTmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
-      release: vi.fn().mockResolvedValue(undefined),
-    });
+    const acquireExecutionLockFn = createAcquireExecutionLockFn();
 
     // Simulate running with high-risk files
     // In a real scenario, the policy engine would be invoked by CI
