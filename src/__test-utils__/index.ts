@@ -37,3 +37,12 @@ export type { LinterTestConfig } from './linter-fixtures.ts';
 export { createLinterConfig, createMockLinterConfig } from './linter-fixtures.ts';
 export type { StreamMock } from './stream-mocks.ts';
 export { createStreamMock, createStreamMockPair } from './stream-mocks.ts';
+export {
+  cleanupTempDirSync,
+  cleanupTempFile,
+  createTempDir,
+  createTempDirSync,
+  createTempFile,
+  createTempScript,
+  getTempDir,
+} from './temp-utils.ts';

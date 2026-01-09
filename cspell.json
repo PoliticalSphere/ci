@@ -62,6 +62,8 @@
     "sonarjs",
     "srcdir",
     "teh",
+    "tmpdir",
+    "tmpobj",
     "Traceparent",
     "traceparent",
     "tsbuildinfo",

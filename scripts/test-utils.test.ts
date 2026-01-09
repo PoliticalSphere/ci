@@ -1,6 +1,10 @@
-import * as fs from 'node:fs';
-import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import {
+  cleanupTempDirSync,
+  createTempDirSync,
+  createTempScript,
+} from '../src/__test-utils__/index.ts';
 import { parseExecError, runScript, runScriptWithEnv } from './test-utils.ts';
 
 describe('parseExecError', () => {
@@ -52,72 +56,59 @@ describe('runScript', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = `/tmp/test-scripts-${Date.now()}`;
-    fs.mkdirSync(tempDir, { recursive: true });
+    tempDir = createTempDirSync('test-scripts-');
   });
 
   afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
-    }
+    cleanupTempDirSync(tempDir);
   });
 
   it('handles successful script execution with stdout', async () => {
-    const script = path.join(tempDir, 'success.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nprintf "hello world\\n"', { mode: 0o755 });
-
+    const script = createTempScript(tempDir, 'success', '#!/bin/bash\nprintf "hello world\\n"');
     const result = await runScript(script);
-
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('hello world');
     expect(result.stderr).toBe('');
   });
 
   it('handles script execution with stderr', async () => {
-    const script = path.join(tempDir, 'stderr.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nprintf "error message\\n" >&2\nexit 0', { mode: 0o755 });
-
+    const script = createTempScript(
+      tempDir,
+      'stderr',
+      '#!/bin/bash\nprintf "error message\\n" >&2\nexit 0',
+    );
     const result = await runScript(script);
-
     expect(result.code).toBe(0);
     expect(result.stderr).toContain('error message');
   });
 
   it('handles script failure with non-zero exit code', async () => {
-    const script = path.join(tempDir, 'fail.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nexit 42', { mode: 0o755 });
-
+    const script = createTempScript(tempDir, 'fail', '#!/bin/bash\nexit 42');
     const result = await runScript(script);
-
     expect(result.code).toBe(42);
   });
 
   it('handles script with both stdout and stderr', async () => {
-    const script = path.join(tempDir, 'mixed.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nprintf "output\\n"\nprintf "error\\n" >&2\nexit 5', {
-      mode: 0o755,
-    });
-
+    const script = createTempScript(
+      tempDir,
+      'mixed',
+      '#!/bin/bash\nprintf "output\\n"\nprintf "error\\n" >&2\nexit 5',
+    );
     const result = await runScript(script);
-
     expect(result.code).toBe(5);
     expect(result.stdout).toContain('output');
     expect(result.stderr).toContain('error');
   });
 
   it('handles script with arguments', async () => {
-    const script = path.join(tempDir, 'args.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nprintf "%s\\n" "$1"', { mode: 0o755 });
-
+    const script = createTempScript(tempDir, 'args', '#!/bin/bash\nprintf "%s\\n" "$1"');
     const result = await runScript(script, ['test-arg']);
-
     expect(result.stdout).toContain('test-arg');
     expect(result.code).toBe(0);
   });
 
   it('handles nonexistent script', async () => {
     const result = await runScript('/nonexistent/script.sh');
-
     expect(result.code).not.toBe(0);
   });
 });
@@ -126,32 +117,31 @@ describe('runScriptWithEnv', () => {
   let tempDir: string;
 
   beforeEach(() => {
-    tempDir = `/tmp/test-scripts-env-${Date.now()}`;
-    fs.mkdirSync(tempDir, { recursive: true });
+    tempDir = createTempDirSync('test-scripts-env-');
   });
 
   afterEach(() => {
-    if (fs.existsSync(tempDir)) {
-      fs.rmSync(tempDir, { recursive: true });
-    }
+    cleanupTempDirSync(tempDir);
   });
 
   it('passes env to successful script', async () => {
-    const script = path.join(tempDir, 'env-success.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nprintf "%s\\n" "FOO=$FOO"', { mode: 0o755 });
-
+    const script = createTempScript(
+      tempDir,
+      'env-success',
+      '#!/bin/bash\nprintf "%s\\n" "FOO=$FOO"',
+    );
     const result = await runScriptWithEnv(script, [], { FOO: 'bar' });
-
     expect(result.code).toBe(0);
     expect(result.stdout).toContain('FOO=bar');
   });
 
   it('captures stdout and non-zero code on failure path', async () => {
-    const script = path.join(tempDir, 'env-fail.sh');
-    fs.writeFileSync(script, '#!/bin/bash\nprintf "%s\\n" "FOO=$FOO"; exit 9', { mode: 0o755 });
-
+    const script = createTempScript(
+      tempDir,
+      'env-fail',
+      '#!/bin/bash\nprintf "%s\\n" "FOO=$FOO"; exit 9',
+    );
     const result = await runScriptWithEnv(script, [], { FOO: 'baz' });
-
     expect(result.code).toBe(9);
     expect(result.stdout).toContain('FOO=baz');
   });

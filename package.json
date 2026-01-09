@@ -61,7 +61,6 @@
     "@eslint/js": "^9.18.0",
     "@types/node": "^25.0.3",
     "@types/react": "^19.2.7",
-    "@types/tmp": "^0.2.6",
     "@vitest/coverage-v8": "^4.0.16",
     "@vitest/ui": "^4.0.16",
     "actionlint": "^2.0.6",
@@ -88,11 +87,13 @@
     "picomatch": "^4.0.3",
     "react": "^19.2.3",
     "semgrep": "^0.0.1",
-    "tmp": "^0.2.5",
     "tsx": "^4.21.0",
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.20.0",
     "vitest": "^4.0.16",
     "yamllint-js": "^0.1.0"
+  },
+  "dependencies": {
+    "tmp": "^0.2.5"
   }
 }

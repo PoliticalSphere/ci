@@ -3,9 +3,17 @@
  */
 
 import { tmpdir } from 'node:os';
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
 import { BinaryError } from '../errors.ts';
 import { calculateSummary, executeLinter } from './executor.ts';
+import {
+  createTrackerMock,
+  getMockedIncremental,
+  getMockedLogger,
+  getMockedModules,
+} from './test-mocks.ts';
 
 // Mock modules before importing executor functions that use them
 vi.mock('./modules/index.ts', async () => {
@@ -67,8 +75,8 @@ describe('Executor Module', () => {
     };
 
     it('returns SKIPPED when linter should be skipped (line 56-62)', async () => {
-      const { shouldSkipLinter } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({
         skip: true,
         reason: 'No files found',
       });
@@ -80,9 +88,9 @@ describe('Executor Module', () => {
     });
 
     it('returns ERROR when binary does not exist (line 68-74)', async () => {
-      const { shouldSkipLinter, checkBinaryExists } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(false);
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(false);
 
       const result = await executeLinter(mockLinter, mockOptions);
 
@@ -92,12 +100,10 @@ describe('Executor Module', () => {
     });
 
     it('returns ERROR when version verification throws error (line 78-84)', async () => {
-      const { shouldSkipLinter, checkBinaryExists, verifyLinterVersion } = await import(
-        './modules/index.ts'
-      );
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockRejectedValueOnce(
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockRejectedValueOnce(
         new BinaryError('BINARY_VERSION_MISMATCH', 'Version mismatch'),
       );
 
@@ -110,12 +116,10 @@ describe('Executor Module', () => {
     });
 
     it('returns ERROR when version verification throws exception (line 85-91)', async () => {
-      const { shouldSkipLinter, checkBinaryExists, verifyLinterVersion } = await import(
-        './modules/index.ts'
-      );
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockRejectedValueOnce(new Error('Version check failed'));
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockRejectedValueOnce(new Error('Version check failed'));
 
       const result = await executeLinter(mockLinter, mockOptions);
 
@@ -125,12 +129,10 @@ describe('Executor Module', () => {
     });
 
     it('returns ERROR when version verification throws non-Error exception (line 83)', async () => {
-      const { shouldSkipLinter, checkBinaryExists, verifyLinterVersion } = await import(
-        './modules/index.ts'
-      );
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockRejectedValueOnce('string error');
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockRejectedValueOnce('string error');
 
       const result = await executeLinter(mockLinter, mockOptions);
 
@@ -140,20 +142,15 @@ describe('Executor Module', () => {
     });
 
     it('skips when incremental tracker says no execution (lines 79-88)', async () => {
-      const { getGlobalTracker } = await import('./incremental.ts');
-      const { appendToLog } = await import('./logger.ts');
+      const logger = await getMockedLogger();
+      const incremental = await getMockedIncremental();
 
-      const tracker = {
-        getExecutionDecision: vi.fn().mockReturnValue({
-          shouldExecute: false,
-          reason: 'cached',
-        }),
-      };
-      vi.mocked(getGlobalTracker).mockReturnValue(tracker as never);
+      const tracker = createTrackerMock(false, 'cached');
+      incremental.getGlobalTracker.mockReturnValue(tracker as never);
 
       const result = await executeLinter(mockLinter, { ...mockOptions, incremental: true });
 
-      expect(appendToLog).toHaveBeenCalledWith(
+      expect(logger.appendToLog).toHaveBeenCalledWith(
         mockOptions.logDir,
         mockLinter.id,
         'SKIPPED (incremental): cached',
@@ -164,27 +161,17 @@ describe('Executor Module', () => {
     });
 
     it('continues when incremental tracker allows execution (line 80 true branch)', async () => {
-      const { getGlobalTracker } = await import('./incremental.ts');
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        determineStatus,
-      } = await import('./modules/index.ts');
+      const incremental = await getMockedIncremental();
+      const mods = await getMockedModules();
 
-      const tracker = {
-        getExecutionDecision: vi.fn().mockReturnValue({
-          shouldExecute: true,
-        }),
-      };
-      vi.mocked(getGlobalTracker).mockReturnValue(tracker as never);
+      const tracker = createTrackerMock(true);
+      incremental.getGlobalTracker.mockReturnValue(tracker as never);
 
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
-      vi.mocked(runProcess).mockResolvedValueOnce({ exitCode: 0, timedOut: false });
-      vi.mocked(determineStatus).mockResolvedValueOnce('PASS');
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
+      mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
+      mods.determineStatus.mockResolvedValueOnce('PASS');
 
       const result = await executeLinter(mockLinter, { ...mockOptions, incremental: true });
 
@@ -193,19 +180,13 @@ describe('Executor Module', () => {
     });
 
     it('records telemetry with success=false when status is not PASS/SKIPPED (line 136)', async () => {
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        determineStatus,
-      } = await import('./modules/index.ts');
+      const mods = await getMockedModules();
 
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
-      vi.mocked(runProcess).mockResolvedValueOnce({ exitCode: 1, timedOut: false });
-      vi.mocked(determineStatus).mockResolvedValueOnce('FAIL' as never);
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
+      mods.runProcess.mockResolvedValueOnce({ exitCode: 1, timedOut: false });
+      mods.determineStatus.mockResolvedValueOnce('FAIL' as never);
 
       await executeLinter(mockLinter, mockOptions);
 
@@ -213,9 +194,9 @@ describe('Executor Module', () => {
     });
 
     it('records telemetry and rethrows on unexpected errors (lines 158-160)', async () => {
-      const { getGlobalTracker } = await import('./incremental.ts');
+      const incremental = await getMockedIncremental();
       const boom = new Error('unexpected');
-      vi.mocked(getGlobalTracker).mockImplementation(() => {
+      incremental.getGlobalTracker.mockImplementation(() => {
         throw boom;
       });
 
@@ -231,18 +212,12 @@ describe('Executor Module', () => {
     });
 
     it('executes process and returns status (line 103-112)', async () => {
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        determineStatus,
-      } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
-      vi.mocked(runProcess).mockResolvedValueOnce({ exitCode: 0, timedOut: false });
-      vi.mocked(determineStatus).mockResolvedValueOnce('PASS');
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
+      mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
+      mods.determineStatus.mockResolvedValueOnce('PASS');
 
       const result = await executeLinter(mockLinter, mockOptions);
 
@@ -251,50 +226,37 @@ describe('Executor Module', () => {
     });
 
     it('handles transient error with retry (line 115-120)', async () => {
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        isTransientError,
-        determineStatus,
-      } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
 
       // First attempt fails with transient error, second succeeds
-      vi.mocked(runProcess)
+      mods.runProcess
         .mockRejectedValueOnce(new Error('ECONNRESET'))
         .mockResolvedValueOnce({ exitCode: 0, timedOut: false });
 
-      vi.mocked(isTransientError).mockReturnValue(true);
-      vi.mocked(determineStatus).mockResolvedValueOnce('PASS');
+      mods.isTransientError.mockReturnValue(true);
+      mods.determineStatus.mockResolvedValueOnce('PASS');
 
       const result = await executeLinter(mockLinter, mockOptions, 1);
 
-      expect(runProcess).toHaveBeenCalledTimes(2);
+      expect(mods.runProcess).toHaveBeenCalledTimes(2);
       expect(result.status).toBe('PASS');
     });
 
     it('returns ERROR when all retries exhausted', async () => {
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        isTransientError,
-      } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
 
       // Mock runProcess to reject twice (first attempt + retry)
-      vi.mocked(runProcess)
+      mods.runProcess
         .mockRejectedValueOnce(new Error('ECONNRESET'))
         .mockRejectedValueOnce(new Error('ECONNRESET'));
 
-      vi.mocked(isTransientError).mockReturnValue(true);
+      mods.isTransientError.mockReturnValue(true);
 
       const result = await executeLinter(mockLinter, mockOptions, 1);
 
@@ -303,18 +265,12 @@ describe('Executor Module', () => {
     });
 
     it('returns ERROR on non-transient error', async () => {
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        isTransientError,
-      } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
-      vi.mocked(runProcess).mockRejectedValueOnce(new Error('EACCES'));
-      vi.mocked(isTransientError).mockReturnValue(false);
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
+      mods.runProcess.mockRejectedValueOnce(new Error('EACCES'));
+      mods.isTransientError.mockReturnValue(false);
 
       const result = await executeLinter(mockLinter, mockOptions, 1);
 
@@ -323,18 +279,12 @@ describe('Executor Module', () => {
     });
 
     it('handles unknown error types', async () => {
-      const {
-        shouldSkipLinter,
-        checkBinaryExists,
-        verifyLinterVersion,
-        runProcess,
-        isTransientError,
-      } = await import('./modules/index.ts');
-      vi.mocked(shouldSkipLinter).mockResolvedValueOnce({ skip: false });
-      vi.mocked(checkBinaryExists).mockResolvedValueOnce(true);
-      vi.mocked(verifyLinterVersion).mockResolvedValueOnce(null);
-      vi.mocked(runProcess).mockRejectedValueOnce('string error');
-      vi.mocked(isTransientError).mockReturnValue(false);
+      const mods = await getMockedModules();
+      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+      mods.checkBinaryExists.mockResolvedValueOnce(true);
+      mods.verifyLinterVersion.mockResolvedValueOnce(null);
+      mods.runProcess.mockRejectedValueOnce('string error');
+      mods.isTransientError.mockReturnValue(false);
 
       const result = await executeLinter(mockLinter, mockOptions);
 
@@ -343,14 +293,14 @@ describe('Executor Module', () => {
     });
 
     it('uses custom skipCheck when provided', async () => {
-      const { shouldSkipLinter } = await import('./modules/index.ts');
+      const mods = await getMockedModules();
       const customSkipCheck = vi.fn().mockResolvedValueOnce({ skip: true });
       const linterWithSkipCheck = { ...mockLinter, skipCheck: customSkipCheck };
 
       await executeLinter(linterWithSkipCheck, mockOptions);
 
       expect(customSkipCheck).toHaveBeenCalled();
-      expect(shouldSkipLinter).not.toHaveBeenCalled();
+      expect(mods.shouldSkipLinter).not.toHaveBeenCalled();
     });
 
     it('exports executeLintersInParallel', async () => {
