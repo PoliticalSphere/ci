@@ -10,8 +10,10 @@
  */
 
 import { mkdirSync, writeFileSync } from 'node:fs';
-import tmp from 'tmp';
 import { describe, expect, it, vi } from 'vitest';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const tmp = require('tmp');
 
 import { createMainTestDeps } from './cli-main-fixtures.ts';
 

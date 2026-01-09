@@ -1,7 +1,9 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
-import tmp from 'tmp';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const tmp = require('tmp');
 
 import {
   cleanupTempDirSync,
