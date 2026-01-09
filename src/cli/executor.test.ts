@@ -47,6 +47,17 @@ vi.mock('./incremental.ts', () => ({
   getGlobalTracker: vi.fn(() => null),
 }));
 
+// Helper to set up a successful run path (reduce duplication)
+async function setupPassRun(modsParam?: Awaited<ReturnType<typeof getMockedModules>>) {
+  const mods = modsParam ?? (await getMockedModules());
+  mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
+  mods.checkBinaryExists.mockResolvedValueOnce(true);
+  mods.verifyLinterVersion.mockResolvedValueOnce(null);
+  mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
+  mods.determineStatus.mockResolvedValueOnce('PASS');
+  return mods;
+}
+
 describe('Executor Module', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -73,17 +84,6 @@ describe('Executor Module', () => {
       skipCheck: undefined,
       expectedVersion: undefined,
     };
-
-    // Helper to set up a successful run path (reduce duplication)
-    async function setupPassRun(modsParam?: Awaited<ReturnType<typeof getMockedModules>>) {
-      const mods = modsParam ?? (await getMockedModules());
-      mods.shouldSkipLinter.mockResolvedValueOnce({ skip: false });
-      mods.checkBinaryExists.mockResolvedValueOnce(true);
-      mods.verifyLinterVersion.mockResolvedValueOnce(null);
-      mods.runProcess.mockResolvedValueOnce({ exitCode: 0, timedOut: false });
-      mods.determineStatus.mockResolvedValueOnce('PASS');
-      return mods;
-    }
 
     it('returns SKIPPED when linter should be skipped (line 56-62)', async () => {
       const mods = await getMockedModules();

@@ -269,12 +269,7 @@ describe('Process Manager Module', () => {
       await expect(runPromise).rejects.toBe(logError);
     }, 10_000);
 
-    const runSpawnErrorScenario = async (
-      emitted: unknown,
-      createLoggerRejects = false,
-      assertFn: (p: Promise<unknown>, emittedArg?: unknown) => Promise<void> | void = async (p) =>
-        p,
-    ) => {
+    const runSpawnErrorScenario = async (emitted: unknown, createLoggerRejects = false) => {
       vi.useFakeTimers();
 
       if (createLoggerRejects) {
@@ -295,35 +290,29 @@ describe('Process Manager Module', () => {
       await vi.advanceTimersByTimeAsync(10);
       proc.emit('error', emitted);
 
-      await assertFn(runPromise, emitted);
+      return runPromise;
     };
 
     it('propagates process errors and tolerates log failures', async () => {
-      await runSpawnErrorScenario(new Error('spawn failed'), true, async (p) => {
-        await expect(p).rejects.toThrow('Process spawn failed: spawn failed');
-      });
+      const p = runSpawnErrorScenario(new Error('spawn failed'), true);
+      await expect(p).rejects.toThrow('Process spawn failed: spawn failed');
     });
 
     it('attaches the original error as cause on spawn failure', async () => {
       const orig = new Error('underlying spawn failure');
-      await runSpawnErrorScenario(orig, false, async (p, _emitted) => {
-        await p.catch((err) => {
-          expect(err).toBeInstanceOf(ProcessError);
-          expect((err as ProcessError).cause).toBe(orig);
-        });
-      });
+      const p = runSpawnErrorScenario(orig, false);
+      await expect(p).rejects.toBeInstanceOf(ProcessError);
+      await expect(p).rejects.toHaveProperty('cause', orig);
     });
 
     it('stringifies non-Error process errors', async () => {
-      await runSpawnErrorScenario('non-error failure', false, async (p) => {
-        await expect(p).rejects.toThrow('Process spawn failed: non-error failure');
-      });
+      const p = runSpawnErrorScenario('non-error failure', false);
+      await expect(p).rejects.toThrow('Process spawn failed: non-error failure');
     });
 
     it('stringifies object process errors', async () => {
-      await runSpawnErrorScenario({ message: 'obj error' }, false, async (p) => {
-        await expect(p).rejects.toThrow('Process spawn failed: [object Object]');
-      });
+      const p = runSpawnErrorScenario({ message: 'obj error' }, false);
+      await expect(p).rejects.toThrow('Process spawn failed: [object Object]');
     });
   });
 

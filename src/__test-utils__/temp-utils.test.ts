@@ -15,6 +15,18 @@ import {
   getTempDir,
 } from './temp-utils.ts';
 
+// Helper to create a temporary directory and ensure cleanup
+async function withTmpDir<T>(
+  fn: (tmpobj: { name: string; removeCallback: () => void }) => T | Promise<T>,
+) {
+  const tmpobj = tmp.dirSync({ unsafeCleanup: true });
+  try {
+    return await fn(tmpobj);
+  } finally {
+    tmpobj.removeCallback();
+  }
+}
+
 describe('temp utils', () => {
   beforeEach(() => {
     vi.resetModules();
@@ -97,18 +109,6 @@ describe('temp utils', () => {
     // Should not have trailing slash
     expect(result.endsWith('/')).toBe(false);
   });
-
-  // Helper to create a temporary directory and ensure cleanup
-  async function withTmpDir<T>(
-    fn: (tmpobj: { name: string; removeCallback: () => void }) => T | Promise<T>,
-  ) {
-    const tmpobj = tmp.dirSync({ unsafeCleanup: true });
-    try {
-      return await fn(tmpobj);
-    } finally {
-      tmpobj.removeCallback();
-    }
-  }
 
   it('getTempDir handles both ternary branches', async () => {
     await withTmpDir(async (tmpobj1) => {

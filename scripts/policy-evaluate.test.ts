@@ -264,6 +264,24 @@ async function setupTestScenario(opts: TestSetupOpts = {}) {
   };
 }
 
+async function runGenerateCommentBodyTest(
+  decision: Decision,
+  violations: Array<{ code: string; message: string; severity: string }>,
+  summary: string,
+  shouldContain: string[],
+  shouldNotContain: string[] = [],
+) {
+  const { generateCommentBody } = await import('./policy-evaluate.ts');
+  const body = generateCommentBody(decision, violations, summary);
+
+  for (const s of shouldContain) {
+    expect(body).toContain(s);
+  }
+  for (const s of shouldNotContain) {
+    expect(body).not.toContain(s);
+  }
+}
+
 describe('scripts/policy-evaluate.ts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -523,24 +541,6 @@ describe('scripts/policy-evaluate.ts', () => {
     expect(body).toContain('Fix the warning');
     expect(body).toContain('# Summary');
   });
-
-  async function runGenerateCommentBodyTest(
-    decision: 'allow' | 'warn' | 'deny',
-    violations: Array<{ code: string; message: string; severity: string }>,
-    summary: string,
-    shouldContain: string[],
-    shouldNotContain: string[] = [],
-  ) {
-    const { generateCommentBody } = await import('./policy-evaluate.ts');
-    const body = generateCommentBody(decision, violations, summary);
-
-    for (const s of shouldContain) {
-      expect(body).toContain(s);
-    }
-    for (const s of shouldNotContain) {
-      expect(body).not.toContain(s);
-    }
-  }
 
   it('generateCommentBody formats deny decision without remediations', async () => {
     await runGenerateCommentBodyTest(

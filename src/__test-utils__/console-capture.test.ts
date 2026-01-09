@@ -35,6 +35,17 @@ const snapshotConsole = () => ({
   info: console.info,
 });
 
+function expectConsoleRestored(original: ReturnType<typeof snapshotConsole>) {
+  // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
+  expect(console.log).toBe(original.log);
+  // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
+  expect(console.error).toBe(original.error);
+  // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
+  expect(console.warn).toBe(original.warn);
+  // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
+  expect(console.info).toBe(original.info);
+}
+
 describe('Console capture', () => {
   function runBasicCaptureTest(
     testName: string,
@@ -53,17 +64,6 @@ describe('Console capture', () => {
       expect(accessor()).toContain(message);
       restore();
     });
-  }
-
-  function expectConsoleRestored(original: ReturnType<typeof snapshotConsole>) {
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.log).toBe(original.log);
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.error).toBe(original.error);
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.warn).toBe(original.warn);
-    // biome-ignore lint/suspicious/noConsole: intentional for testing console capture
-    expect(console.info).toBe(original.info);
   }
 
   runBasicCaptureTest('captures console.log output', 'log', 'test message', getLogs);

@@ -20,6 +20,12 @@ async function readLog(linterId: string): Promise<string> {
   return readFile(p, 'utf8');
 }
 
+async function parseFirstStructuredLog(linterId: string) {
+  const out = await readLog(linterId);
+  const lines = out.trim().split('\n');
+  return JSON.parse(lines[0]);
+}
+
 // Helper to mock fs with write failures
 async function mockFsWithWriteFailure() {
   const actual = await vi.importActual('node:fs');
@@ -402,12 +408,6 @@ describe('Political Sphere — Logger', () => {
   });
 
   describe('trace context support', () => {
-    async function parseFirstStructuredLog(linterId: string) {
-      const out = await readLog(linterId);
-      const lines = out.trim().split('\n');
-      return JSON.parse(lines[0]);
-    }
-
     it('includes trace ID in normalizing mode', async () => {
       vi.useFakeTimers();
       vi.setSystemTime(fixedDate);

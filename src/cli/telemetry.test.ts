@@ -7,19 +7,19 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getGlobalTelemetry, resetGlobalTelemetry, TelemetryCollector } from './telemetry.ts';
 import { createTraceContext } from './tracing.ts';
 
-describe('Political Sphere — Telemetry', () => {
-  function recordOneMetric(
-    collector: TelemetryCollector,
-    linter = 'eslint',
-    bytes = 1,
-    success = true,
-  ) {
-    const ctx = createTraceContext();
-    const exec = collector.startExecution(linter, ctx);
-    collector.recordExecution(exec, bytes, success);
-    return ctx;
-  }
+function recordOneMetric(
+  collector: TelemetryCollector,
+  linter = 'eslint',
+  bytes = 1,
+  success = true,
+) {
+  const ctx = createTraceContext();
+  const exec = collector.startExecution(linter, ctx);
+  collector.recordExecution(exec, bytes, success);
+  return ctx;
+}
 
+describe('Political Sphere — Telemetry', () => {
   describe('TelemetryCollector', () => {
     let collector: TelemetryCollector;
 
