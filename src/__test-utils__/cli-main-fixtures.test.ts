@@ -123,15 +123,16 @@ describe('CLI test utils (explicit temp handling)', () => {
 
 /**
  * Direct unit coverage for pure normalisation logic.
+ * Uses synthetic, non-environmental strings to avoid OS coupling.
  */
 describe('normaliseTmpDir (direct unit coverage)', () => {
   it('removes a trailing slash when present', () => {
-    expect(normaliseTmpDir('/tmp/')).toBe('/tmp');
-    expect(normaliseTmpDir('/custom/path/')).toBe('/custom/path');
+    expect(normaliseTmpDir('alpha/')).toBe('alpha');
+    expect(normaliseTmpDir('example-path/')).toBe('example-path');
   });
 
   it('returns the input unchanged when no trailing slash is present', () => {
-    expect(normaliseTmpDir('/tmp')).toBe('/tmp');
-    expect(normaliseTmpDir('/custom/path')).toBe('/custom/path');
+    expect(normaliseTmpDir('alpha')).toBe('alpha');
+    expect(normaliseTmpDir('example-path')).toBe('example-path');
   });
 });
