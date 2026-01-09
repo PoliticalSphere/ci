@@ -9,7 +9,7 @@ import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { appendToLog, createLogger, makeLogOptions } from './logger.ts';
-import { createTraceContext } from './tracing.ts';
+import { createChildTraceContext, createTraceContext } from './tracing.ts';
 
 const fixedDate = new Date('2024-01-01T00:00:00.000Z');
 
@@ -493,8 +493,8 @@ describe('Political Sphere — Logger', () => {
       vi.useFakeTimers();
       vi.setSystemTime(fixedDate);
 
-      const traceContext = createTraceContext();
-      traceContext.parentSpanId = 'parent-span-1234';
+      const parent = { ...createTraceContext(), spanId: 'parent-span-1234' };
+      const traceContext = createChildTraceContext(parent);
 
       const logger = await createLogger({
         logDir: tempDir,
@@ -520,8 +520,8 @@ describe('Political Sphere — Logger', () => {
       vi.useFakeTimers();
       vi.setSystemTime(fixedDate);
 
-      const traceContext = createTraceContext();
-      traceContext.parentSpanId = 'parent123456789abcde';
+      const parent = { ...createTraceContext(), spanId: 'parent123456789abcde' };
+      const traceContext = createChildTraceContext(parent);
 
       const logger = await createLogger({
         logDir: tempDir,
