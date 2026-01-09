@@ -96,8 +96,25 @@ const renderNode = (node: unknown): string => {
   return '';
 };
 
-async function loadUiModule() {
-  vi.resetModules();
+// Helper to create ink render implementation
+const createInkRenderImpl = () => (node: unknown) => {
+  const root = node;
+  const performRender = () => {
+    hookIndex = 0;
+    effectQueue = [];
+    const output = renderNode(root);
+    outputFrames.push(output);
+    for (const effect of effectQueue) {
+      effect();
+    }
+  };
+  rerender = performRender;
+  performRender();
+  return { unmount: () => {} };
+};
+
+// Helper to set up React mocks
+const setupReactMocks = () => {
   vi.doMock('react', () => ({
     __esModule: true,
     default: { createElement, Fragment },
@@ -108,27 +125,58 @@ async function loadUiModule() {
     useCallback: <T>(callback: T) => callback,
     useState,
   }));
+};
+
+// Helper to set up Ink mocks
+const setupInkMocks = () => {
   vi.doMock('ink', async () => {
-    return createInkMock((node: unknown) => {
-      const root = node;
-      const performRender = () => {
-        hookIndex = 0;
-        effectQueue = [];
-        const output = renderNode(root);
-        outputFrames.push(output);
-        for (const effect of effectQueue) {
-          effect();
-        }
-      };
-      rerender = performRender;
-      performRender();
-      return { unmount: () => {} };
-    });
+    return createInkMock(createInkRenderImpl());
+  });
+};
+
+// Helper to set up Ink Spinner mocks
+const setupInkSpinnerMocks = () => {
+  vi.doMock('ink-spinner', () => ({
+    __esModule: true,
+    default: () => 'spinner',
+  }));
+};
+
+// Helper to set up mocks for buffer test with custom render
+const setupBufferTestMocks = (
+  captureSubscribe: (subscribe: (l: (id: string, status: string) => void) => void) => void,
+) => {
+  vi.doMock('react', () => ({
+    __esModule: true,
+    default: { createElement, Fragment },
+    createElement,
+    Fragment,
+    useEffect: (effect: () => undefined | (() => void)) => {
+      effectQueue.push(() => effect());
+    },
+    useMemo: <T>(factory: () => T) => factory(),
+    useCallback: <T>(callback: T) => callback,
+    useState,
+  }));
+  vi.doMock('ink', async () => {
+    return {
+      __esModule: true,
+      Box: ({ children }: { children?: unknown }) => children ?? null,
+      Text: ({ children }: { children?: unknown }) => children ?? null,
+      render: createInkRenderForBufferTest(captureSubscribe),
+    };
   });
   vi.doMock('ink-spinner', () => ({
     __esModule: true,
     default: () => 'spinner',
   }));
+};
+
+async function loadUiModule() {
+  vi.resetModules();
+  setupReactMocks();
+  setupInkMocks();
+  setupInkSpinnerMocks();
   return import('./ui.tsx');
 }
 
@@ -403,30 +451,8 @@ describe('Political Sphere — UI', () => {
       capturedSubscribe = subscribe;
     };
 
-    vi.doMock('react', () => ({
-      __esModule: true,
-      default: { createElement, Fragment },
-      createElement,
-      Fragment,
-      useEffect: (effect: () => undefined | (() => void)) => {
-        effectQueue.push(() => effect());
-      },
-      useMemo: <T>(factory: () => T) => factory(),
-      useCallback: <T>(callback: T) => callback,
-      useState,
-    }));
-    vi.doMock('ink', async () => {
-      return {
-        __esModule: true,
-        Box: ({ children }: { children?: unknown }) => children ?? null,
-        Text: ({ children }: { children?: unknown }) => children ?? null,
-        render: createInkRenderForBufferTest(captureSubscribe),
-      };
-    });
-    vi.doMock('ink-spinner', () => ({
-      __esModule: true,
-      default: () => 'spinner',
-    }));
+    // Set up mock modules for buffer test
+    setupBufferTestMocks(captureSubscribe);
 
     const { renderDashboard } = await import('./ui.tsx');
     const linters: LinterConfig[] = [makeLinter('test', 'Test')];
