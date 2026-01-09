@@ -9,8 +9,7 @@
  *   - Verifies that mock factories and bundled options behave as expected.
  */
 
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
-import path from 'node:path';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import tmp from 'tmp';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -29,10 +28,8 @@ describe('CLI test utils', () => {
 
     expect(options.console).toBeUndefined();
 
-    const tmpobj = tmp.fileSync(); // Compliant
-    tmpobj.removeCallback(); // Clean up the temp file
-    const testTmpDir = `${path.dirname(tmpobj.name)}/test-${Date.now()}`;
-    mkdirSync(testTmpDir, { recursive: true });
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
+    const testTmpDir = tmpobj.name;
 
     try {
       mkdirSync(`${testTmpDir}/logs`, { recursive: true });
@@ -56,7 +53,7 @@ describe('CLI test utils', () => {
       const results = await executeLintersFn([], { logDir: testLogDir });
       expect(results[0]?.logPath).toBe(`${testLogDir}/eslint.log`);
     } finally {
-      rmSync(testTmpDir, { recursive: true, force: true });
+      tmpobj.removeCallback();
     }
   });
 
@@ -85,9 +82,10 @@ describe('CLI test utils', () => {
 
   it('handles TMPDIR with trailing slash correctly', async () => {
     const originalTmpDir = process.env.TMPDIR;
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     try {
       // Set TMPDIR with trailing slash
-      process.env.TMPDIR = '/tmp/test/';
+      process.env.TMPDIR = `${tmpobj.name}/`;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
       // Verify options.cwd doesn't have double slashes
@@ -103,37 +101,42 @@ describe('CLI test utils', () => {
     } finally {
       // Restore original TMPDIR
       if (originalTmpDir === undefined) {
-        process.env.TMPDIR = undefined;
+        // biome-ignore lint/performance/noDelete: Required to restore environment state
+        delete process.env.TMPDIR;
       } else {
         process.env.TMPDIR = originalTmpDir;
       }
+      tmpobj.removeCallback();
     }
   });
 
   it('handles TMPDIR without trailing slash correctly', async () => {
     const originalTmpDir = process.env.TMPDIR;
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     try {
       // Set TMPDIR without trailing slash
-      process.env.TMPDIR = '/tmp/test';
+      process.env.TMPDIR = tmpobj.name;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
       // Verify options.cwd is set correctly
       expect(options.cwd).toBeDefined();
       expect(typeof options.cwd).toBe('string');
-      expect(options.cwd).toContain('/tmp/test/');
+      expect(options.cwd).toContain(tmpobj.name);
 
       // Verify lock path is set correctly
       const lock = await acquireExecutionLockFn();
       expect(lock.lockPath).toBeDefined();
       expect(typeof lock.lockPath).toBe('string');
-      expect(lock.lockPath).toContain('/tmp/test/');
+      expect(lock.lockPath).toContain(tmpobj.name);
     } finally {
       // Restore original TMPDIR
       if (originalTmpDir === undefined) {
-        process.env.TMPDIR = undefined;
+        // biome-ignore lint/performance/noDelete: Required to restore environment state
+        delete process.env.TMPDIR;
       } else {
         process.env.TMPDIR = originalTmpDir;
       }
+      tmpobj.removeCallback();
     }
   });
 
@@ -158,7 +161,8 @@ describe('CLI test utils', () => {
     } finally {
       // Restore original TMPDIR
       if (originalTmpDir === undefined) {
-        process.env.TMPDIR = undefined;
+        // biome-ignore lint/performance/noDelete: Required to restore environment state
+        delete process.env.TMPDIR;
       } else {
         process.env.TMPDIR = originalTmpDir;
       }

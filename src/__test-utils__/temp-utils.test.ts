@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import path from 'node:path';
+import tmp from 'tmp';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
@@ -97,44 +98,52 @@ describe('temp utils', () => {
 
   it('getTempDir handles both ternary branches', () => {
     // Test the exact logic from getTempDir by simulating both inputs
-    const testCasesWithSlash = '/tmp/';
+    const tmpobj1 = tmp.dirSync({ unsafeCleanup: true }); // Compliant
+    const testCasesWithSlash = `${tmpobj1.name}/`;
     const resultWithSlash = testCasesWithSlash.endsWith('/')
       ? testCasesWithSlash.slice(0, -1)
       : testCasesWithSlash;
-    expect(resultWithSlash).toBe('/tmp');
+    expect(resultWithSlash).toBe(tmpobj1.name);
+    tmpobj1.removeCallback();
 
-    const testCasesNoSlash = '/tmp';
+    const tmpobj2 = tmp.dirSync({ unsafeCleanup: true }); // Compliant
+    const testCasesNoSlash = tmpobj2.name;
     const resultNoSlash = testCasesNoSlash.endsWith('/')
       ? testCasesNoSlash.slice(0, -1)
       : testCasesNoSlash;
-    expect(resultNoSlash).toBe('/tmp');
+    expect(resultNoSlash).toBe(tmpobj2.name);
+    tmpobj2.removeCallback();
   });
 
   it('getTempDir normalizes path with trailing slash', async () => {
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     // Mock os.tmpdir to return path with trailing slash
     vi.doMock('node:os', () => ({
-      tmpdir: () => '/tmp/',
+      tmpdir: () => `${tmpobj.name}/`,
     }));
 
     // Re-import the function with mocked tmpdir
     const { getTempDir: getTempDirMocked } = await import('./temp-utils.ts');
     const result = getTempDirMocked();
 
-    expect(result).toBe('/tmp');
+    expect(result).toBe(tmpobj.name);
     expect(result.endsWith('/')).toBe(false);
+    tmpobj.removeCallback();
   });
 
   it('getTempDir preserves path without trailing slash', async () => {
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
     // Mock os.tmpdir to return path without trailing slash
     vi.doMock('node:os', () => ({
-      tmpdir: () => '/tmp',
+      tmpdir: () => tmpobj.name,
     }));
 
     // Re-import the function with mocked tmpdir
     const { getTempDir: getTempDirMocked } = await import('./temp-utils.ts');
     const result = getTempDirMocked();
 
-    expect(result).toBe('/tmp');
+    expect(result).toBe(tmpobj.name);
     expect(result.endsWith('/')).toBe(false);
+    tmpobj.removeCallback();
   });
 });
