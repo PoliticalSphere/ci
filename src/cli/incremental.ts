@@ -52,10 +52,10 @@ interface IncrementalExecutionDecision {
  * Track file changes for incremental linting.
  */
 export class IncrementalExecutionTracker {
-  private lastChangeCheckTime: Map<string, number> = new Map();
-  private lastChangeHash: Map<string, string> = new Map();
-  private linterPatterns: Map<string, LinterFilePattern> = new Map();
-  private gitAvailable: boolean;
+  private readonly lastChangeCheckTime: Map<string, number> = new Map();
+  private readonly lastChangeHash: Map<string, string> = new Map();
+  private readonly linterPatterns: Map<string, LinterFilePattern> = new Map();
+  private readonly gitAvailable: boolean;
 
   constructor() {
     this.gitAvailable = this.isGitAvailable();

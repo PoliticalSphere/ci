@@ -2,6 +2,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('node:child_process', () => ({ execFileSync: vi.fn() }));
 vi.mock('node:fs', () => ({ readFileSync: vi.fn(), writeFileSync: vi.fn() }));
+vi.mock('node:https', () => ({
+  default: {
+    get: vi.fn(),
+    request: vi.fn(),
+  },
+}));
 vi.mock('../src/policy/decision.ts', () => ({
   evaluatePolicy: vi.fn(),
   generateMarkdownSummary: vi.fn(),
@@ -9,6 +15,10 @@ vi.mock('../src/policy/decision.ts', () => ({
 }));
 
 type EvaluatePolicyOutput = import('../src/policy/decision.ts').EvaluatePolicyOutput;
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared test fixtures and helpers to reduce duplication
+// ─────────────────────────────────────────────────────────────────────────────
 
 const NO_RULES_DECISION_TRAIL: EvaluatePolicyOutput['result']['decisionTrail'] = [
   {
@@ -18,6 +28,31 @@ const NO_RULES_DECISION_TRAIL: EvaluatePolicyOutput['result']['decisionTrail'] =
     detail: 'No policy violations detected',
   },
 ];
+
+const DEFAULT_ATTESTATION = {
+  ai: {
+    attestation: {
+      declared: false,
+      reviewed: false,
+      noSecrets: false,
+      alignsWithStandards: false,
+      locallyTested: false,
+    },
+    validation: { valid: true, missing: [], warnings: [] },
+  },
+  highRisk: {
+    attestation: {
+      declared: false,
+      understood: false,
+      securityReviewed: false,
+      noPrivilegeEscalation: false,
+      documented: false,
+      rollbackPlan: false,
+      monitoringCommitment: false,
+    },
+    validation: { valid: true, missing: [], warnings: [] },
+  },
+};
 
 function makePolicyOutput(
   decision: EvaluatePolicyOutput['result']['decision'],
@@ -38,34 +73,8 @@ function makePolicyOutput(
         rationale: [],
       },
     },
-    classification: {
-      tier: 'low',
-      paths: [],
-      reasons: [],
-      ...classification,
-    },
-    ai: {
-      attestation: {
-        declared: false,
-        reviewed: false,
-        noSecrets: false,
-        alignsWithStandards: false,
-        locallyTested: false,
-      },
-      validation: { valid: true, missing: [], warnings: [] },
-    },
-    highRisk: {
-      attestation: {
-        declared: false,
-        understood: false,
-        securityReviewed: false,
-        noPrivilegeEscalation: false,
-        documented: false,
-        rollbackPlan: false,
-        monitoringCommitment: false,
-      },
-      validation: { valid: true, missing: [], warnings: [] },
-    },
+    classification: { tier: 'low', paths: [], reasons: [], ...classification },
+    ...DEFAULT_ATTESTATION,
   };
 }
 
@@ -73,8 +82,183 @@ const getMocks = async () => {
   const childProcess = await import('node:child_process');
   const fs = await import('node:fs');
   const policy = await import('../src/policy/decision.ts');
-  return { childProcess, fs, policy };
+  const https = await import('node:https');
+  return { childProcess, fs, policy, https };
 };
+
+/** Create a mock GitHub event JSON for pull request */
+function createPREvent(
+  opts: {
+    body?: string;
+    base?: string;
+    head?: string;
+    number?: number;
+    owner?: string;
+    repo?: string;
+  } = {},
+) {
+  return JSON.stringify({
+    pull_request: {
+      body: opts.body ?? 'test body',
+      base: { sha: opts.base ?? 'base-sha' },
+      head: { sha: opts.head ?? 'head-sha' },
+      number: opts.number ?? 123,
+    },
+    repository: { owner: { login: opts.owner ?? 'test-owner' }, name: opts.repo ?? 'test-repo' },
+  });
+}
+
+/** Create a minimal mock event emitter for https response */
+function createMockResponse(statusCode: number, data: string) {
+  const handlers: Record<string, ((chunk: unknown) => void)[]> = {};
+  const response = {
+    statusCode,
+    on(event: string, handler: (chunk: unknown) => void) {
+      handlers[event] = handlers[event] ?? [];
+      handlers[event].push(handler);
+      if (event === 'end') {
+        // Schedule data and end events
+        setImmediate(() => {
+          for (const h of handlers.data ?? []) {
+            h(Buffer.from(data));
+          }
+          for (const h of handlers.end ?? []) {
+            h(undefined);
+          }
+        });
+      }
+      return this;
+    },
+  };
+  return response;
+}
+
+/** Mock https.get to return success with given JSON data */
+function mockHttpsGetSuccess(
+  httpsMock: typeof import('node:https'),
+  responses: Record<string, unknown>,
+) {
+  vi.mocked(httpsMock.default.get).mockImplementation(
+    (options: { path?: string }, callback: (res: unknown) => void) => {
+      const path = typeof options === 'string' ? options : (options?.path ?? '');
+      const responseData = responses[path] ?? { statuses: [], check_runs: [] };
+      const res = createMockResponse(200, JSON.stringify(responseData));
+      setImmediate(() => callback(res));
+      return { on: vi.fn().mockReturnThis() } as unknown as ReturnType<
+        typeof httpsMock.default.get
+      >;
+    },
+  );
+}
+
+/** Mock https.get to return non-200 status (error case) */
+function mockHttpsGetNon200(httpsMock: typeof import('node:https'), statusCode: number) {
+  vi.mocked(httpsMock.default.get).mockImplementation(
+    (_options: unknown, callback: (res: unknown) => void) => {
+      const res = createMockResponse(statusCode, 'Not Found');
+      setImmediate(() => callback(res));
+      return { on: vi.fn().mockReturnThis() } as unknown as ReturnType<
+        typeof httpsMock.default.get
+      >;
+    },
+  );
+}
+
+/** Mock https.get to trigger network error */
+function mockHttpsGetError(httpsMock: typeof import('node:https'), immediate = false) {
+  vi.mocked(httpsMock.default.get).mockImplementation(() => {
+    return {
+      on: (event: string, handler: (e?: Error) => void) => {
+        if (event === 'error') {
+          if (immediate) {
+            handler(new Error('Network error'));
+          } else {
+            setImmediate(() => handler(new Error('Network error')));
+          }
+        }
+        return { on: vi.fn() };
+      },
+    } as unknown as ReturnType<typeof httpsMock.default.get>;
+  });
+}
+
+/** Mock https.request for comment posting */
+function mockHttpsRequestResult(httpsMock: typeof import('node:https'), statusCode: number) {
+  vi.mocked(httpsMock.default.request).mockImplementation(
+    (_options: unknown, callback: (res: unknown) => void) => {
+      const res = createMockResponse(statusCode, statusCode === 201 ? '{}' : 'Error response');
+      setImmediate(() => callback(res));
+      return {
+        on: vi.fn().mockReturnThis(),
+        write: vi.fn(),
+        end: vi.fn(),
+      } as unknown as ReturnType<typeof httpsMock.default.request>;
+    },
+  );
+}
+
+/** Setup standard policy mocks for allow/warn/deny */
+function setupPolicyMocks(
+  policy: Awaited<ReturnType<typeof getMocks>>['policy'],
+  decision: 'allow' | 'warn' | 'deny',
+  changedCount = 1,
+) {
+  const out = makePolicyOutput(decision, changedCount);
+  vi.mocked(policy.evaluatePolicy).mockReturnValueOnce(out);
+  vi.mocked(policy.serializeToJSON).mockReturnValueOnce(`{"decision":"${decision}"}`);
+  vi.mocked(policy.generateMarkdownSummary).mockReturnValueOnce(`# ${decision}`);
+  return out;
+}
+
+interface TestSetupOpts {
+  prEvent?: string;
+  changedFiles?: string;
+  decision?: 'allow' | 'warn' | 'deny';
+  withToken?: boolean;
+  gitFails?: boolean;
+}
+
+/** Setup common test scenario with PR event, git changes, and policy decision */
+async function setupTestScenario(opts: TestSetupOpts = {}) {
+  const {
+    prEvent = createPREvent(),
+    changedFiles = 'src/file.ts\n',
+    decision = 'allow',
+    withToken = false,
+    gitFails = false,
+  } = opts;
+
+  const consoleLogs = vi.spyOn(console, 'log').mockImplementation(() => {});
+  const consoleErrors = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+  vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
+  if (withToken) {
+    vi.stubEnv('GITHUB_TOKEN', 'fake-token');
+  }
+
+  const mocks = await getMocks();
+  vi.mocked(mocks.fs.readFileSync).mockReturnValueOnce(prEvent);
+
+  if (gitFails) {
+    vi.mocked(mocks.childProcess.execFileSync).mockImplementation(() => {
+      throw new Error('git failed');
+    });
+  } else {
+    vi.mocked(mocks.childProcess.execFileSync).mockReturnValueOnce(changedFiles);
+  }
+
+  setupPolicyMocks(mocks.policy, decision);
+
+  return {
+    ...mocks,
+    consoleLogs,
+    consoleErrors,
+    cleanup: () => {
+      consoleLogs.mockRestore();
+      consoleErrors.mockRestore();
+    },
+  };
+}
 
 describe('scripts/policy-evaluate.ts', () => {
   beforeEach(() => {
@@ -95,7 +279,7 @@ describe('scripts/policy-evaluate.ts', () => {
     );
 
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
+    const code = await main();
 
     expect(code).toBe(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -108,7 +292,7 @@ describe('scripts/policy-evaluate.ts', () => {
     const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
 
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
+    const code = await main();
 
     expect(code).toBe(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -125,7 +309,7 @@ describe('scripts/policy-evaluate.ts', () => {
     });
 
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
+    const code = await main();
 
     expect(code).toBe(1);
     expect(consoleErrorSpy).toHaveBeenCalled();
@@ -134,116 +318,255 @@ describe('scripts/policy-evaluate.ts', () => {
   });
 
   it('returns 0 and writes outputs for ALLOW decisions (even when git diff fails)', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
-    const { childProcess, fs, policy } = await getMocks();
-    vi.mocked(fs.readFileSync).mockReturnValueOnce(
-      JSON.stringify({
+    const { fs, policy, consoleLogs, cleanup } = await setupTestScenario({
+      prEvent: JSON.stringify({
         pull_request: { body: 'pr body', base: { sha: 'base' }, head: { sha: 'head' } },
       }),
-    );
-
-    vi.mocked(childProcess.execFileSync).mockImplementation(() => {
-      throw new Error('git failed');
+      gitFails: true,
     });
 
-    const outAllow = makePolicyOutput('allow', 0);
-    vi.mocked(policy.evaluatePolicy).mockReturnValueOnce(outAllow);
-    vi.mocked(policy.serializeToJSON).mockReturnValueOnce('{"decision":"allow"}');
-    vi.mocked(policy.generateMarkdownSummary).mockReturnValueOnce('# ok');
-
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
+    const code = await main();
 
     expect(code).toBe(0);
-    expect(policy.evaluatePolicy).toHaveBeenCalledWith({ prBody: 'pr body', changedFiles: [] });
-
+    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
+      prBody: 'pr body',
+      changedFiles: [],
+      failedCIChecks: [],
+    });
     const writes = vi.mocked(fs.writeFileSync).mock.calls.map((c) => String(c[0]));
     expect(writes.some((p) => p.endsWith('policy.decision.json'))).toBe(true);
     expect(writes.some((p) => p.endsWith('policy.summary.md'))).toBe(true);
-    expect(consoleLogSpy).toHaveBeenCalledWith('Policy decision: ALLOW');
+    expect(consoleLogs).toHaveBeenCalledWith('Policy decision: ALLOW');
 
-    consoleLogSpy.mockRestore();
+    cleanup();
   });
 
   it('returns 0 for WARN decisions', async () => {
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
-    const { childProcess, fs, policy } = await getMocks();
-    vi.mocked(fs.readFileSync).mockReturnValueOnce(
-      JSON.stringify({ pull_request: { body: '', base: { sha: 'b' }, head: { sha: 'h' } } }),
-    );
-
-    vi.mocked(childProcess.execFileSync).mockReturnValueOnce('src/file.ts\n');
-
-    const outWarn = makePolicyOutput('warn', 1, { paths: ['p'], reasons: ['r'] });
-    vi.mocked(policy.evaluatePolicy).mockReturnValueOnce(outWarn);
-    vi.mocked(policy.serializeToJSON).mockReturnValueOnce('{"decision":"warn"}');
-    vi.mocked(policy.generateMarkdownSummary).mockReturnValueOnce('# warn');
+    const { consoleLogs, cleanup } = await setupTestScenario({ decision: 'warn' });
 
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
+    expect(await main()).toBe(0);
+    expect(consoleLogs).toHaveBeenCalledWith('Policy decision: WARN');
 
-    expect(code).toBe(0);
-    expect(consoleLogSpy).toHaveBeenCalledWith('Policy decision: WARN');
-
-    consoleLogSpy.mockRestore();
+    cleanup();
   });
 
   it('returns 1 for DENY decisions and still attempts to write outputs', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
-    const { childProcess, fs, policy } = await getMocks();
-    vi.mocked(fs.readFileSync).mockReturnValueOnce(
-      JSON.stringify({ pull_request: { body: '', base: { sha: 'b' }, head: { sha: 'h' } } }),
-    );
-
-    vi.mocked(childProcess.execFileSync).mockReturnValueOnce('src/file.ts\n');
-
-    const outDeny = makePolicyOutput('deny', 1);
-    vi.mocked(policy.evaluatePolicy).mockReturnValueOnce(outDeny);
-    vi.mocked(policy.serializeToJSON).mockReturnValueOnce('{"decision":"deny"}');
-    vi.mocked(policy.generateMarkdownSummary).mockReturnValueOnce('# deny');
+    const { fs, consoleErrors, cleanup } = await setupTestScenario({ decision: 'deny' });
 
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
-
-    expect(code).toBe(1);
-    expect(consoleErrorSpy).toHaveBeenCalledWith('Policy decision: DENY');
+    expect(await main()).toBe(1);
+    expect(consoleErrors).toHaveBeenCalledWith('Policy decision: DENY');
     expect(vi.mocked(fs.writeFileSync)).toHaveBeenCalled();
 
-    consoleErrorSpy.mockRestore();
+    cleanup();
   });
 
   it('logs write errors but does not throw', async () => {
-    const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-    const consoleLogSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
-    vi.stubEnv('GITHUB_EVENT_PATH', '/tmp/event.json');
-    const { childProcess, fs, policy } = await getMocks();
-    vi.mocked(fs.readFileSync).mockReturnValueOnce(
-      JSON.stringify({ pull_request: { body: '', base: { sha: 'b' }, head: { sha: 'h' } } }),
-    );
-    vi.mocked(childProcess.execFileSync).mockReturnValueOnce('src/file.ts\n');
-
-    const outAllow2 = makePolicyOutput('allow', 1);
-    vi.mocked(policy.evaluatePolicy).mockReturnValueOnce(outAllow2);
-    vi.mocked(policy.serializeToJSON).mockReturnValueOnce('{"decision":"allow"}');
-    vi.mocked(policy.generateMarkdownSummary).mockReturnValueOnce('# ok');
-
+    const { fs, consoleErrors, cleanup } = await setupTestScenario();
     vi.mocked(fs.writeFileSync).mockImplementationOnce(() => {
       throw new Error('disk full');
     });
 
     const { main } = await import('./policy-evaluate.ts');
-    const code = main();
-
-    expect(code).toBe(0);
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
+    expect(await main()).toBe(0);
+    expect(consoleErrors).toHaveBeenCalledWith(
       expect.stringContaining('Failed to write'),
       expect.any(Error),
     );
 
-    consoleErrorSpy.mockRestore();
-    consoleLogSpy.mockRestore();
+    cleanup();
+  });
+
+  it('fetches CI checks and includes failures in policy evaluation', async () => {
+    const { https, policy, cleanup } = await setupTestScenario({ withToken: true });
+
+    mockHttpsGetError(https);
+
+    const { main } = await import('./policy-evaluate.ts');
+    expect(await main()).toBe(0);
+    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
+      prBody: 'test body',
+      changedFiles: ['src/file.ts'],
+      failedCIChecks: [],
+    });
+
+    cleanup();
+  });
+
+  it('handles GitHub API errors gracefully', async () => {
+    const { https, policy, consoleErrors, cleanup } = await setupTestScenario({ withToken: true });
+
+    mockHttpsGetError(https, true);
+
+    const { main } = await import('./policy-evaluate.ts');
+    expect(await main()).toBe(0);
+    expect(consoleErrors).toHaveBeenCalledWith('Failed to fetch CI checks:', expect.any(Error));
+    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
+      prBody: 'test body',
+      changedFiles: ['src/file.ts'],
+      failedCIChecks: [],
+    });
+
+    cleanup();
+  });
+
+  it('successfully fetches failed CI checks from GitHub API', async () => {
+    const { https, policy, cleanup } = await setupTestScenario({ withToken: true });
+
+    mockHttpsGetSuccess(https, {
+      '/repos/test-owner/test-repo/commits/head-sha/status': {
+        statuses: [
+          { context: 'SonarQube', state: 'failure' },
+          { context: 'CodeQL', state: 'error' },
+          { context: 'Passing Check', state: 'success' },
+        ],
+      },
+      '/repos/test-owner/test-repo/commits/head-sha/check-runs': {
+        check_runs: [
+          { name: 'Build', conclusion: 'failure' },
+          { name: 'Lint', conclusion: 'cancelled' },
+          { name: 'Tests', conclusion: 'success' },
+        ],
+      },
+    });
+
+    const { main } = await import('./policy-evaluate.ts');
+    expect(await main()).toBe(0);
+    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
+      prBody: 'test body',
+      changedFiles: ['src/file.ts'],
+      failedCIChecks: ['SonarQube', 'CodeQL', 'Build', 'Lint'],
+    });
+
+    cleanup();
+  });
+
+  it('handles non-200 GitHub API status codes gracefully', async () => {
+    const { https, policy, consoleErrors, cleanup } = await setupTestScenario({ withToken: true });
+
+    mockHttpsGetNon200(https, 404);
+
+    const { main } = await import('./policy-evaluate.ts');
+    expect(await main()).toBe(0);
+    expect(consoleErrors).toHaveBeenCalledWith('Failed to fetch CI checks:', expect.any(Error));
+    expect(policy.evaluatePolicy).toHaveBeenCalledWith({
+      prBody: 'test body',
+      changedFiles: ['src/file.ts'],
+      failedCIChecks: [],
+    });
+
+    cleanup();
+  });
+
+  it('posts comment to PR on successful comment posting', async () => {
+    const { https, consoleLogs, cleanup } = await setupTestScenario({ withToken: true });
+
+    mockHttpsGetSuccess(https, {});
+    mockHttpsRequestResult(https, 201);
+
+    const { main } = await import('./policy-evaluate.ts');
+    expect(await main()).toBe(0);
+    expect(consoleLogs).toHaveBeenCalledWith('Posted policy decision comment to PR');
+    expect(https.default.request).toHaveBeenCalled();
+
+    cleanup();
+  });
+
+  it('handles comment posting failure gracefully', async () => {
+    const { https, consoleLogs, consoleErrors, cleanup } = await setupTestScenario({
+      withToken: true,
+    });
+
+    mockHttpsGetSuccess(https, {});
+    mockHttpsRequestResult(https, 403);
+
+    const { main } = await import('./policy-evaluate.ts');
+    expect(await main()).toBe(0);
+    expect(consoleErrors).toHaveBeenCalledWith('Failed to post PR comment:', expect.any(Error));
+    expect(consoleLogs).not.toHaveBeenCalledWith('Posted policy decision comment to PR');
+
+    cleanup();
+  });
+
+  it('generateCommentBody formats violations with remediations correctly', async () => {
+    const { generateCommentBody } = await import('./policy-evaluate.ts');
+
+    const violations = [
+      {
+        code: 'TEST_ERROR',
+        message: 'Error message',
+        severity: 'error',
+        remediation: 'Fix the error',
+      },
+      {
+        code: 'TEST_WARNING',
+        message: 'Warning message',
+        severity: 'warning',
+        remediation: 'Fix the warning',
+      },
+    ];
+
+    const body = generateCommentBody('deny', violations, '# Summary');
+
+    expect(body).toContain('Policy Decision: DENY');
+    expect(body).toContain('TEST_ERROR');
+    expect(body).toContain('Error message');
+    expect(body).toContain('TEST_WARNING');
+    expect(body).toContain('Warning message');
+    expect(body).toContain('### Remediation');
+    expect(body).toContain('Fix the error');
+    expect(body).toContain('Fix the warning');
+    expect(body).toContain('# Summary');
+  });
+
+  it('generateCommentBody formats deny decision without remediations', async () => {
+    const { generateCommentBody } = await import('./policy-evaluate.ts');
+
+    const violations = [
+      {
+        code: 'NO_REMEDY',
+        message: 'Issue without fix',
+        severity: 'error',
+      },
+    ];
+
+    const body = generateCommentBody('deny', violations, '# Summary');
+
+    expect(body).toContain('❌');
+    expect(body).toContain('Policy Decision: DENY');
+    expect(body).toContain('NO_REMEDY');
+    expect(body).not.toContain('### Remediation');
+  });
+
+  it('generateCommentBody formats allow decision', async () => {
+    const { generateCommentBody } = await import('./policy-evaluate.ts');
+
+    const body = generateCommentBody('allow', [], '# All good');
+
+    expect(body).toContain('✅');
+    expect(body).toContain('Policy Decision: ALLOW');
+    expect(body).not.toContain('### Reasons');
+    expect(body).toContain('# All good');
+  });
+
+  it('generateCommentBody formats warn decision with violations', async () => {
+    const { generateCommentBody } = await import('./policy-evaluate.ts');
+
+    const violations = [
+      {
+        code: 'WARN_CODE',
+        message: 'Warning issue',
+        severity: 'warning',
+      },
+    ];
+
+    const body = generateCommentBody('warn', violations, '# Warning');
+
+    expect(body).toContain('⚠️');
+    expect(body).toContain('Policy Decision: WARN');
+    expect(body).toContain('WARN_CODE');
+    expect(body).toContain('Warning issue');
   });
 });

@@ -79,6 +79,7 @@ describe('Policy Engine Public API', () => {
     expect(policyExports.VIOLATION_AI_ATTESTATION_NEAR_MATCH).toBeDefined();
     expect(policyExports.VIOLATION_HIGH_RISK_ATTESTATION_NEAR_MATCH).toBeDefined();
     expect(policyExports.VIOLATION_CHECKBOX_FORMAT_ISSUE).toBeDefined();
+    expect(policyExports.VIOLATION_CI_CHECK_FAILURE).toBeDefined();
   });
 
   it('exports and executes risk classification functions', () => {

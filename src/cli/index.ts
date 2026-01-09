@@ -437,8 +437,8 @@ export async function main(deps: MainDeps = {}): Promise<MainResult> {
           JSON.stringify(out, null, 2),
           'utf8',
         );
-      } catch (writeErr) {
-        error('\nWARN: Failed to write telemetry.json:', writeErr);
+      } catch (error_) {
+        error('\nWARN: Failed to write telemetry.json:', error_);
       }
     }
   }

@@ -21,7 +21,7 @@
  * Supports event registration, emission, and listener tracking
  */
 export class MockEmitter {
-  private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
+  private readonly listeners = new Map<string, Array<(...args: unknown[]) => void>>();
 
   /**
    * Register a listener for an event

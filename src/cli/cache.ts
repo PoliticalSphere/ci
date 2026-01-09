@@ -55,9 +55,9 @@ interface SkipCacheEntry extends CacheEntry<{ readonly skip: boolean; readonly r
  * Execution cache for linter operations.
  */
 export class ExecutionCache {
-  private binaries: Map<string, BinaryCacheEntry> = new Map();
-  private versions: Map<string, VersionCacheEntry> = new Map();
-  private skipDecisions: Map<string, SkipCacheEntry> = new Map();
+  private readonly binaries: Map<string, BinaryCacheEntry> = new Map();
+  private readonly versions: Map<string, VersionCacheEntry> = new Map();
+  private readonly skipDecisions: Map<string, SkipCacheEntry> = new Map();
 
   private readonly binaryTtlMs: number;
   private readonly versionTtlMs: number;

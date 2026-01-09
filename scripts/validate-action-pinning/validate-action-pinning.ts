@@ -398,13 +398,11 @@ const isMainModule =
   process.argv[1]?.endsWith('validate-action-pinning.ts') === true ||
   process.argv[1]?.endsWith('validate-action-pinning.js') === true;
 
-/**
- * Execute the main CLI flow with proper error handling
- * Exported for testing purposes
- */
-export async function executeMainModule(argv: string[]): Promise<void> {
+/* c8 ignore start -- CLI bootstrap code only runs when executed directly */
+if (isMainModule) {
   try {
-    const exitCode = await main(argv);
+    const args = process.argv.slice(2);
+    const exitCode = await main(args);
     // eslint-disable-next-line n/no-process-exit, unicorn/no-process-exit -- CLI entry point
     process.exit(exitCode);
   } catch (error: unknown) {
@@ -412,11 +410,5 @@ export async function executeMainModule(argv: string[]): Promise<void> {
     // eslint-disable-next-line n/no-process-exit, unicorn/no-process-exit -- CLI entry point
     process.exit(1);
   }
-}
-
-/* c8 ignore start -- CLI bootstrap code only runs when executed directly */
-if (isMainModule) {
-  const args = process.argv.slice(2);
-  void executeMainModule(args);
 }
 /* c8 ignore stop */

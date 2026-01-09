@@ -76,6 +76,7 @@ export const VIOLATION_AI_ATTESTATION_NEAR_MATCH = 'AI_ATTESTATION_NEAR_MATCH' a
 export const VIOLATION_HIGH_RISK_ATTESTATION_NEAR_MATCH =
   'HIGH_RISK_ATTESTATION_NEAR_MATCH' as const;
 export const VIOLATION_CHECKBOX_FORMAT_ISSUE = 'CHECKBOX_FORMAT_ISSUE' as const;
+export const VIOLATION_CI_CHECK_FAILURE = 'CI_CHECK_FAILURE' as const;
 
 /* -------------------------------------------------------------------------- */
 /* Decision precedence                                                        */
@@ -204,6 +205,7 @@ export function makeDecision(
   aiAssisted: boolean,
   changedFiles: readonly string[],
   timestamp: string,
+  failedCIChecks: readonly string[] = [],
 ): PolicyResult {
   const violations: PolicyViolation[] = [];
   const rationale: string[] = [];
@@ -216,6 +218,25 @@ export function makeDecision(
     decision = escalateDecision(decision, next);
     decisionTrail.push({ rule, before, after: decision, detail });
   };
+
+  // CI check failures (highest priority)
+  if (failedCIChecks.length > 0) {
+    for (const checkName of failedCIChecks) {
+      violations.push({
+        code: VIOLATION_CI_CHECK_FAILURE,
+        severity: 'error',
+        category: 'governance',
+        message: `Required CI check failed: ${checkName}`,
+        remediation: `Fix the issues reported by ${checkName} and ensure all checks pass.`,
+      });
+    }
+    rationale.push(`CI checks failed: ${failedCIChecks.join(', ')}`);
+    recordDecisionStep(
+      VIOLATION_CI_CHECK_FAILURE,
+      `Required CI checks failed (${failedCIChecks.length}): ${failedCIChecks.join(', ')}`,
+      'deny',
+    );
+  }
 
   // AI attestation requirements
   if (aiAssisted && !attestationValid) {
@@ -416,6 +437,7 @@ export interface EvaluatePolicyInput {
   readonly changedFiles: readonly string[];
   readonly timestamp?: string;
   readonly options?: EvaluatePolicyOptions;
+  readonly failedCIChecks?: readonly string[];
 }
 
 export interface EvaluatePolicyOptions {
@@ -459,6 +481,7 @@ export function evaluatePolicy(input: EvaluatePolicyInput): EvaluatePolicyOutput
   const enableNearMatch = opts.enableNearMatchWarnings ?? true;
   const enableFormat = opts.enableCheckboxFormatWarnings ?? true;
   const nearMatchMax = opts.nearMatchMaxDistance;
+  const failedCIChecks = input.failedCIChecks ?? [];
 
   const classification = classifyRisk(changedFiles);
 
@@ -479,6 +502,7 @@ export function evaluatePolicy(input: EvaluatePolicyInput): EvaluatePolicyOutput
     aiAttestation.declared,
     changedFiles,
     timestamp,
+    failedCIChecks,
   );
 
   // Append non-blocking warnings for near-matches and checkbox format issues

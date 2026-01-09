@@ -214,6 +214,50 @@ describe('Policy Decision Engine', () => {
       const govViolations = result.violations.filter((v) => v.category === 'governance');
       expect(govViolations.length).toBeGreaterThanOrEqual(2);
     });
+
+    it('denies when CI checks fail', () => {
+      const result = makeDecision(
+        'low',
+        [],
+        true,
+        [],
+        true,
+        [],
+        false,
+        ['src/index.ts'],
+        fixedTimestamp,
+        ['SonarQube', 'CodeQL'],
+      );
+
+      expect(result.decision).toBe('deny');
+      expect(result.violations).toHaveLength(2);
+      expect(result.violations.every((v) => v.severity === 'error')).toBe(true);
+      expect(result.violations.every((v) => v.category === 'governance')).toBe(true);
+      expect(result.violations[0]?.message).toContain('SonarQube');
+      expect(result.violations[1]?.message).toContain('CodeQL');
+      expect(result.metadata.rationale).toContain('CI checks failed: SonarQube, CodeQL');
+    });
+
+    it('denies with CI check failure taking precedence over other violations', () => {
+      const result = makeDecision(
+        'high',
+        ['.github/workflows/ci.yml'],
+        false,
+        ['AI attestation missing'],
+        false,
+        ['Security review'],
+        true,
+        ['.github/workflows/ci.yml'],
+        fixedTimestamp,
+        ['SonarQube'],
+      );
+
+      expect(result.decision).toBe('deny');
+      // Should have CI check violation + AI attestation + governance attestation violations
+      const ciViolations = result.violations.filter((v) => v.message.includes('SonarQube'));
+      expect(ciViolations.length).toBe(1);
+      expect(result.decisionTrail[0]?.rule).toContain('CI_CHECK');
+    });
   });
 
   describe('serializeToJSON', () => {

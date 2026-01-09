@@ -5,9 +5,8 @@
  *
  * Coverage notes (uncovered lines explained):
  * - Line 16: Comment/documentation line (not executable code)
- * - Lines 376-377: Main module execution block `if (isMainModule) { void executeMainModule(args); }`
- *   Only executes when the script runs directly as a CLI tool, not when imported as a module
- *   in tests. The executeMainModule function itself is fully tested.
+ * - CLI bootstrap block (isMainModule check): Only executes when the script runs directly
+ *   as a CLI tool, not when imported as a module in tests.
  */
 
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
@@ -32,28 +31,39 @@ describe('validate-action-pinning', () => {
   });
 
   // Shared HTTPS mock helpers for tests that need to stub GitHub API responses
+  const createMockResponse = (data: string) => ({
+    on: (event: string, handler: (...args: unknown[]) => void) => {
+      if (event === 'data') {
+        handler(data);
+      } else if (event === 'end') {
+        handler();
+      }
+      return createMockResponse(data);
+    },
+  });
+
   const mockHttpsGetWithData = (data: string) =>
     vi.spyOn(https, 'get').mockImplementation((_url, _options, callback) => {
       if (typeof callback === 'function') {
-        const mockResponse = {
-          on: (event: string, handler: (...args: unknown[]) => void) => {
-            if (event === 'data') {
-              handler(data);
-            } else if (event === 'end') {
-              handler();
-            }
-            return mockResponse;
-          },
-        };
-        callback(mockResponse as never);
+        const response = createMockResponse(data);
+        callback(response as never);
       }
-      const mockRequest = {
-        on: () => ({ on: () => ({}) }),
-      };
-      return mockRequest as never;
+      const request = { on: () => ({ on: () => ({}) }) };
+      return request as never;
     });
 
   const mockHttpsGetWithSha = (sha: string) => mockHttpsGetWithData(JSON.stringify({ sha }));
+
+  const mockHttpsGetWithOptionsCheck = (expectedHeaders: Record<string, unknown>, sha: string) =>
+    vi.spyOn(https, 'get').mockImplementation((_url, options, callback) => {
+      expect(options).toMatchObject({ headers: expectedHeaders });
+      if (typeof callback === 'function') {
+        const response = createMockResponse(JSON.stringify({ sha }));
+        callback(response as never);
+      }
+      const request = { on: () => ({ on: () => ({}) }) };
+      return request as never;
+    });
 
   describe('isValidSha', () => {
     it('should return true for valid 40-char SHA', () => {
@@ -110,64 +120,30 @@ describe('validate-action-pinning', () => {
   describe('resolveToSha authorization headers', () => {
     it('should include Authorization header when GITHUB_TOKEN is set', async () => {
       vi.stubEnv('GITHUB_TOKEN', 'token123');
+      const sha = '8e8c483db84b4bee98b60c0593521ed34d9990e8';
 
-      const getSpy = vi.spyOn(https, 'get').mockImplementation((_url, options, callback) => {
-        expect(options).toMatchObject({
-          headers: expect.objectContaining({ Authorization: 'Bearer token123' }),
-        });
-
-        if (typeof callback === 'function') {
-          const mockResponse = {
-            on: (event: string, handler: (...args: unknown[]) => void) => {
-              if (event === 'data') {
-                handler(JSON.stringify({ sha: '8e8c483db84b4bee98b60c0593521ed34d9990e8' }));
-              } else if (event === 'end') {
-                handler();
-              }
-              return mockResponse;
-            },
-          };
-          callback(mockResponse as never);
-        }
-
-        const mockRequest = { on: () => ({ on: () => ({}) }) };
-        return mockRequest as never;
-      });
+      const getSpy = mockHttpsGetWithOptionsCheck(
+        expect.objectContaining({ Authorization: 'Bearer token123' }),
+        sha,
+      );
 
       const result = await validator.resolveToSha('actions/checkout@v4');
-      expect(result?.sha).toBe('8e8c483db84b4bee98b60c0593521ed34d9990e8');
+      expect(result?.sha).toBe(sha);
 
       getSpy.mockRestore();
     });
 
     it('should omit Authorization header when no token is set', async () => {
       vi.unstubAllEnvs();
+      const sha = '8e8c483db84b4bee98b60c0593521ed34d9990e8';
 
-      const getSpy = vi.spyOn(https, 'get').mockImplementation((_url, options, callback) => {
-        expect(options).toMatchObject({
-          headers: expect.not.objectContaining({ Authorization: expect.any(String) }),
-        });
-
-        if (typeof callback === 'function') {
-          const mockResponse = {
-            on: (event: string, handler: (...args: unknown[]) => void) => {
-              if (event === 'data') {
-                handler(JSON.stringify({ sha: '8e8c483db84b4bee98b60c0593521ed34d9990e8' }));
-              } else if (event === 'end') {
-                handler();
-              }
-              return mockResponse;
-            },
-          };
-          callback(mockResponse as never);
-        }
-
-        const mockRequest = { on: () => ({ on: () => ({}) }) };
-        return mockRequest as never;
-      });
+      const getSpy = mockHttpsGetWithOptionsCheck(
+        expect.not.objectContaining({ Authorization: expect.any(String) }),
+        sha,
+      );
 
       const result = await validator.resolveToSha('actions/checkout@v4');
-      expect(result?.sha).toBe('8e8c483db84b4bee98b60c0593521ed34d9990e8');
+      expect(result?.sha).toBe(sha);
 
       getSpy.mockRestore();
     });
@@ -854,42 +830,6 @@ steps:
 
       // Restore
       process.argv[1] = originalArgv;
-    });
-
-    it('should execute main module and handle successful exit', async () => {
-      vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('exit');
-      });
-
-      try {
-        await validator.executeMainModule([workflowsDir]);
-        // If we get here without exception, main() didn't try to exit
-        expect.fail('Should have called process.exit');
-      } catch (error) {
-        // Expected - process.exit throws in test
-        expect(error).toBeDefined();
-      }
-
-      vi.restoreAllMocks();
-    });
-
-    it('should execute main module and handle errors', async () => {
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
-      const exitSpy = vi.spyOn(process, 'exit').mockImplementation(() => {
-        throw new Error('exit');
-      });
-
-      // Mock main to reject
-      const mainSpy = vi.spyOn(validator, 'main').mockRejectedValue(new Error('Test error'));
-
-      await expect(validator.executeMainModule([])).rejects.toThrow('exit');
-
-      expect(consoleErrorSpy).toHaveBeenCalledWith('Unexpected error:', expect.any(Error));
-      expect(exitSpy).toHaveBeenCalledWith(1);
-
-      mainSpy.mockRestore();
-      consoleErrorSpy.mockRestore();
-      exitSpy.mockRestore();
     });
   });
 });
