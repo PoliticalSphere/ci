@@ -9,7 +9,9 @@
  *   - Verifies that mock factories and bundled options behave as expected.
  */
 
-import tmp from 'tmp';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMainTestDeps } from './cli-main-fixtures.ts';
@@ -28,26 +30,29 @@ describe('CLI test utils', () => {
 
     expect(options.console).toBeUndefined();
 
-    const tmpObj = tmp.dirSync({ unsafeCleanup: true });
-    const testTmpDir = tmpObj.name;
-    await mkdirFn(`${testTmpDir}/logs`, { recursive: true });
+    const testTmpDir = await mkdtemp(path.join(tmpdir(), 'ps-cli-test-utils-'));
+    try {
+      await mkdirFn(`${testTmpDir}/logs`, { recursive: true });
 
-    const dashboard = renderDashboardFn();
-    dashboard.updateStatus('running');
-    await dashboard.waitForExit();
+      const dashboard = renderDashboardFn();
+      dashboard.updateStatus('running');
+      await dashboard.waitForExit();
 
-    const waiting = renderWaitingHeaderFn();
-    waiting.unmount();
+      const waiting = renderWaitingHeaderFn();
+      waiting.unmount();
 
-    const summary = calculateSummaryFn();
-    expect(summary.total).toBe(1);
+      const summary = calculateSummaryFn();
+      expect(summary.total).toBe(1);
 
-    const lock = await acquireExecutionLockFn();
-    await lock.release();
+      const lock = await acquireExecutionLockFn();
+      await lock.release();
 
-    const testLogDir = `${testTmpDir}/test-logs`;
-    const results = await executeLintersFn([], { logDir: testLogDir });
-    expect(results[0]?.logPath).toBe(`${testLogDir}/eslint.log`);
+      const testLogDir = `${testTmpDir}/test-logs`;
+      const results = await executeLintersFn([], { logDir: testLogDir });
+      expect(results[0]?.logPath).toBe(`${testLogDir}/eslint.log`);
+    } finally {
+      await rm(testTmpDir, { recursive: true, force: true });
+    }
   });
 
   it('includes injected console and lock helpers', async () => {
@@ -57,7 +62,8 @@ describe('CLI test utils', () => {
     expect(options.console).toBe(fakeConsole);
 
     const lock = await acquireExecutionLockFn();
-    expect(lock.lockPath).toMatch(/ps-parallel-lint-test-\d+\.lock$/);
+    const testTmpDir = tmpdir().replace(/\/$/, '');
+    expect(lock.lockPath).toBe(`${testTmpDir}/ps-parallel-lint-test-${process.pid}.lock`);
     await lock.release();
   });
 
@@ -69,12 +75,13 @@ describe('CLI test utils', () => {
     try {
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
-      // Verify options.cwd uses system temp directory (not /tmp hardcoded, but actual system temp)
-      expect(options.cwd).toMatch(/ps-test-project-\d+$/);
+      // Verify options.cwd uses tmpdir() fallback
+      const expectedTmpDir = tmpdir().replace(/\/$/, '');
+      expect(options.cwd).toBe(`${expectedTmpDir}/ps-test-project-${process.pid}`);
 
-      // Verify lock path uses system temp directory
+      // Verify lock path uses tmpdir() fallback
       const lock = await acquireExecutionLockFn();
-      expect(lock.lockPath).toMatch(/ps-parallel-lint-test-\d+\.lock$/);
+      expect(lock.lockPath).toBe(`${expectedTmpDir}/ps-parallel-lint-test-${process.pid}.lock`);
       await lock.release();
     } finally {
       // Restore original TMPDIR
