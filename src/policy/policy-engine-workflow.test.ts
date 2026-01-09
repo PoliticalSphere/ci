@@ -53,17 +53,17 @@ function setupHighRiskWorkflow(
   const highRiskAttestation = parseHighRiskAttestation(pullRequestBody);
   const highRiskValidation = validateHighRiskAttestation(highRiskAttestation, true);
 
-  const decision = makeDecision(
-    riskClassification.tier,
-    riskClassification.paths,
-    true,
-    [],
-    highRiskValidation.valid,
-    highRiskValidation.missing,
-    false,
+  const decision = makeDecision({
+    riskTier: riskClassification.tier,
+    riskPaths: riskClassification.paths,
+    attestationValid: true,
+    attestationMissing: [],
+    highRiskAttestationValid: highRiskValidation.valid,
+    highRiskAttestationMissing: highRiskValidation.missing,
+    aiAssisted: false,
     changedFiles,
-    fixedTimestamp,
-  );
+    timestamp: fixedTimestamp,
+  });
 
   const markdown = generateMarkdownSummary(
     decision,
@@ -84,17 +84,17 @@ function setupHighRiskAIWorkflow(
   const highRiskAttestation = parseHighRiskAttestation(pullRequestBody);
   const highRiskValidation = validateHighRiskAttestation(highRiskAttestation, true);
 
-  const decision = makeDecision(
-    riskClassification.tier,
-    riskClassification.paths,
-    aiValidation.valid,
-    aiValidation.missing,
-    highRiskValidation.valid,
-    highRiskValidation.missing,
-    true,
+  const decision = makeDecision({
+    riskTier: riskClassification.tier,
+    riskPaths: riskClassification.paths,
+    attestationValid: aiValidation.valid,
+    attestationMissing: aiValidation.missing,
+    highRiskAttestationValid: highRiskValidation.valid,
+    highRiskAttestationMissing: highRiskValidation.missing,
+    aiAssisted: true,
     changedFiles,
-    fixedTimestamp,
-  );
+    timestamp: fixedTimestamp,
+  });
 
   return { riskClassification, aiValidation, highRiskValidation, decision };
 }
@@ -185,17 +185,17 @@ describe('Policy Engine Workflow', () => {
       expect(aiAttestation.declared).toBe(false);
 
       // Make decision
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        true,
-        [],
-        true,
-        [],
-        false,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: true,
+        attestationMissing: [],
+        highRiskAttestationValid: true,
+        highRiskAttestationMissing: [],
+        aiAssisted: false,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
     });
@@ -203,17 +203,17 @@ describe('Policy Engine Workflow', () => {
     it('should exclude governance requirements from low-risk output', () => {
       const changedFiles = ['src/index.ts'];
       const riskClassification = classifyRisk(changedFiles);
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        true,
-        [],
-        true,
-        [],
-        false,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: true,
+        attestationMissing: [],
+        highRiskAttestationValid: true,
+        highRiskAttestationMissing: [],
+        aiAssisted: false,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
 
       const markdown = generateMarkdownSummary(decision, [], []);
       expect(markdown).toContain('✅ ALLOW');
@@ -238,17 +238,17 @@ describe('Policy Engine Workflow', () => {
       const aiAttestation = parseAIAttestation(pullRequestBody);
       expect(aiAttestation.declared).toBe(false);
 
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        true,
-        [],
-        true,
-        [],
-        false,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: true,
+        attestationMissing: [],
+        highRiskAttestationValid: true,
+        highRiskAttestationMissing: [],
+        aiAssisted: false,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
 
@@ -282,17 +282,17 @@ describe('Policy Engine Workflow', () => {
       const aiValidation = validateAttestation(aiAttestation, riskClassification.tier);
       expect(aiValidation.valid).toBe(true);
 
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        aiValidation.valid,
-        aiValidation.missing,
-        true,
-        [],
-        true,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: aiValidation.valid,
+        attestationMissing: aiValidation.missing,
+        highRiskAttestationValid: true,
+        highRiskAttestationMissing: [],
+        aiAssisted: true,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
       expect(decision.metadata.aiAssisted).toBe(true);
@@ -317,17 +317,17 @@ describe('Policy Engine Workflow', () => {
       const aiValidation = validateAttestation(aiAttestation, riskClassification.tier);
       expect(aiValidation.valid).toBe(false);
 
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        aiValidation.valid,
-        aiValidation.missing,
-        true,
-        [],
-        true,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: aiValidation.valid,
+        attestationMissing: aiValidation.missing,
+        highRiskAttestationValid: true,
+        highRiskAttestationMissing: [],
+        aiAssisted: true,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
       expect(decision.decision).toBe('deny');
       expect(decision.violations.length).toBeGreaterThan(0);
       expect(decision.violations.every((v) => v.code === VIOLATION_AI_ATTESTATION_MISSING)).toBe(
@@ -359,17 +359,17 @@ describe('Policy Engine Workflow', () => {
       );
       expect(highRiskValidation.valid).toBe(false);
 
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        true,
-        [],
-        highRiskValidation.valid,
-        highRiskValidation.missing,
-        false,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: true,
+        attestationMissing: [],
+        highRiskAttestationValid: highRiskValidation.valid,
+        highRiskAttestationMissing: highRiskValidation.missing,
+        aiAssisted: false,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
       expect(decision.decision).toBe('deny');
       expect(
         decision.violations.some((v) => v.code === VIOLATION_HIGH_RISK_GOVERNANCE_MISSING),
@@ -407,17 +407,17 @@ describe('Policy Engine Workflow', () => {
       const highRiskValidation = validateHighRiskAttestation(highRiskAttestation, true);
       expect(highRiskValidation.valid).toBe(true);
 
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        true,
-        [],
-        highRiskValidation.valid,
-        highRiskValidation.missing,
-        false,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: true,
+        attestationMissing: [],
+        highRiskAttestationValid: highRiskValidation.valid,
+        highRiskAttestationMissing: highRiskValidation.missing,
+        aiAssisted: false,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
       expect(decision.decision).toBe('allow');
       expect(decision.violations).toHaveLength(0);
     });
@@ -557,17 +557,17 @@ ${prWithHighRiskPathsAndCompleteGovernanceAttestations}
       const highRiskValidation = validateHighRiskAttestation(highRiskAttestation, true);
       expect(highRiskValidation.valid).toBe(false);
 
-      const decision = makeDecision(
-        riskClassification.tier,
-        riskClassification.paths,
-        aiValidation.valid,
-        aiValidation.missing,
-        highRiskValidation.valid,
-        highRiskValidation.missing,
-        true,
+      const decision = makeDecision({
+        riskTier: riskClassification.tier,
+        riskPaths: riskClassification.paths,
+        attestationValid: aiValidation.valid,
+        attestationMissing: aiValidation.missing,
+        highRiskAttestationValid: highRiskValidation.valid,
+        highRiskAttestationMissing: highRiskValidation.missing,
+        aiAssisted: true,
         changedFiles,
-        fixedTimestamp,
-      );
+        timestamp: fixedTimestamp,
+      });
 
       expect(decision.decision).toBe('deny');
       expect(decision.violations.length).toBeGreaterThan(1);

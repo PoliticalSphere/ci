@@ -2,6 +2,7 @@
  * Integration tests for executor module
  */
 
+import { tmpdir } from 'node:os';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BinaryError } from '../errors.ts';
 import { calculateSummary, executeLinter } from './executor.ts';
@@ -50,9 +51,8 @@ describe('Executor Module', () => {
   });
 
   describe('executeLinter', () => {
-    const tmpDir = process.env.TMPDIR || '/tmp';
     const mockOptions = {
-      logDir: `${tmpDir}/test-logs-${process.pid}`,
+      logDir: `${tmpdir()}/test-logs-${process.pid}`,
       verifyMode: false,
       onStatusChange: vi.fn(),
     };

@@ -2,6 +2,7 @@
  * Political Sphere — CLI Tests (behavioral, coverage-oriented)
  */
 
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { createMainTestDeps } from '../__test-utils__/cli-main-fixtures.ts';
@@ -66,6 +67,21 @@ const mockNodeUtil = async (parseArgsFn: () => never) => {
   return {
     ...actual,
     parseArgs: parseArgsFn,
+  };
+};
+
+// Helper to create lock acquisition handler with deferred promise
+const createLockAcquisitionHandler = (
+  lockDeferred: ReturnType<
+    typeof createDeferred<{ lockPath: string; release: () => Promise<void> }>
+  >,
+) => {
+  return ({ onWaitStart, onWaitEnd }: { onWaitStart?: () => void; onWaitEnd?: () => void }) => {
+    onWaitStart?.();
+    return lockDeferred.promise.then((lock) => {
+      onWaitEnd?.();
+      return lock;
+    });
   };
 };
 
@@ -330,10 +346,7 @@ describe('Political Sphere — CLI', () => {
 
   describe('main', () => {
     // Helper to get temp directory without trailing slash
-    const getTmpDir = () => {
-      const tmpDir = process.env.TMPDIR || '/tmp';
-      return tmpDir.endsWith('/') ? tmpDir.slice(0, -1) : tmpDir;
-    };
+    const getTmpDir = () => tmpdir().replace(/\/$/, '');
 
     const baseDeps = () => ({
       mkdirFn: vi.fn().mockResolvedValue(undefined),
@@ -465,21 +478,7 @@ describe('Political Sphere — CLI', () => {
         release: () => Promise<void>;
       }>();
 
-      // Extract lock handler to reduce nesting
-      const handleLockAcquisition = ({
-        onWaitStart,
-        onWaitEnd,
-      }: {
-        onWaitStart?: () => void;
-        onWaitEnd?: () => void;
-      }) => {
-        onWaitStart?.();
-        return lockDeferred.promise.then((lock) => {
-          onWaitEnd?.();
-          return lock;
-        });
-      };
-
+      const handleLockAcquisition = createLockAcquisitionHandler(lockDeferred);
       const acquireExecutionLockFn = vi.fn(handleLockAcquisition);
 
       const mainPromise = main({

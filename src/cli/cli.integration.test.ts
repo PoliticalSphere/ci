@@ -3,6 +3,7 @@
  */
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -53,7 +54,7 @@ async function loadMain() {
 let tempDir = '';
 
 beforeEach(async () => {
-  tempDir = await mkdtemp(path.join(process.cwd(), 'tmp-cli-'));
+  tempDir = await mkdtemp(path.join(tmpdir(), 'ps-ci-test-cli-'));
 });
 
 afterEach(async () => {

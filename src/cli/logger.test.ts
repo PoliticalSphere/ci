@@ -3,6 +3,7 @@
  */
 
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -19,8 +20,23 @@ async function readLog(linterId: string): Promise<string> {
   return readFile(p, 'utf8');
 }
 
+// Helper to mock fs with write failures
+async function mockFsWithWriteFailure() {
+  const actual = await vi.importActual('node:fs');
+  return {
+    ...actual,
+    createWriteStream: vi.fn(() => ({
+      write: (_data: string, cb: (error?: Error | null) => void) => {
+        cb(new Error('write failed'));
+        return true;
+      },
+      end: vi.fn(),
+    })),
+  };
+}
+
 beforeEach(async () => {
-  tempDir = await mkdtemp(path.join(process.cwd(), 'tmp-logs-'));
+  tempDir = await mkdtemp(path.join(tmpdir(), 'ps-ci-test-logs-'));
 });
 
 afterEach(async () => {
@@ -32,25 +48,9 @@ afterEach(async () => {
 });
 
 describe('Political Sphere — Logger', () => {
-  // Helper to mock fs with write failures
-  async function mockFsWithWriteFailure() {
-    const actual = await vi.importActual('node:fs');
-    return {
-      ...actual,
-      createWriteStream: vi.fn(() => ({
-        write: (_data: string, cb: (error?: Error | null) => void) => {
-          cb(new Error('write failed'));
-          return true;
-        },
-        end: vi.fn(),
-      })),
-    };
-  }
-
   it('builds LogOptions with provided optional values', () => {
     const traceContext = createTraceContext();
-    const tmpDir = process.env.TMPDIR || '/tmp';
-    const logDir = `${tmpDir}/test-logs-${process.pid}`;
+    const logDir = `${tmpdir()}/test-logs-${process.pid}`;
 
     const built = makeLogOptions({
       logDir,
@@ -72,8 +72,7 @@ describe('Political Sphere — Logger', () => {
   });
 
   it('omits optional fields when not provided to makeLogOptions', () => {
-    const tmpDir = process.env.TMPDIR || '/tmp';
-    const logDir = `${tmpDir}/test-logs-${process.pid}`;
+    const logDir = `${tmpdir()}/test-logs-${process.pid}`;
 
     const built = makeLogOptions({
       logDir,

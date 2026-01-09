@@ -2,6 +2,7 @@
  * Political Sphere — UI Tests (coverage-focused)
  */
 
+import { tmpdir } from 'node:os';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /* eslint-disable @typescript-eslint/no-namespace */
@@ -143,8 +144,40 @@ const makeLinter = (id: string, name: string): LinterConfig => ({
   description: `${name} linter`,
 });
 
+// Helper to create perform render function for buffer test
+const createPerformRenderForBufferTest = (root: unknown) => {
+  return () => {
+    hookIndex = 0;
+    effectQueue = [];
+    const output = renderNode(root);
+    outputFrames.push(output);
+    // Run effects AFTER we've had a chance to call updateStatus
+  };
+};
+
+// Helper to create ink render function for buffer test
+const createInkRenderForBufferTest = (
+  captureSubscribe: (subscribe: (l: (id: string, status: string) => void) => void) => void,
+) => {
+  return (node: unknown, _options: unknown) => {
+    // Intercept the render to capture subscribe before effects run
+    const element = node as {
+      props?: { subscribe?: (l: (id: string, status: string) => void) => void };
+    };
+    if (element?.props?.subscribe) {
+      captureSubscribe(element.props.subscribe);
+    }
+
+    const root = node;
+    const performRender = createPerformRenderForBufferTest(root);
+    rerender = performRender;
+    performRender();
+    return { unmount: () => {} };
+  };
+};
+
 describe('Political Sphere — UI', () => {
-  const tmpDir = (process.env.TMPDIR ?? '/tmp').replace(/\/$/, '');
+  const testTmpDir = tmpdir().replace(/\/$/, '');
   const TERM_KEY = 'TERM' as const;
   const TERM_PROGRAM_KEY = 'TERM_PROGRAM' as const;
   const NO_COLOR_KEY = 'NO_COLOR' as const;
@@ -273,7 +306,7 @@ describe('Political Sphere — UI', () => {
       makeLinter('skipped', 'Skipped'),
     ];
 
-    const { updateStatus, waitForExit } = renderDashboard(linters, `${tmpDir}/test-logs`, {
+    const { updateStatus, waitForExit } = renderDashboard(linters, `${testTmpDir}/test-logs`, {
       stdout: ttyStream,
       stderr: ttyStream,
     });
@@ -302,7 +335,7 @@ describe('Political Sphere — UI', () => {
     updateStatus('running', 'PASS');
 
     const outputNoLinks = outputFrames.join('');
-    expect(outputNoLinks).toContain(`${tmpDir}/test-logs/running.log`);
+    expect(outputNoLinks).toContain(`${testTmpDir}/test-logs/running.log`);
     expect(outputNoLinks).not.toContain(']8;;');
 
     updateStatus('pending', 'PASS');
@@ -333,7 +366,7 @@ describe('Political Sphere — UI', () => {
       },
     } as unknown as NodeJS.WriteStream;
 
-    const { updateStatus, waitForExit } = renderDashboard(linters, `${tmpDir}/test-logs`, {
+    const { updateStatus, waitForExit } = renderDashboard(linters, `${testTmpDir}/test-logs`, {
       stdout,
       stderr: stdout,
     });
@@ -354,7 +387,7 @@ describe('Political Sphere — UI', () => {
     expect(output).toContain('SKIPPED');
     expect(output).toContain('PENDING');
     expect(output).toContain('RUNNING');
-    expect(output).toContain(`${tmpDir}/test-logs/pass.log`);
+    expect(output).toContain(`${testTmpDir}/test-logs/pass.log`);
     expect(output).toContain('\u001b[');
   });
 
@@ -365,33 +398,9 @@ describe('Political Sphere — UI', () => {
     vi.resetModules();
     let capturedSubscribe: ((l: (id: string, status: string) => void) => void) | undefined;
 
-    // Extract render logic to reduce nesting
-    const createPerformRender = (root: unknown) => {
-      return () => {
-        hookIndex = 0;
-        effectQueue = [];
-        const output = renderNode(root);
-        outputFrames.push(output);
-        // Run effects AFTER we've had a chance to call updateStatus
-      };
-    };
-
-    const createInkRender = () => {
-      return (node: unknown, _options: unknown) => {
-        // Intercept the render to capture subscribe before effects run
-        const element = node as {
-          props?: { subscribe?: (l: (id: string, status: string) => void) => void };
-        };
-        if (element?.props?.subscribe) {
-          capturedSubscribe = element.props.subscribe;
-        }
-
-        const root = node;
-        const performRender = createPerformRender(root);
-        rerender = performRender;
-        performRender();
-        return { unmount: () => {} };
-      };
+    // Use extracted helper functions
+    const captureSubscribe = (subscribe: (l: (id: string, status: string) => void) => void) => {
+      capturedSubscribe = subscribe;
     };
 
     vi.doMock('react', () => ({
@@ -411,7 +420,7 @@ describe('Political Sphere — UI', () => {
         __esModule: true,
         Box: ({ children }: { children?: unknown }) => children ?? null,
         Text: ({ children }: { children?: unknown }) => children ?? null,
-        render: createInkRender(),
+        render: createInkRenderForBufferTest(captureSubscribe),
       };
     });
     vi.doMock('ink-spinner', () => ({
@@ -424,7 +433,7 @@ describe('Political Sphere — UI', () => {
     const ttyStream: NodeJS.WriteStream = { ...process.stdout, isTTY: true };
 
     // Grab updateStatus but DON'T run effects yet
-    const { updateStatus } = renderDashboard(linters, `${tmpDir}/test-logs`, {
+    const { updateStatus } = renderDashboard(linters, `${testTmpDir}/test-logs`, {
       stdout: ttyStream,
       stderr: ttyStream,
     });
@@ -451,7 +460,7 @@ describe('Political Sphere — UI', () => {
     const { renderDashboard } = await loadUiModule();
     const linters: LinterConfig[] = [makeLinter('eslint', 'ESLint')];
 
-    const { updateStatus, waitForExit } = renderDashboard(linters, `${tmpDir}/test-logs`);
+    const { updateStatus, waitForExit } = renderDashboard(linters, `${testTmpDir}/test-logs`);
 
     updateStatus('eslint', 'PASS');
     await waitForExit();

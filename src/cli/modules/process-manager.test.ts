@@ -120,6 +120,21 @@ describe('Process Manager Module', () => {
       return { proc, linter, runPromise } as const;
     };
 
+    const setupBasicRun = async (exitCode = 0, useFakeTimers = false) => {
+      if (useFakeTimers) {
+        vi.useFakeTimers();
+      }
+      vi.mocked(createLogger).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
+      const proc = buildProc();
+      vi.mocked(spawn).mockReturnValue(proc);
+      const linter = buildLinter('direct', 5000);
+      const runPromise = processManager.runProcess(linter, 'logs', false);
+      await Promise.resolve();
+      proc.emit('close', exitCode);
+      await Promise.resolve();
+      return { proc, linter, runPromise, result: await runPromise } as const;
+    };
+
     for (const mode of ['shell', 'direct'] as const) {
       it(`throws a timeout error for ${mode} mode`, async () => {
         const { linter, runPromise } = setupTimeoutRun(mode, 5);
@@ -195,21 +210,7 @@ describe('Process Manager Module', () => {
     }, 10_000);
 
     it('resolves with provided exit code', async () => {
-      vi.useFakeTimers();
-      vi.mocked(createLogger).mockResolvedValue(vi.fn().mockResolvedValue(undefined));
-
-      const proc = buildProc();
-      vi.mocked(spawn).mockReturnValue(proc);
-
-      const linter = buildLinter('direct', 5000);
-      const runPromise = processManager.runProcess(linter, 'logs', false);
-
-      await Promise.resolve();
-      proc.emit('close', 0);
-      // Allow the Promise to settle
-      await Promise.resolve();
-
-      const result = await runPromise;
+      const { result } = await setupBasicRun(0, true);
       expect(result.exitCode).toBe(0);
       expect(result.timedOut).toBe(false);
     }, 10_000);

@@ -43,17 +43,17 @@ describe('Policy Engine Public API', () => {
     expect(typeof policyExports.serializeToJSON).toBe('function');
 
     // Execute to register coverage
-    const decision = policyExports.makeDecision(
-      'low',
-      [],
-      true,
-      [],
-      true,
-      [],
-      false,
-      ['test.ts'],
-      '2024-01-01T00:00:00.000Z',
-    );
+    const decision = policyExports.makeDecision({
+      riskTier: 'low',
+      riskPaths: [],
+      attestationValid: true,
+      attestationMissing: [],
+      highRiskAttestationValid: true,
+      highRiskAttestationMissing: [],
+      aiAssisted: false,
+      changedFiles: ['test.ts'],
+      timestamp: '2024-01-01T00:00:00.000Z',
+    });
     expect(decision).toBeDefined();
 
     const json = policyExports.serializeToJSON(decision);
@@ -127,17 +127,17 @@ describe('Policy Engine Public API', () => {
     const attestation = parseAIAttestation('no AI');
     expect(attestation.declared).toBe(false);
 
-    const decision = makeDecision(
-      'low',
-      [],
-      true,
-      [],
-      true,
-      [],
-      false,
-      ['test.ts'],
-      '2024-01-01T00:00:00.000Z',
-    );
+    const decision = makeDecision({
+      riskTier: 'low',
+      riskPaths: [],
+      attestationValid: true,
+      attestationMissing: [],
+      highRiskAttestationValid: true,
+      highRiskAttestationMissing: [],
+      aiAssisted: false,
+      changedFiles: ['test.ts'],
+      timestamp: '2024-01-01T00:00:00.000Z',
+    });
     expect(decision.decision).toBe('allow');
   });
 
@@ -162,17 +162,17 @@ describe('Policy Engine Public API', () => {
     );
 
     // Step 4: Make decision
-    const decision = policyExports.makeDecision(
-      classification.tier,
-      classification.paths,
-      aiValidation.valid,
-      aiValidation.missing,
-      highRiskValidation.valid,
-      highRiskValidation.missing,
-      aiAttestation.declared,
+    const decision = policyExports.makeDecision({
+      riskTier: classification.tier,
+      riskPaths: classification.paths,
+      attestationValid: aiValidation.valid,
+      attestationMissing: aiValidation.missing,
+      highRiskAttestationValid: highRiskValidation.valid,
+      highRiskAttestationMissing: highRiskValidation.missing,
+      aiAssisted: aiAttestation.declared,
       changedFiles,
-      '2024-01-01T00:00:00.000Z',
-    );
+      timestamp: '2024-01-01T00:00:00.000Z',
+    });
 
     expect(decision.decision).toBe('deny');
 

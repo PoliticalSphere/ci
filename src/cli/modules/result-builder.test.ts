@@ -2,12 +2,13 @@
  * Tests for result builder module
  */
 
+import { tmpdir } from 'node:os';
 import { describe, expect, it } from 'vitest';
 
 import { buildResult, calculateSummary, determineStatus } from '../modules/result-builder.ts';
 
 describe('Result Builder Module', () => {
-  const tmpDir = (process.env.TMPDIR ?? '/tmp').replace(/\/$/, '');
+  const testTmpDir = tmpdir().replace(/\/$/, '');
   const buildCtx = (startOffset = 100) => ({
     linter: {
       id: 'test',
@@ -20,7 +21,7 @@ describe('Result Builder Module', () => {
       enforcement: 'advisory' as const,
       description: 'Test linter',
     },
-    logPath: `${tmpDir}/test.log`,
+    logPath: `${testTmpDir}/test.log`,
     start: Date.now() - startOffset,
   });
 
@@ -51,34 +52,34 @@ describe('Result Builder Module', () => {
 
   describe('determineStatus', () => {
     it('returns PASS for zero exit code', async () => {
-      const status = await determineStatus('eslint', 0, `${tmpDir}/test.log`);
+      const status = await determineStatus('eslint', 0, `${testTmpDir}/test.log`);
       expect(status).toBe('PASS');
     });
 
     it('returns FAIL for non-zero exit code', async () => {
-      const status = await determineStatus('eslint', 1, `${tmpDir}/test.log`);
+      const status = await determineStatus('eslint', 1, `${testTmpDir}/test.log`);
       expect(status).toBe('FAIL');
     });
 
     it('handles jscpd with zero exit code', async () => {
-      const status = await determineStatus('jscpd', 0, `${tmpDir}/jscpd.log`);
+      const status = await determineStatus('jscpd', 0, `${testTmpDir}/jscpd.log`);
       expect(status).toBe('PASS');
     });
 
     it('handles jscpd with non-zero exit code', async () => {
-      const status = await determineStatus('jscpd', 1, `${tmpDir}/jscpd.log`);
+      const status = await determineStatus('jscpd', 1, `${testTmpDir}/jscpd.log`);
       expect(status).toBe('FAIL');
     });
 
     it('handles knip with detector function', async () => {
       const mockDetector = async () => false;
-      const status = await determineStatus('knip', 0, `${tmpDir}/knip.log`, mockDetector);
+      const status = await determineStatus('knip', 0, `${testTmpDir}/knip.log`, mockDetector);
       expect(status).toBe('PASS');
     });
 
     it('handles knip findings', async () => {
       const mockDetector = async () => true;
-      const status = await determineStatus('knip', 0, `${tmpDir}/knip.log`, mockDetector);
+      const status = await determineStatus('knip', 0, `${testTmpDir}/knip.log`, mockDetector);
       expect(status).toBe('FAIL');
     });
   });
@@ -92,7 +93,7 @@ describe('Result Builder Module', () => {
           status: 'PASS' as const,
           exitCode: 0,
           duration: 100,
-          logPath: `${tmpDir}/a.log`,
+          logPath: `${testTmpDir}/a.log`,
         },
         {
           id: 'b',
@@ -100,7 +101,7 @@ describe('Result Builder Module', () => {
           status: 'FAIL' as const,
           exitCode: 1,
           duration: 200,
-          logPath: `${tmpDir}/b.log`,
+          logPath: `${testTmpDir}/b.log`,
         },
         {
           id: 'c',
@@ -109,7 +110,7 @@ describe('Result Builder Module', () => {
           exitCode: null,
           error: 'err',
           duration: 50,
-          logPath: `${tmpDir}/c.log`,
+          logPath: `${testTmpDir}/c.log`,
         },
         {
           id: 'd',
@@ -117,7 +118,7 @@ describe('Result Builder Module', () => {
           status: 'SKIPPED' as const,
           exitCode: null,
           duration: 10,
-          logPath: `${tmpDir}/d.log`,
+          logPath: `${testTmpDir}/d.log`,
         },
       ];
 

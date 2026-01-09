@@ -195,21 +195,36 @@ function collectCheckboxFormatViolations(
 /* Core decision function                                                     */
 /* -------------------------------------------------------------------------- */
 
-// Note: This pure function accepts 10 parameters to maintain explicit, deterministic
-// policy evaluation. Each parameter represents a distinct policy input. Grouping them
-// into an object would obscure the intentional separation of concerns.
-export function makeDecision(
-  riskTier: RiskTier,
-  riskPaths: readonly string[],
-  attestationValid: boolean,
-  attestationMissing: readonly string[],
-  highRiskAttestationValid: boolean,
-  highRiskAttestationMissing: readonly string[],
-  aiAssisted: boolean,
-  changedFiles: readonly string[],
-  timestamp: string,
-  failedCIChecks: readonly string[] = [],
-): PolicyResult {
+export interface MakeDecisionInput {
+  readonly riskTier: RiskTier;
+  readonly riskPaths: readonly string[];
+  readonly attestationValid: boolean;
+  readonly attestationMissing: readonly string[];
+  readonly highRiskAttestationValid: boolean;
+  readonly highRiskAttestationMissing: readonly string[];
+  readonly aiAssisted: boolean;
+  readonly changedFiles: readonly string[];
+  readonly timestamp: string;
+  readonly failedCIChecks?: readonly string[];
+}
+
+/**
+ * Core policy decision function. Accepts structured input to maintain explicit,
+ * deterministic policy evaluation while keeping parameter count manageable.
+ */
+export function makeDecision(input: MakeDecisionInput): PolicyResult {
+  const {
+    riskTier,
+    riskPaths,
+    attestationValid,
+    attestationMissing,
+    highRiskAttestationValid,
+    highRiskAttestationMissing,
+    aiAssisted,
+    changedFiles,
+    timestamp,
+    failedCIChecks = [],
+  } = input;
   const violations: PolicyViolation[] = [];
   const rationale: string[] = [];
   const decisionTrail: DecisionTrailEntry[] = [];
@@ -503,18 +518,18 @@ export function evaluatePolicy(input: EvaluatePolicyInput): EvaluatePolicyOutput
   const hasHighRiskPaths = classification.tier === 'high' && classification.paths.length > 0;
   const highRiskValidation = validateHighRiskAttestation(highRiskAttestation, hasHighRiskPaths);
 
-  const baseResult = makeDecision(
-    classification.tier,
-    classification.paths,
-    aiValidation.valid,
-    aiValidation.missing,
-    highRiskValidation.valid,
-    highRiskValidation.missing,
-    aiAttestation.declared,
+  const baseResult = makeDecision({
+    riskTier: classification.tier,
+    riskPaths: classification.paths,
+    attestationValid: aiValidation.valid,
+    attestationMissing: aiValidation.missing,
+    highRiskAttestationValid: highRiskValidation.valid,
+    highRiskAttestationMissing: highRiskValidation.missing,
+    aiAssisted: aiAttestation.declared,
     changedFiles,
     timestamp,
     failedCIChecks,
-  );
+  });
 
   // Append non-blocking warnings for near-matches and checkbox format issues
   const extraViolations: PolicyViolation[] = [];

@@ -9,6 +9,7 @@
  *   - Verifies that mock factories and bundled options behave as expected.
  */
 
+import { tmpdir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createMainTestDeps } from './cli-main-fixtures.ts';
@@ -27,14 +28,8 @@ describe('CLI test utils', () => {
 
     expect(options.console).toBeUndefined();
 
-    // Helper to normalize temp directory
-    const getTmpDir = () => {
-      const tmpDir = process.env.TMPDIR || '/tmp';
-      return tmpDir.endsWith('/') ? tmpDir.slice(0, -1) : tmpDir;
-    };
-
-    const tmpDir = getTmpDir();
-    await mkdirFn(`${tmpDir}/logs`, { recursive: true });
+    const testTmpDir = tmpdir().replace(/\/$/, '');
+    await mkdirFn(`${testTmpDir}/logs`, { recursive: true });
 
     const dashboard = renderDashboardFn();
     dashboard.updateStatus('running');
@@ -49,7 +44,7 @@ describe('CLI test utils', () => {
     const lock = await acquireExecutionLockFn();
     await lock.release();
 
-    const testLogDir = `${tmpDir}/test-logs`;
+    const testLogDir = `${testTmpDir}/test-logs`;
     const results = await executeLintersFn([], { logDir: testLogDir });
     expect(results[0]?.logPath).toBe(`${testLogDir}/eslint.log`);
   });
@@ -61,12 +56,8 @@ describe('CLI test utils', () => {
     expect(options.console).toBe(fakeConsole);
 
     const lock = await acquireExecutionLockFn();
-    // Helper to normalize temp directory
-    const getTmpDir = () => {
-      const tmpDir = process.env.TMPDIR || '/tmp';
-      return tmpDir.endsWith('/') ? tmpDir.slice(0, -1) : tmpDir;
-    };
-    expect(lock.lockPath).toBe(`${getTmpDir()}/ps-parallel-lint-test-${process.pid}.lock`);
+    const testTmpDir = tmpdir().replace(/\/$/, '');
+    expect(lock.lockPath).toBe(`${testTmpDir}/ps-parallel-lint-test-${process.pid}.lock`);
     await lock.release();
   });
 
@@ -78,12 +69,13 @@ describe('CLI test utils', () => {
     try {
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
-      // Verify options.cwd uses /tmp fallback
-      expect(options.cwd).toBe(`/tmp/ps-test-project-${process.pid}`);
+      // Verify options.cwd uses tmpdir() fallback
+      const expectedTmpDir = tmpdir().replace(/\/$/, '');
+      expect(options.cwd).toBe(`${expectedTmpDir}/ps-test-project-${process.pid}`);
 
-      // Verify lock path uses /tmp fallback
+      // Verify lock path uses tmpdir() fallback
       const lock = await acquireExecutionLockFn();
-      expect(lock.lockPath).toBe(`/tmp/ps-parallel-lint-test-${process.pid}.lock`);
+      expect(lock.lockPath).toBe(`${expectedTmpDir}/ps-parallel-lint-test-${process.pid}.lock`);
       await lock.release();
     } finally {
       // Restore original TMPDIR
