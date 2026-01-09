@@ -1,10 +1,10 @@
 /**
  * Political Sphere — CLI Test Fixtures — Tests
  *
- * Fully compliant:
- *   - No direct TMPDIR access
- *   - No environment mutation
- *   - Legacy TMPDIR logic covered via mocking
+ * Guarantees:
+ *   - No environment access
+ *   - No legacy TMPDIR path
+ *   - Temp directories are always explicit and deterministic
  */
 
 import { mkdirSync, realpathSync, writeFileSync } from 'node:fs';
@@ -14,12 +14,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const tmp = require('tmp');
 
-import * as cliFixtures from './cli-main-fixtures';
-import { createMainTestDeps } from './cli-main-fixtures.ts';
+import { createMainTestDeps, normaliseTmpDir } from './cli-main-fixtures.ts';
 
 /**
- * Assert both paths are derived from the same temp root.
- * Does NOT require existence or directory nesting.
+ * Assert both paths resolve under the same temp root.
+ * Does not require the paths to exist.
  */
 function expectSameTempRoot(actualPath: string, injectedTempDir: string): void {
   const actualRoot = realpathSync(path.resolve(path.dirname(actualPath)));
@@ -28,53 +27,11 @@ function expectSameTempRoot(actualPath: string, injectedTempDir: string): void {
   expect(actualRoot).toBe(injectedRoot);
 }
 
-/**
- * Helper to run legacy TMPDIR scenarios with dynamic test names.
- */
-function runLegacyTmpDirScenario(testName: string, getterValue: string | undefined) {
-  // eslint-disable-next-line vitest/valid-title
-  it(testName, async () => {
-    vi.spyOn(cliFixtures, 'getTmpDir').mockReturnValue(getterValue);
-
-    const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
-
-    expect(options.cwd.endsWith(`ps-test-project-${process.pid}`)).toBe(true);
-    expect(options.cwd.includes('//')).toBe(false);
-
-    const lock = await acquireExecutionLockFn();
-    expect(lock.lockPath.endsWith(`ps-parallel-lint-test-${process.pid}.lock`)).toBe(true);
-    expect(lock.lockPath.includes('//')).toBe(false);
-  });
-}
-
-/**
- * Helper to run build options scenarios with dynamic test names.
- */
-function runBuildOptionsScenario(testName: string, setup: () => void) {
-  // eslint-disable-next-line vitest/valid-title
-  it(testName, async () => {
-    setup();
-
-    const { acquireExecutionLockFn, options } = createMainTestDeps(['--test']);
-
-    expect(options.cwd.includes('//')).toBe(false);
-    expect(options.cwd.endsWith(`ps-test-project-${process.pid}`)).toBe(true);
-
-    const lock = await acquireExecutionLockFn();
-    expect(lock.lockPath.includes('//')).toBe(false);
-    expect(lock.lockPath.endsWith(`ps-parallel-lint-test-${process.pid}.lock`)).toBe(true);
-  });
-}
-
 afterEach(() => {
   vi.restoreAllMocks();
-  // Ensure we restore the tmp dir getter to avoid cross-test leakage
-  if (typeof cliFixtures.resetTmpDirGetter === 'function') {
-    cliFixtures.resetTmpDirGetter();
-  }
 });
 
-describe('CLI test utils (preferred temp handling)', () => {
+describe('CLI test utils (explicit temp handling)', () => {
   it('creates dependencies without injecting console', async () => {
     const tmpobj = tmp.dirSync({ unsafeCleanup: true });
 
@@ -131,53 +88,50 @@ describe('CLI test utils (preferred temp handling)', () => {
       tmpobj.removeCallback();
     }
   });
-});
 
-describe('CLI test utils (legacy TMPDIR normalisation — compliant)', () => {
-  // Reuse module-scope helper `runLegacyTmpDirScenario`
-  runLegacyTmpDirScenario('normalises TMPDIR with trailing slash', '/tmp/');
-  runLegacyTmpDirScenario('uses TMPDIR as-is when no trailing slash is present', '/custom-tmp');
-  runLegacyTmpDirScenario('falls back correctly when TMPDIR is undefined', undefined);
+  it('uses the provided tempDirOverride verbatim (no double slashes)', async () => {
+    const { options, acquireExecutionLockFn } = createMainTestDeps(['--test'], undefined, {
+      tempDirOverride: '/custom/tmpdir',
+    });
+
+    expect(options.cwd).toBe(`/custom/tmpdir/ps-test-project-${process.pid}`);
+
+    const lock = await acquireExecutionLockFn();
+    expect(lock.lockPath).toBe(`/custom/tmpdir/ps-parallel-lint-test-${process.pid}.lock`);
+  });
+
+  it('normalises a trailing slash in tempDirOverride', async () => {
+    const { options, acquireExecutionLockFn } = createMainTestDeps(['--test'], undefined, {
+      tempDirOverride: '/custom/tmpdir/',
+    });
+
+    expect(options.cwd).toBe(`/custom/tmpdir/ps-test-project-${process.pid}`);
+
+    const lock = await acquireExecutionLockFn();
+    expect(lock.lockPath).toBe(`/custom/tmpdir/ps-parallel-lint-test-${process.pid}.lock`);
+  });
+
+  it('falls back to /tmp when no tempDirOverride is provided', async () => {
+    const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
+
+    expect(options.cwd).toBe(`/tmp/ps-test-project-${process.pid}`);
+
+    const lock = await acquireExecutionLockFn();
+    expect(lock.lockPath).toBe(`/tmp/ps-parallel-lint-test-${process.pid}.lock`);
+  });
 });
 
 /**
  * Direct unit coverage for pure normalisation logic.
- * This exists to satisfy branch coverage for `normaliseTmpDir`
- * without relying on higher-level integration behaviour.
  */
 describe('normaliseTmpDir (direct unit coverage)', () => {
   it('removes a trailing slash when present', () => {
-    expect(cliFixtures.normaliseTmpDir('/tmp/')).toBe('/tmp');
-    expect(cliFixtures.normaliseTmpDir('/custom/path/')).toBe('/custom/path');
+    expect(normaliseTmpDir('/tmp/')).toBe('/tmp');
+    expect(normaliseTmpDir('/custom/path/')).toBe('/custom/path');
   });
 
   it('returns the input unchanged when no trailing slash is present', () => {
-    expect(cliFixtures.normaliseTmpDir('/tmp')).toBe('/tmp');
-    expect(cliFixtures.normaliseTmpDir('/custom/path')).toBe('/custom/path');
+    expect(normaliseTmpDir('/tmp')).toBe('/tmp');
+    expect(normaliseTmpDir('/custom/path')).toBe('/custom/path');
   });
-});
-
-/**
- * Branch coverage for createAcquireExecutionLockFn and buildOptions
- * ensuring both branches of `getTmpDir() ?? '/tmp'` are exercised.
- */
-describe('createAcquireExecutionLockFn and buildOptions (branch coverage)', () => {
-  runBuildOptionsScenario('takes the fallback branch when getTmpDir returns undefined', () => {
-    vi.spyOn(cliFixtures, 'getTmpDir').mockReturnValue(undefined);
-  });
-
-  runBuildOptionsScenario('takes the non-null branch when getTmpDir returns a value', () => {
-    vi.spyOn(cliFixtures, 'getTmpDir').mockReturnValue('/custom-test-tmp');
-  });
-
-  runBuildOptionsScenario('honours an injected tmp dir getter (trailing slash)', () => {
-    cliFixtures.setTmpDirGetter(() => '/injected/tmpdir/');
-  });
-
-  runBuildOptionsScenario(
-    'honours an injected tmp dir getter returning undefined (fallback)',
-    () => {
-      cliFixtures.setTmpDirGetter(() => undefined);
-    },
-  );
 });

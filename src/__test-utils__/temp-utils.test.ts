@@ -61,9 +61,9 @@ describe('temp utils', () => {
 
   it('creates an executable temp script with provided content', () => {
     const dirPath = createTempDirSync('ps-script-');
-    const scriptPath = createTempScript(dirPath, 'test-script', '#!/bin/sh\necho "hi"\n');
+    const scriptPath = createTempScript(dirPath, 'test-script', '#!/bin/sh\nprintf "hi"\n');
 
-    expect(readFileSync(scriptPath, 'utf8')).toContain('echo "hi"');
+    expect(readFileSync(scriptPath, 'utf8')).toContain('printf "hi"');
     expect(statSync(scriptPath).mode & 0o777).toBe(0o755);
 
     cleanupTempDirSync(dirPath);

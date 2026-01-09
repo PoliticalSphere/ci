@@ -4,23 +4,41 @@
  * Role:
  *   Provide reusable mock factories and test dependency bundles for CLI tests.
  *
- * Notes:
- *   - Exported helpers create mocks for dashboard rendering, execution lock,
- *     linter execution, and other CLI dependencies used in multiple tests.
+ * Guarantees:
+ *   - No environment access
+ *   - No TMPDIR legacy path
+ *   - Deterministic temp directory handling
  */
 
+import path from 'node:path';
+import type { Mock } from 'vitest';
 import { vi } from 'vitest';
 
 import type { LinterResult } from '../cli/executor.ts';
 
-interface TestDeps {
-  mkdirFn: ReturnType<typeof vi.fn>;
-  renderDashboardFn: ReturnType<typeof vi.fn>;
-  renderWaitingHeaderFn: ReturnType<typeof vi.fn>;
-  executeLintersFn: ReturnType<typeof vi.fn>;
-  calculateSummaryFn: ReturnType<typeof vi.fn>;
-  acquireExecutionLockFn: ReturnType<typeof vi.fn>;
-  options: Record<string, unknown>;
+interface SharedDeps {
+  mkdirFn: Mock<() => Promise<void>>;
+  renderDashboardFn: Mock<() => { updateStatus: Mock; waitForExit: Mock<() => Promise<void>> }>;
+  renderWaitingHeaderFn: Mock<() => { unmount: Mock }>;
+  executeLintersFn: Mock<
+    (linters: unknown, options: { logDir: string }) => Promise<readonly LinterResult[]>
+  >;
+  calculateSummaryFn: Mock<
+    () => { total: number; passed: number; failed: number; errors: number; duration: number }
+  >;
+  acquireExecutionLockFn: Mock<
+    () => Promise<{ lockPath: string; release: Mock<() => Promise<void>> }>
+  >;
+}
+
+interface TestOptions extends SharedDeps {
+  argv: string[];
+  cwd: string;
+  console?: unknown;
+}
+
+interface TestDeps extends SharedDeps {
+  options: TestOptions;
 }
 
 const sampleResults = (logDir: string): readonly LinterResult[] => [
@@ -35,38 +53,35 @@ const sampleResults = (logDir: string): readonly LinterResult[] => [
 ];
 
 /**
- * Abstract TMPDIR access behind a function so tests can mock it
- * without mutating process.env (security + compliance).
+ * Pure normalisation helper.
  */
-export type TmpDirGetter = () => string | undefined;
-
-let tmpDirGetter: TmpDirGetter = () => {
-  // Default behaviour: read the platform env var if present
-  // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
-  return process.env['TMPDIR'];
-};
-
-export function setTmpDirGetter(getter: TmpDirGetter): void {
-  tmpDirGetter = getter;
+export function normaliseTmpDir(tmpDirRaw: string): string {
+  return tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
 }
 
-export function resetTmpDirGetter(): void {
-  tmpDirGetter = () => {
-    // biome-ignore lint/complexity/useLiteralKeys: TypeScript requires bracket notation for index signatures
-    return process.env['TMPDIR'];
-  };
+/**
+ * Resolve the effective temp directory.
+ * Single source of truth. No environment access.
+ */
+function resolveTempDir(tempDirOverride?: string): string {
+  let tmpDirRaw = tempDirOverride ?? '/tmp';
+
+  // If a per-run temp dir (tmp-*) is injected, use its parent as the temp root
+  if (typeof tempDirOverride === 'string' && path.basename(tempDirOverride).startsWith('tmp-')) {
+    tmpDirRaw = path.dirname(tempDirOverride);
+  }
+
+  return normaliseTmpDir(tmpDirRaw);
 }
 
-export function getTmpDir(): string | undefined {
-  return tmpDirGetter();
-}
-
-function createMkdirFn(): ReturnType<typeof vi.fn> {
+function createMkdirFn(): Mock<() => Promise<void>> {
   // eslint-disable-next-line unicorn/no-useless-undefined
   return vi.fn().mockResolvedValue(undefined);
 }
 
-function createRenderDashboardFn(): ReturnType<typeof vi.fn> {
+function createRenderDashboardFn(): Mock<
+  () => { updateStatus: Mock; waitForExit: Mock<() => Promise<void>> }
+> {
   return vi.fn(() => ({
     updateStatus: vi.fn(),
     // eslint-disable-next-line unicorn/no-useless-undefined
@@ -74,19 +89,21 @@ function createRenderDashboardFn(): ReturnType<typeof vi.fn> {
   }));
 }
 
-function createRenderWaitingHeaderFn(): ReturnType<typeof vi.fn> {
+function createRenderWaitingHeaderFn(): Mock<() => { unmount: Mock }> {
   return vi.fn(() => ({
     unmount: vi.fn(),
   }));
 }
 
-function createExecuteLintersFn(): ReturnType<typeof vi.fn> {
-  return vi.fn((_linters, options: { logDir: string }) =>
-    Promise.resolve(sampleResults(options.logDir)),
-  );
+function createExecuteLintersFn(): Mock<
+  (linters: unknown, options: { logDir: string }) => Promise<readonly LinterResult[]>
+> {
+  return vi.fn((_linters, options) => Promise.resolve(sampleResults(options.logDir)));
 }
 
-function createCalculateSummaryFn(): ReturnType<typeof vi.fn> {
+function createCalculateSummaryFn(): Mock<
+  () => { total: number; passed: number; failed: number; errors: number; duration: number }
+> {
   return vi.fn(() => ({
     total: 1,
     passed: 1,
@@ -96,16 +113,9 @@ function createCalculateSummaryFn(): ReturnType<typeof vi.fn> {
   }));
 }
 
-export function normaliseTmpDir(tmpDirRaw: string): string {
-  return tmpDirRaw.endsWith('/') ? tmpDirRaw.slice(0, -1) : tmpDirRaw;
-}
-
-function createAcquireExecutionLockFn(): ReturnType<typeof vi.fn> {
-  const tmpDirRaw = getTmpDir() ?? '/tmp';
-  const tmpDir = normaliseTmpDir(tmpDirRaw);
-
+function createAcquireExecutionLockFn(tempDir: string) {
   return vi.fn().mockResolvedValue({
-    lockPath: `${tmpDir}/ps-parallel-lint-test-${process.pid}.lock`,
+    lockPath: `${tempDir}/ps-parallel-lint-test-${process.pid}.lock`,
     release: vi.fn().mockResolvedValue(void 0),
   });
 }
@@ -113,14 +123,12 @@ function createAcquireExecutionLockFn(): ReturnType<typeof vi.fn> {
 function buildOptions(
   argv: string[],
   deps: Omit<TestDeps, 'options'>,
-  injectedConsole?: unknown,
-): Record<string, unknown> {
-  const tmpDirRaw = getTmpDir() ?? '/tmp';
-  const tmpDir = normaliseTmpDir(tmpDirRaw);
-
-  const options: Record<string, unknown> & { console?: unknown } = {
+  injectedConsole: unknown,
+  tempDir: string,
+): TestOptions {
+  const options: TestOptions = {
     argv,
-    cwd: `${tmpDir}/ps-test-project-${process.pid}`,
+    cwd: `${tempDir}/ps-test-project-${process.pid}`,
     mkdirFn: deps.mkdirFn,
     renderDashboardFn: deps.renderDashboardFn,
     renderWaitingHeaderFn: deps.renderWaitingHeaderFn,
@@ -136,13 +144,19 @@ function buildOptions(
   return options;
 }
 
-export function createMainTestDeps(argv: string[], injectedConsole?: unknown): TestDeps {
+export function createMainTestDeps(
+  argv: string[],
+  injectedConsole?: unknown,
+  opts?: { tempDirOverride?: string },
+): TestDeps {
+  const tempDir = resolveTempDir(opts?.tempDirOverride);
+
   const mkdirFn = createMkdirFn();
   const renderDashboardFn = createRenderDashboardFn();
   const renderWaitingHeaderFn = createRenderWaitingHeaderFn();
   const executeLintersFn = createExecuteLintersFn();
   const calculateSummaryFn = createCalculateSummaryFn();
-  const acquireExecutionLockFn = createAcquireExecutionLockFn();
+  const acquireExecutionLockFn = createAcquireExecutionLockFn(tempDir);
 
   const options = buildOptions(
     argv,
@@ -155,6 +169,7 @@ export function createMainTestDeps(argv: string[], injectedConsole?: unknown): T
       acquireExecutionLockFn,
     },
     injectedConsole,
+    tempDir,
   );
 
   return {
