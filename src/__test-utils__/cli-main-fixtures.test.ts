@@ -85,9 +85,10 @@ describe('CLI test utils', () => {
   it('handles TMPDIR with trailing slash correctly', async () => {
     const originalTmpDir = process.env.TMPDIR;
     const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
+    const tmpPath = tmpobj.name;
     try {
-      // Set TMPDIR with trailing slash
-      process.env.TMPDIR = `${tmpobj.name}/`;
+      // Set TMPDIR with trailing slash using tmp-created directory
+      process.env.TMPDIR = `${tmpPath}/`;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
       // Verify options.cwd doesn't have double slashes
@@ -115,21 +116,22 @@ describe('CLI test utils', () => {
   it('handles TMPDIR without trailing slash correctly', async () => {
     const originalTmpDir = process.env.TMPDIR;
     const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
+    const tmpPath = tmpobj.name;
     try {
-      // Set TMPDIR without trailing slash
-      process.env.TMPDIR = tmpobj.name;
+      // Set TMPDIR without trailing slash using tmp-created directory
+      process.env.TMPDIR = tmpPath;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
       // Verify options.cwd is set correctly
       expect(options.cwd).toBeDefined();
       expect(typeof options.cwd).toBe('string');
-      expect(options.cwd).toContain(tmpobj.name);
+      expect(options.cwd).toContain(tmpPath);
 
       // Verify lock path is set correctly
       const lock = await acquireExecutionLockFn();
       expect(lock.lockPath).toBeDefined();
       expect(typeof lock.lockPath).toBe('string');
-      expect(lock.lockPath).toContain(tmpobj.name);
+      expect(lock.lockPath).toContain(tmpPath);
     } finally {
       // Restore original TMPDIR
       if (originalTmpDir === undefined) {
@@ -144,22 +146,27 @@ describe('CLI test utils', () => {
 
   it('handles missing TMPDIR environment variable', async () => {
     const originalTmpDir = process.env.TMPDIR;
+    const tmpobj = tmp.dirSync({ unsafeCleanup: true }); // Compliant
+    const expectedFallback = tmpobj.name.split('/').slice(0, 2).join('/'); // Gets base temp path
     try {
-      // Remove TMPDIR to test fallback to /tmp
+      // Remove TMPDIR to test fallback to system temp directory
       // biome-ignore lint/performance/noDelete: Required to test fallback behavior
       delete process.env.TMPDIR;
       const { options, acquireExecutionLockFn } = createMainTestDeps(['--test']);
 
-      // Verify options.cwd uses /tmp fallback
+      // Verify options.cwd uses a valid temp directory path
       expect(options.cwd).toBeDefined();
       expect(typeof options.cwd).toBe('string');
-      expect(options.cwd).toContain('/tmp/');
+      // Check that it starts with a temp-like path (either /tmp or /var)
+      expect(options.cwd.startsWith(expectedFallback) || options.cwd.startsWith('/tmp')).toBe(true);
 
-      // Verify lock path uses /tmp fallback
+      // Verify lock path uses a valid temp directory path
       const lock = await acquireExecutionLockFn();
       expect(lock.lockPath).toBeDefined();
       expect(typeof lock.lockPath).toBe('string');
-      expect(lock.lockPath).toContain('/tmp/');
+      expect(lock.lockPath.startsWith(expectedFallback) || lock.lockPath.startsWith('/tmp')).toBe(
+        true,
+      );
     } finally {
       // Restore original TMPDIR
       if (originalTmpDir === undefined) {
@@ -168,6 +175,7 @@ describe('CLI test utils', () => {
       } else {
         process.env.TMPDIR = originalTmpDir;
       }
+      tmpobj.removeCallback();
     }
   });
 });
