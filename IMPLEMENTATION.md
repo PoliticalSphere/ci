@@ -1,7 +1,8 @@
 # Implementation Summary
 
-**Date**: 2026-01-07  
-**Status**: Bootstrap Complete ✅
+**Last updated**: 2026-01-07
+
+**Status**: Bootstrap complete (see CI for live status)
 
 ## What Was Delivered
 
@@ -73,28 +74,12 @@ Created [.github/pull_request_template.md](.github/pull_request_template.md):
 
 ### 5. Testing Infrastructure
 
-Established comprehensive test suite with **44 passing tests**:
+Established a comprehensive test suite with extensive coverage; run tests via `npm run test`.
 
-- **[risk-classification.test.ts](src/policy/risk-classification.test.ts)**: 15 tests
-  - Validates high-risk pattern matching (workflows, actions, scripts, supply chain)
-  - Validates medium-risk config detection
-  - Validates low-risk classification for docs/code
-  - Tests tier prioritization and edge cases
+- **Test framework**: Vitest with v8 coverage  
+- **Configuration**: [vitest.config.ts](vitest.config.ts)
 
-- **[attestation.test.ts](src/policy/attestation.test.ts)**: 16 tests
-  - AI attestation parsing and validation
-  - High-risk attestation parsing and validation
-  - Completeness checks and missing item detection
-  - Risk-tier-specific warnings
-
-- **[decision.test.ts](src/policy/decision.test.ts)**: 13 tests
-  - Decision logic (allow/deny/warn)
-  - Violation aggregation
-  - JSON serialization
-  - Markdown summary generation
-
-**Test framework**: Vitest with v8 coverage  
-**Configuration**: [vitest.config.ts](vitest.config.ts)
+The policy engine and related modules are covered by unit tests; add tests for any behavioural changes and validate with `npm run test` and `npm run test:coverage`.
 
 ### 6. Tooling Configuration
 

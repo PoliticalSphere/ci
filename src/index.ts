@@ -7,19 +7,19 @@
 
 export const VERSION = '0.0.1' as const;
 
-export { DEFAULT_EXECUTION_LOCK_PATH } from './cli/execution-lock.js';
+export { DEFAULT_EXECUTION_LOCK_PATH } from './cli/execution/execution-lock.js';
 export type {
   LinterMetrics,
   TelemetryStats,
-} from './cli/telemetry.js';
+} from './cli/observability/telemetry.js';
 export {
   getGlobalTelemetry,
   resetGlobalTelemetry,
   TelemetryCollector,
-} from './cli/telemetry.js';
+} from './cli/observability/telemetry.js';
 
 // Re-export observability components
-export type { TraceContext } from './cli/tracing.js';
+export type { TraceContext } from './cli/observability/tracing.js';
 export {
   createChildTraceContext,
   createTraceContext,
@@ -28,7 +28,7 @@ export {
   generateTraceId,
   parseTraceparent,
   traceContextToJSON,
-} from './cli/tracing.js';
+} from './cli/observability/tracing.js';
 // Re-export all policy engine components
 export type {
   AIAttestation,

@@ -1,13 +1,9 @@
 # Political Sphere — CI/CD & Governance Platform
 
-| Field           | Value                                              |
-| --------------- | -------------------------------------------------- |
-| **Version**     | 0.0.1                                              |
-| **Created**     | 2026-01-07                                         |
-| **Last edited** | 2026-01-07                                         |
-| **Created by**  | GitHub Copilot (GPT-5.1-Codex-Max)                 |
-| **Updated by**  | GitHub Copilot (GPT-5.1-Codex-Max)                 |
-| **Purpose**     | CI/CD and governance platform for Political Sphere |
+- **Version:** 0.0.1
+- **Last edited:** 2026-01-07
+- **Maintained by:** Political Sphere CI maintainers
+- **Purpose:** CI/CD and governance platform for Political Sphere
 
 ---
 
@@ -250,6 +246,20 @@ npm run lint:all -- --linters gitleaks,biome,eslint
 ```
 
 See [PARALLEL_LINTER.md](PARALLEL_LINTER.md) for complete documentation.
+
+## Development
+
+- Node version: use Node >= 22.21.1 (see `package.json` engines)
+- Install dependencies: `npm ci`
+- Run tests: `npm run test` (watch: `npm run test:watch`; UI: `npm run test:ui`)
+- Run coverage: `npm run test:coverage`
+- Run linters: `npm run lint:all`
+- To run a single test: `npm run test -- <path-to-test>`
+
+AI-specific guidance
+
+- If an AI assisted or authored a change, include an AI Attestation in the PR body (see `.github/pull_request_template.md`) and a short `prompt history` describing the prompts used and human review steps taken.
+- Always validate AI-generated changes with tests and linters, and require a human reviewer to sign off before merging.
 
 ### Binary Dependencies
 

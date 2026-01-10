@@ -568,9 +568,7 @@ describe('Levenshtein — branch coverage', () => {
     let codePointCalls = 0;
 
     // Store original methods safely
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     const originalMapGet = Map.prototype.get;
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     const originalStringCodePointAt = String.prototype.codePointAt;
 
     const mapGetSpy = vi.spyOn(Map.prototype, 'get').mockImplementation(function (
@@ -726,7 +724,6 @@ describe('Helper branches & nullish handling', () => {
     let callCount = 0;
 
     // Store original method safely
-    // eslint-disable-next-line @typescript-eslint/unbound-method
     const originalMapGet = Map.prototype.get;
 
     const mapGetSpy = vi.spyOn(Map.prototype, 'get').mockImplementation(function (

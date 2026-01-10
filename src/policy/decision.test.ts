@@ -12,10 +12,12 @@ import { describe, expect, it } from 'vitest';
 import {
   evaluatePolicy,
   generateMarkdownSummary,
+  type MakeDecisionInput,
   makeDecision,
   type PolicyResult,
   serializeToJSON,
   VIOLATION_AI_ATTESTATION_MISSING,
+  VIOLATION_CI_CHECK_FAILURE,
   VIOLATION_HIGH_RISK_AI_CHANGE,
   VIOLATION_HIGH_RISK_GOVERNANCE_MISSING,
 } from './decision.ts';
@@ -222,6 +224,8 @@ describe('Policy Decision Engine', () => {
       expect(result.violations.every((v) => v.category === 'governance')).toBe(true);
       expect(result.violations[0]?.message).toContain('SonarQube');
       expect(result.violations[1]?.message).toContain('CodeQL');
+      expect(result.violations[0]?.code).toBe(VIOLATION_CI_CHECK_FAILURE);
+      expect(result.violations[1]?.code).toBe(VIOLATION_CI_CHECK_FAILURE);
       expect(result.metadata.rationale).toContain('CI checks failed: SonarQube, CodeQL');
     });
 
@@ -243,6 +247,7 @@ describe('Policy Decision Engine', () => {
       // Should have CI check violation + AI attestation + governance attestation violations
       const ciViolations = result.violations.filter((v) => v.message.includes('SonarQube'));
       expect(ciViolations.length).toBe(1);
+      expect(ciViolations[0]?.code).toBe(VIOLATION_CI_CHECK_FAILURE);
       expect(result.decisionTrail[0]?.rule).toContain('CI_CHECK');
     });
   });

@@ -158,7 +158,7 @@ src/cli/
 
 **Key Functions**:
 
-- `runProcess(linter, logDir, verifyMode)`: Execute linter process
+- `runProcess(linter, logDir, verifyMode, traceContext?, extraArgs?)`: Execute linter process (supports optional trace context and extra args)
   - Stream stdout/stderr to log file
   - Handle timeouts with AbortController
   - Capture exit codes

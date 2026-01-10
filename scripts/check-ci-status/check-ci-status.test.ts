@@ -48,15 +48,21 @@ describe('scripts/check-ci-status/check-ci-status.ts', () => {
     it('should display all job labels in output', () => {
       const result = evaluateArgs(makeJobArgs());
 
-      expect(result.stdout).toContain('Secrets Detection: success');
-      expect(result.stdout).toContain('Action Pinning: success');
-      expect(result.stdout).toContain('Biome: success');
-      expect(result.stdout).toContain('ESLint: success');
-      expect(result.stdout).toContain('TypeScript: success');
-      expect(result.stdout).toContain('knip: success');
-      expect(result.stdout).toContain('Duplication: success');
-      expect(result.stdout).toContain('Tests: success');
-      expect(result.stdout).toContain('Policy: success');
+      const labels = [
+        'Secrets Detection',
+        'Action Pinning',
+        'Biome',
+        'ESLint',
+        'TypeScript',
+        'knip',
+        'Duplication',
+        'Tests',
+        'Policy',
+      ];
+
+      for (const label of labels) {
+        expect(result.stdout).toContain(`${label}: success`);
+      }
     });
 
     it('should display section headers', () => {

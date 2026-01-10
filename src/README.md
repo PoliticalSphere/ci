@@ -53,7 +53,7 @@ The CLI module provides:
 **Key Files:**
 
 - `index.ts` — Main CLI entry point and argument parsing
-- `linters.ts` — Linter registry and configuration
+- `linter-registry.ts` — Linter registry and configuration
 - `executor.ts` — Core execution logic for running linters in parallel
 - `execution-lock.ts` — Distributed lock implementation
 - `logger.ts` — Deterministic logging to files

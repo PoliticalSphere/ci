@@ -6,6 +6,12 @@
 
 import process from 'node:process';
 
+/**
+ * CLI usage text shown when `--help` or invalid arguments are provided.
+ *
+ * This string is printed to stdout by `evaluateArgs` when the user requests
+ * help or when the argument count is incorrect.
+ */
 const USAGE = `Usage:
   check-ci-status [--debug] <secrets> <pinning> <lint> <eslint> <types> <knip> <duplication> <tests> <policy>
 
@@ -22,6 +28,7 @@ Examples:
   check-ci-status --debug success success success success success success success success success
 `;
 
+/** Human-readable labels for the ordered CI job arguments. */
 const JOB_LABELS = [
   'Secrets Detection',
   'Action Pinning',
@@ -34,9 +41,16 @@ const JOB_LABELS = [
   'Policy',
 ] as const;
 
+/** Valid job result strings produced by GitHub Actions. */
 type JobStatus = 'success' | 'failure' | 'cancelled' | 'skipped';
 
+/** Tuple representing the two trust-boundary checks: [secrets, pinning]. */
 type TrustStatuses = [JobStatus, JobStatus];
+
+/**
+ * Tuple representing the quality checks in the canonical order used by the
+ * aggregator: [lint, eslint, types, knip, duplication, tests, policy].
+ */
 type QualityStatuses = [
   JobStatus,
   JobStatus,
@@ -47,21 +61,37 @@ type QualityStatuses = [
   JobStatus,
 ];
 
+/** Result returned by `evaluateArgs` describing outputs and exit code. */
 type EvaluateResult = {
   code: number;
   stdout: string;
   stderr: string;
 };
 
+/** Options controlling evaluation behavior. */
 type EvaluateOptions = {
+  /** Enable debug/trace output. */
   debug?: boolean;
 };
 
+/**
+ * Return a debug line when tracing is enabled.
+ *
+ * Kept side-effect free: callers append this value to stderr when appropriate.
+ */
 function debugLog(enabled: boolean, message: string): string {
   // eslint-disable-next-line sonarjs/no-selector-parameter -- Simple debug flag is appropriate here
   return enabled ? `[debug] ${message}\n` : '';
 }
 
+/**
+ * Format the full CI summary given trust and quality status tuples.
+ *
+ * This function enforces error precedence: trust-boundary failures are
+ * reported and cause a non-zero exit code before quality failures are
+ * evaluated. It returns the `stdout` text, any debug `stderr` output, and the
+ * numeric exit `code` the CLI should use.
+ */
 function formatSummary(
   trust: TrustStatuses,
   quality: QualityStatuses,
@@ -139,6 +169,13 @@ function formatSummary(
   return { stdout: [...lines, ...extra, ''].join('\n'), stderr, code };
 }
 
+/**
+ * Parse CLI arguments and produce an evaluation result.
+ *
+ * Accepts the argument vector (excluding `node` and script path) and an
+ * optional `options` bag. Returns an object suitable for tests and for the
+ * `main()` wrapper to print and set process exit status.
+ */
 export function evaluateArgs(args: string[], options: EvaluateOptions = {}): EvaluateResult {
   const debug = options.debug === true;
 
@@ -166,6 +203,14 @@ export function evaluateArgs(args: string[], options: EvaluateOptions = {}): Eva
   return formatSummary(trust, quality, effectiveDebug);
 }
 
+/**
+ * CLI entrypoint wrapper.
+ *
+ * Reads `process.argv` and `CHECK_CI_STATUS_DEBUG` environment variables,
+ * invokes `evaluateArgs`, prints outputs to the console, and sets
+ * `process.exitCode` accordingly. When executed directly, this function is
+ * invoked automatically.
+ */
 export function main(): void {
   const envDebug =
     // biome-ignore lint/complexity/useLiteralKeys: TypeScript noPropertyAccessFromIndexSignature requires bracket notation

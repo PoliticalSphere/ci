@@ -12,7 +12,15 @@
       "project": ["scripts/**/*.{ts,tsx}"]
     }
   },
-  "ignore": ["**/*.d.ts", "**/fixtures/**", "**/test-data/**", "src/__test-utils__/**", "html/**"],
+  "ignore": [
+    "**/*.d.ts",
+    "**/fixtures/**",
+    "**/test-data/**",
+    "src/__test-utils__/**",
+    "html/**",
+    "**/*.test.tsx",
+    "**/*.test.ts"
+  ],
   "ignoreBinaries": ["security"],
   "ignoreDependencies": ["actionlint", "yamllint-js", "cspell", "jscpd", "markdownlint-cli2"],
   "rules": {

@@ -84,14 +84,23 @@ export const VIOLATION_CI_CHECK_FAILURE = 'CI_CHECK_FAILURE' as const;
 
 const DECISION_PRECEDENCE: readonly PolicyDecision[] = ['allow', 'warn', 'deny'];
 
+/**
+ *
+ */
 function escalateDecision(current: PolicyDecision, next: PolicyDecision): PolicyDecision {
   return DECISION_PRECEDENCE.indexOf(next) > DECISION_PRECEDENCE.indexOf(current) ? next : current;
 }
 
+/**
+ *
+ */
 function buildMissingSummary(prefix: string, missing: readonly string[], fallback: string): string {
   return missing.length > 0 ? `${prefix}: ${missing.join(', ')}` : fallback;
 }
 
+/**
+ *
+ */
 function appendMissingViolations(
   violations: PolicyViolation[],
   missing: readonly string[],
@@ -111,6 +120,9 @@ function appendMissingViolations(
   }
 }
 
+/**
+ *
+ */
 function collectAttestationNearMatchViolations(params: {
   readonly enabled: boolean;
   readonly shouldCheck: boolean;
@@ -159,6 +171,9 @@ function collectAttestationNearMatchViolations(params: {
   return { violations, trail };
 }
 
+/**
+ *
+ */
 function collectCheckboxFormatViolations(
   enabled: boolean,
   prBody: string,
@@ -341,10 +356,24 @@ export function makeDecision(input: MakeDecisionInput): PolicyResult {
 /* Serialization helpers                                                      */
 /* -------------------------------------------------------------------------- */
 
+/**
+ * Serialize a policy evaluation result to a pretty-printed JSON string.
+ *
+ * @param {PolicyResult} result - The policy evaluation result to serialize.
+ * @returns {string} A formatted JSON string representation of the policy result.
+ */
 export function serializeToJSON(result: PolicyResult): string {
   return JSON.stringify(result, null, 2);
 }
 
+/**
+ * Generate a human-readable Markdown summary for a policy evaluation.
+ *
+ * @param {PolicyResult} result - The policy evaluation result.
+ * @param {readonly string[]} riskReasons - Reasons contributing to the risk classification.
+ * @param {readonly string[]} riskPaths - Paths considered high-risk in the evaluation.
+ * @returns {string} A Markdown-formatted summary of the policy evaluation.
+ */
 export function generateMarkdownSummary(
   result: PolicyResult,
   riskReasons: readonly string[],

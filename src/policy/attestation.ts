@@ -33,6 +33,9 @@ export interface AttestationValidation {
 
 export const CHECKED_CHECKBOX_RE = /^\s*[-*][ \t]*\[x\][ \t]+(\S[^\r\n]*)$/i;
 
+/**
+ *
+ */
 function normalizeText(s: string): string {
   return s
     .toLowerCase()
@@ -42,6 +45,9 @@ function normalizeText(s: string): string {
     .trim();
 }
 
+/**
+ *
+ */
 function extractCheckedTexts(body: string): string[] {
   const texts: string[] = [];
   for (const rawLine of (body ?? '').split(/\r?\n/)) {
@@ -53,6 +59,9 @@ function extractCheckedTexts(body: string): string[] {
   return texts;
 }
 
+/**
+ *
+ */
 function hasCheckedAttestation(body: string, expected: string): boolean {
   const want = normalizeText(expected);
   const checked = extractCheckedTexts(body);
@@ -79,6 +88,9 @@ export const HIGH_RISK_ATTESTATION_LABELS = {
 } as const;
 
 // Simple Levenshtein distance for near-match detection
+/**
+ *
+ */
 function levenshtein(a: string, b: string): number {
   const m = a.length;
   const n = b.length;
@@ -114,6 +126,9 @@ function levenshtein(a: string, b: string): number {
   return dp.get(n) ?? 0;
 }
 
+/**
+ *
+ */
 function findNearMatchesInChecked(expected: string, body = '', maxDistance = 3): string[] {
   const want = normalizeText(expected);
   const checked = extractCheckedTexts(body);
@@ -131,11 +146,17 @@ function findNearMatchesInChecked(expected: string, body = '', maxDistance = 3):
   return near;
 }
 
+/**
+ *
+ */
 export function findAIAttestationNearMatches(prBody = '', maxDistance?: number): readonly string[] {
   const keys = ['reviewed', 'noSecrets', 'alignsWithStandards', 'locallyTested'] as const;
   return findNearMatchesForKeys(prBody, AI_ATTESTATION_LABELS, keys, maxDistance);
 }
 
+/**
+ *
+ */
 export function findHighRiskAttestationNearMatches(
   prBody = '',
   maxDistance?: number,
@@ -151,6 +172,9 @@ export function findHighRiskAttestationNearMatches(
   return findNearMatchesForKeys(prBody, HIGH_RISK_ATTESTATION_LABELS, keys, maxDistance);
 }
 
+/**
+ *
+ */
 function findNearMatchesForKeys<
   TLabels extends Record<string, string>,
   TKeys extends readonly (keyof TLabels & string)[],
@@ -175,6 +199,9 @@ function findNearMatchesForKeys<
 }
 
 // Format validator for checkbox lines
+/**
+ *
+ */
 export function validateCheckboxFormat(prBody = ''): { readonly issues: readonly string[] } {
   const issues: string[] = [];
   const body = typeof prBody === 'string' ? prBody : '';

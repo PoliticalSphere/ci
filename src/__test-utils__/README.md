@@ -394,6 +394,6 @@ Import from the root: `import { captureLogs, MockEmitter } from '__test-utils__'
 
 ## See Also
 
-- [Linter Registry](../cli/linters.ts) - Production linter configurations
+- [Linter Registry](../cli/config/linter-registry.ts) - Production linter configurations
 - [Executor](../cli/executor.ts) - Linter execution logic
 - [CLI](../cli/index.ts) - Main CLI entry point

@@ -214,7 +214,7 @@ The CLI is built on these core principles:
 src/cli/
 ├── index.ts          # CLI entry point & orchestration
 ├── executor.ts       # Parallel execution engine
-├── linters.ts        # Linter registry & configuration
+├── linter-registry.ts # Linter registry & configuration
 ├── ui.tsx           # Ink dashboard components
 └── logger.ts        # Deterministic logging utilities
 ```
@@ -237,7 +237,7 @@ src/cli/
 - Result aggregation
 - Execution summary generation
 
-#### **linters.ts** — Linter Registry
+#### **linter-registry.ts** — Linter Registry
 
 - Centralized linter definitions
 - Configuration per linter
@@ -335,7 +335,7 @@ If a linter fails with "command not found":
 
 - Ensure all linter dependencies are installed (`npm install`)
 - Check that binaries are available in `node_modules/.bin`
-- Verify the linter is properly configured in `linters.ts`
+- Verify the linter is properly configured in `linter-registry.ts`
 
 ---
 
@@ -359,7 +359,7 @@ npm run test:ui
 
 ### Adding a New Linter
 
-1. **Define the linter** in `src/cli/linters.ts`:
+1. **Define the linter** in `src/cli/config/linter-registry.ts`:
 
    ```typescript
    {
@@ -508,7 +508,7 @@ When contributing to the CLI:
 
 - [Policy Engine](../policy/README.md) — Risk classification and attestation
 - [CI/CD Platform](../../README.md) — Overall platform architecture
-- [Linter Registry](./linters.ts) — Full linter configuration
+- [Linter Registry](./config/linter-registry.ts) — Full linter configuration
 
 ---
 

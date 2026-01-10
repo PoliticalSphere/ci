@@ -122,7 +122,7 @@ npm run lint:all -- --verify-logs --log-dir ./audit-logs
 ```bash
 src/cli/
 ├── index.ts          # CLI entry point and orchestration
-├── linters.ts        # Linter registry and configuration
+├── linter-registry.ts # Linter registry and configuration
 ├── executor.ts       # Parallel execution engine
 ├── logger.ts         # Dual-stream logging system
 └── ui.tsx            # Ink UI components
@@ -248,7 +248,7 @@ logs/
 
 ### Linter Timeouts
 
-Default timeouts (configurable in [linters.ts](src/cli/linters.ts)):
+Default timeouts (configurable in [linter-registry.ts](src/cli/config/linter-registry.ts)):
 
 - Gitleaks: 60s
 - Biome: 60s
@@ -261,7 +261,7 @@ Default timeouts (configurable in [linters.ts](src/cli/linters.ts)):
 
 ### Adding New Linters
 
-Edit [linters.ts](src/cli/linters.ts):
+Edit [linter-registry.ts](src/cli/config/linter-registry.ts):
 
 ```typescript
 {
@@ -309,7 +309,7 @@ npm install
 
 ### Timeout Errors
 
-Increase timeout in [linters.ts](src/cli/linters.ts) for slow linters.
+Increase timeout in [linter-registry.ts](src/cli/config/linter-registry.ts) for slow linters.
 
 ### Logs Not Created
 

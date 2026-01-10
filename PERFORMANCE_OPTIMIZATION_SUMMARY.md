@@ -151,30 +151,36 @@ The new modules are ready to integrate with:
 ### Execution Cache
 
 ```typescript
-import { 
-  enableCaching, 
-  getGlobalCache, 
-  disableCaching 
-} from './cache.ts';
+import { createExecutionCache, ExecutionCache } from './cache.ts';
 
-// Enable with defaults
-enableCaching();
+// Create cache with defaults
+const cache = createExecutionCache();
 
 // Customize TTLs
-enableCaching({
-  binaryTtlMs: 10 * 60 * 1000,
-  versionTtlMs: 30 * 60 * 1000,
-  skipDecisionTtlMs: 5 * 60 * 1000,
+const customCache = createExecutionCache({
+  binaryTtlMs: 10 * 60 * 1000,      // 10 minutes
+  versionTtlMs: 30 * 60 * 1000,     // 30 minutes
+  skipDecisionTtlMs: 5 * 60 * 1000, // 5 minutes
 });
 
-// Get cache instance
-const cache = getGlobalCache();
-cache?.setBinaryCheck('eslint', true);
-cache?.getBinaryCheck('eslint'); // true or null
+// Use cache methods directly
+cache.setBinaryCheck('eslint', true);
+cache.getBinaryCheck('eslint'); // true or null
 
-// Disable
-disableCaching();
+// Pass cache through execution context (dependency injection)
+executeLintersInParallel(linters, {
+  cache,
+  // ... other options
+});
+
+// Disable caching: pass null instead of a cache instance
+executeLintersInParallel(linters, {
+  cache: null,
+  // ... other options
+});
 ```
+
+**Design Note**: The cache is execution-scoped, not application-scoped. It should be instantiated per execution and passed through the call stack via dependency injection. This eliminates global state and makes the cache lifecycle explicit.
 
 ### Incremental Execution
 

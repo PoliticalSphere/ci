@@ -16,6 +16,15 @@
  *   - Pure re-exports with no logic
  */
 
+export { createLockAcquisitionHandler } from './fixtures/cli/cli-main-fixtures.ts';
+export type { LinterTestConfig } from './fixtures/linter/linter-fixtures.ts';
+export { createLinterConfig, createMockLinterConfig } from './fixtures/linter/linter-fixtures.ts';
+export {
+  createTrackerMock,
+  getMockedIncremental,
+  getMockedLogger,
+  getMockedModules,
+} from './mocks/cli/test-mocks.ts';
 export {
   captureLogs,
   clearCaptured,
@@ -24,7 +33,8 @@ export {
   getLogs,
   getWarnings,
   restoreLogs,
-} from './console-capture.ts';
+} from './mocks/console/console-capture.ts';
+export { fakeConsole } from './mocks/console/fake-console.ts';
 export {
   createMockChild,
   type MockChild,
@@ -32,11 +42,11 @@ export {
   mockProcessError,
   mockProcessExit,
   mockStreamData,
-} from './emitter.ts';
-export type { LinterTestConfig } from './linter-fixtures.ts';
-export { createLinterConfig, createMockLinterConfig } from './linter-fixtures.ts';
-export type { StreamMock } from './stream-mocks.ts';
-export { createStreamMock, createStreamMockPair } from './stream-mocks.ts';
+} from './mocks/process/emitter.ts';
+export type { StreamMock } from './mocks/streams/stream-mocks.ts';
+export { createStreamMock, createStreamMockPair } from './mocks/streams/stream-mocks.ts';
+export { _createDeferred, createDeferred } from './utils/deferred.ts';
+export { restoreEnv, snapshotEnv, withEnv } from './utils/env.ts';
 export {
   cleanupTempDirSync,
   cleanupTempFile,
@@ -45,4 +55,4 @@ export {
   createTempFile,
   createTempScript,
   getTempDir,
-} from './temp-utils.ts';
+} from './utils/temp-utils.ts';

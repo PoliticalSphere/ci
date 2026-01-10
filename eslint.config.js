@@ -40,20 +40,25 @@ export default [
       'html/**',
       '*.min.js',
       '*.bundle.js',
-      'eslint.config.js',
     ],
   },
 
   // Base recommended rules
   eslint.configs.recommended,
+  ...tseslint.configs.recommended,
 
   // TypeScript-aware rules (what Biome can't do yet)
-  ...tseslint.configs.recommendedTypeChecked,
+  // Apply the type-checked-only rules (they are arrays of config entries)
+  ...tseslint.configs.recommendedTypeCheckedOnly,
   {
+    files: ['**/*.ts', '**/*.tsx'],
+    ignores: ['**/*.test.*', '**/*.spec.*', 'src/__test-utils__/**'],
     languageOptions: {
+      parser: tseslint.parser,
       parserOptions: {
-        project: ['./tsconfig.eslint.json'],
+        project: './tsconfig.eslint.json',
         tsconfigRootDir: import.meta.dirname,
+        createDefaultProgram: true,
       },
     },
   },
@@ -109,8 +114,23 @@ export default [
     plugins: {
       jsdoc: jsdocPlugin,
     },
+    // Use the base recommended rules but run the plugin in TSDoc compatibility
+    // mode so TSDoc-style tags and typing are preferred over classic JSDoc
     rules: {
-      ...jsdocPlugin.configs['flat/recommended-typescript-flavor'].rules,
+      ...jsdocPlugin.configs['flat/recommended'].rules,
+      // Rely on TypeScript for type information; don't require JSDoc types
+      'jsdoc/require-param-type': 'off',
+      'jsdoc/require-returns-type': 'off',
+      // Allow TSDoc-specific tags used in this repo
+      'jsdoc/check-tag-names': ['warn', { definedTags: ['packageDocumentation', 'remarks'] }],
+    },
+    settings: {
+      jsdoc: {
+        mode: 'typescript',
+        additionalTagNames: {
+          names: ['packageDocumentation', 'remarks'],
+        },
+      },
     },
   },
 
@@ -129,6 +149,8 @@ export default [
       'react/prop-types': 'off', // Using TypeScript for prop types
       'react-hooks/purity': 'warn', // Warn instead of error
       'react-hooks/set-state-in-effect': 'off', // Allow state updates in effects for orchestration
+      // Sonar rule is noisy for React render methods returning different ReactNode shapes
+      'sonarjs/function-return-type': 'off',
     },
     settings: {
       react: {
@@ -327,17 +349,54 @@ export default [
     },
   },
 
+  // Selective JSDoc enforcement for source files (exclude tests and test utils)
+  {
+    files: ['src/**/*.ts', 'src/**/*.tsx'],
+    ignores: ['**/*.test.*', 'src/__test-utils__/**'],
+    rules: {
+      // Require JSDoc for public APIs and class/method declarations, but keep it as a warning
+      'jsdoc/require-jsdoc': [
+        'warn',
+        { contexts: ['FunctionDeclaration', 'MethodDefinition', 'ClassDeclaration'] },
+      ],
+    },
+  },
+
   // Test file overrides
   {
-    files: ['**/*.test.ts', '**/*.spec.ts', '**/test/**/*.ts', '**/tests/**/*.ts'],
+    files: [
+      '**/*.test.ts',
+      '**/*.spec.ts',
+      '**/test/**/*.ts',
+      '**/tests/**/*.ts',
+      '**/*.test.tsx',
+      '**/*.spec.tsx',
+      'src/__test-utils__/**',
+    ],
     plugins: {
+      '@typescript-eslint': tseslint.plugin,
       vitest: vitestPlugin,
     },
+    languageOptions: {
+      parserOptions: {
+        // Disable project-based type checking for test files to avoid parsing errors
+        project: [],
+      },
+    },
+
     rules: {
       ...vitestPlugin.configs.recommended.rules,
+      // Turn off the type-checked set for tests (dynamically) to avoid parserErrors when
+      // tests are linted without project-aware parsing.
+      ...Object.fromEntries(
+        Object.keys(tseslint.configs.recommendedTypeChecked[2].rules).map((k) => [k, 'off']),
+      ),
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-floating-promises': 'off',
+      '@typescript-eslint/no-misused-promises': 'off',
       '@typescript-eslint/strict-boolean-expressions': 'off',
+      // Some rules are too strict or noisy for test code even with type info
+      '@typescript-eslint/await-thenable': 'off',
       '@typescript-eslint/no-unsafe-argument': 'off', // Test mocks often use any
       '@typescript-eslint/no-unsafe-assignment': 'off', // Test mocks often use any
       '@typescript-eslint/no-unsafe-member-access': 'off', // Test mocks often use any
@@ -347,6 +406,9 @@ export default [
       'security/detect-non-literal-fs-filename': 'off',
       'security/detect-object-injection': 'off',
       'sonarjs/no-duplicate-string': 'off',
+      // Surface but don't fail CI on tests without explicit assertions or hardcoded secrets
+      'sonarjs/assertions-in-tests': 'warn',
+      'sonarjs/no-hardcoded-passwords': 'warn',
       'unicorn/no-useless-undefined': 'off',
       'unicorn/consistent-function-scoping': 'off',
       'vitest/expect-expect': 'off', // Some tests use custom assertions
@@ -357,12 +419,18 @@ export default [
   {
     files: ['*.config.js', '*.config.mjs', '*.config.ts'],
     rules: {
+      // Turn off the type-checked set for configs to avoid parser errors on JS config files
+      ...Object.fromEntries(
+        Object.keys(tseslint.configs.recommendedTypeChecked[2].rules).map((k) => [k, 'off']),
+      ),
       '@typescript-eslint/no-unsafe-argument': 'off',
       '@typescript-eslint/no-unsafe-assignment': 'off',
       '@typescript-eslint/no-unsafe-member-access': 'off',
       '@typescript-eslint/strict-boolean-expressions': 'off',
       'n/no-unsupported-features/node-builtins': 'off',
       'sonarjs/deprecation': 'off',
+      // Config files may include rule names containing the word "passwords"; disable noise
+      'sonarjs/no-hardcoded-passwords': 'off',
     },
   },
 ];

@@ -26,64 +26,60 @@ describe('Policy Engine — Risk Classification', () => {
    * ============================================
    */
   describe('classifyRisk', () => {
-    it('classifies workflow changes as high risk', () => {
-      const files = ['.github/workflows/ci.yml', 'src/index.ts'];
+    const expectTierAndPaths = (
+      result: ReturnType<typeof classifyRisk>,
+      tier: string,
+      expectedPaths?: string[],
+      reasonAssertion?: ((n: number) => void) | number,
+    ) => {
+      expect(result.tier).toBe(tier);
+      if (expectedPaths) {
+        expect(result.paths).toEqual(expect.arrayContaining(expectedPaths));
+      }
+      if (typeof reasonAssertion === 'number') {
+        expect(result.reasons.length).toBe(reasonAssertion);
+      } else if (typeof reasonAssertion === 'function') {
+        reasonAssertion(result.reasons.length);
+      }
+    };
+
+    it.each<[string, string[], string, string[]?, (((n: number) => void) | number)?]>([
+      [
+        'workflow changes',
+        ['.github/workflows/ci.yml', 'src/index.ts'],
+        'high',
+        ['.github/workflows/ci.yml'],
+        (n: number) => expect(n).toBeGreaterThan(0),
+      ],
+      [
+        'GitHub action changes',
+        ['.github/actions/setup/action.yml'],
+        'high',
+        ['.github/actions/setup/action.yml'],
+      ],
+      [
+        'executable scripts',
+        ['scripts/deploy.ts', 'tools/build.ts'],
+        'high',
+        ['scripts/deploy.ts', 'tools/build.ts'],
+      ],
+      ['package.json', ['package.json', 'src/index.ts'], 'high', ['package.json']],
+      ['lockfiles', ['package-lock.json'], 'high', ['package-lock.json']],
+      [
+        'security config (toml/yml)',
+        ['.gitleaks.toml', 'codeql-config.yml'],
+        'high',
+        ['.gitleaks.toml', 'codeql-config.yml'],
+      ],
+      [
+        'yaml security config files',
+        ['.github/dependabot.yaml', '.github/scorecard.yaml', 'codeql-config.yaml'],
+        'high',
+        ['.github/dependabot.yaml', '.github/scorecard.yaml', 'codeql-config.yaml'],
+      ],
+    ])('classifies %s as %s', (_desc, files, tier, paths, reasonAssertion) => {
       const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths).toContain('.github/workflows/ci.yml');
-      expect(result.reasons.length).toBeGreaterThan(0);
-    });
-
-    it('classifies GitHub action changes as high risk', () => {
-      const files = ['.github/actions/setup/action.yml'];
-      const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths).toContain('.github/actions/setup/action.yml');
-    });
-
-    it('classifies executable scripts as high risk', () => {
-      const files = ['scripts/deploy.ts', 'tools/build.ts'];
-      const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths).toContain('scripts/deploy.ts');
-      expect(result.paths).toContain('tools/build.ts');
-    });
-
-    it('classifies package.json as high risk', () => {
-      const files = ['package.json', 'src/index.ts'];
-      const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths).toContain('package.json');
-    });
-
-    it('classifies lockfiles as high risk', () => {
-      const files = ['package-lock.json'];
-      const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths).toContain('package-lock.json');
-    });
-
-    it('classifies security configuration files as high risk', () => {
-      const files = ['.gitleaks.toml', 'codeql-config.yml'];
-      const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths.length).toBe(2);
-    });
-
-    it('classifies .yaml security configuration files as high risk', () => {
-      const files = ['.github/dependabot.yaml', '.github/scorecard.yaml', 'codeql-config.yaml'];
-      const result = classifyRisk(files);
-
-      expect(result.tier).toBe('high');
-      expect(result.paths).toContain('.github/dependabot.yaml');
-      expect(result.paths).toContain('.github/scorecard.yaml');
-      expect(result.paths).toContain('codeql-config.yaml');
+      expectTierAndPaths(result, tier, paths, reasonAssertion);
     });
 
     it('classifies enforcement configuration as medium risk', () => {

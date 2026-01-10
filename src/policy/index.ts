@@ -15,7 +15,7 @@
  * } from '@politicalsphere/ci/policy';
  *
  * const changedFiles = ['src/app.ts'] as const;
- * const prBody = `\n- [x] **This PR contains AI-assisted changes**\n- [x] I have reviewed all AI-generated code\n- [x] I have verified that no secrets\n- [x] The changes align with\n- [x] I have tested the changes locally\n+ `;
+ * const prBody = `\n- [x] **This PR contains AI-assisted changes**\n- [x] I have reviewed all AI-generated code\n- [x] I have verified that no secrets\n- [x] The changes align with\n- [x] I have tested the changes locally\n`;
  *
  * const out = evaluatePolicy({ prBody, changedFiles });
  * const summary = generateMarkdownSummary(
@@ -24,6 +24,8 @@
  *   out.classification.paths,
  * );
  * ```
+ * This file is a pure re-export barrel defining the public API.
+ * It contains no logic and is intentionally untested.
  */
 
 export {

@@ -62,25 +62,42 @@ interface CommitResponse {
   sha?: unknown;
 }
 
+/**
+ * Normalized result returned when a tag/branch is successfully resolved to a
+ * commit SHA. `sha` is guaranteed to be a valid 40-character SHA when present.
+ */
+interface ResolvedAction {
+  sha: string;
+  owner: string;
+  repo: string;
+  actionPath: string;
+  repoSlug: string;
+}
+
+/** Normalize a path relative to the current working directory. */
 function normalizePath(inputPath: string): string {
   return path.resolve(process.cwd(), inputPath);
 }
 
+/** Synchronously check whether `filePath` exists on disk. */
 function fileExists(filePath: string): boolean {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is normalized from CLI input
   return existsSync(filePath);
 }
 
+/** Read a UTF-8 file synchronously. */
 function readUtf8(filePath: string): string {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is normalized from CLI input
   return readFileSync(filePath, 'utf8');
 }
 
+/** Write a UTF-8 file synchronously. */
 function writeUtf8(filePath: string, contents: string): void {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is normalized from CLI input
   writeFileSync(filePath, contents, 'utf8');
 }
 
+/** Read directory entries with `Dirent` information. Returns [] on error. */
 function readDirEntries(dirPath: string): import('node:fs').Dirent[] {
   // eslint-disable-next-line security/detect-non-literal-fs-filename -- path is normalized from CLI input
   return readdirSync(dirPath, { withFileTypes: true });
@@ -89,12 +106,23 @@ function readDirEntries(dirPath: string): import('node:fs').Dirent[] {
 /**
  * Check if a string is a valid 40-character SHA-1 hash
  */
+/**
+ * Determine whether `sha` is a valid 40-character hexadecimal SHA-1.
+ *
+ * Exported for tests.
+ */
 export function isValidSha(sha: string): boolean {
   return /^[0-9a-f]{40}$/i.test(sha);
 }
 
 /**
  * Parse action reference (e.g., "actions/checkout@v3")
+ */
+/**
+ * Parse an action `uses` reference of the form `owner/repo[/path]@ref`.
+ *
+ * Returns an `ActionReference` on success or `null` for malformed inputs.
+ * Exported for tests.
  */
 export function parseActionRef(actionRef: string): ActionReference | null {
   const atIndex = actionRef.indexOf('@');
@@ -121,24 +149,25 @@ export function parseActionRef(actionRef: string): ActionReference | null {
 /**
  * Check if an action is a local action (starts with ./ or ../)
  */
+/**
+ * Return true when the `uses` reference points to a local action (./ or ../).
+ * Local actions are exempted from SHA pinning.
+ */
 export function isLocalAction(actionRef: string): boolean {
   return actionRef.startsWith('./') || actionRef.startsWith('../');
 }
 
 /**
- * Result of resolving an action reference to its commit SHA
- */
-interface ResolvedAction {
-  sha: string;
-  owner: string;
-  repo: string;
-  actionPath: string;
-  repoSlug: string;
-}
-
-/**
  * Resolve tag/branch to latest commit SHA for an action
  * Returns the SHA and repo info to avoid needing to re-parse the action reference
+ */
+/**
+ * Resolve a tag or branch for `actionRef` to the latest commit SHA using the
+ * GitHub REST API. If `GITHUB_TOKEN` or `GH_TOKEN` is present it will be used
+ * to authenticate the request and avoid rate limits.
+ *
+ * Returns a `ResolvedAction` when resolution succeeds or `null` on failure.
+ * Exported for tests.
  */
 export async function resolveToSha(actionRef: string): Promise<ResolvedAction | null> {
   const parsed = parseActionRef(actionRef);
@@ -198,6 +227,11 @@ export async function resolveToSha(actionRef: string): Promise<ResolvedAction | 
 /**
  * Find all workflow files in a directory
  */
+/**
+ * Locate workflow files (`.yml`/`.yaml`) in `workflowsDir` and return full
+ * paths. Returns an empty array if the directory doesn't exist or cannot be
+ * read.
+ */
 export function findWorkflowFiles(workflowsDir: string): string[] {
   if (!fileExists(workflowsDir)) {
     return [];
@@ -217,6 +251,10 @@ export function findWorkflowFiles(workflowsDir: string): string[] {
 
 /**
  * Extract unpinned actions from a workflow file
+ */
+/**
+ * Scan a workflow file and return any `uses:` entries that are not pinned to
+ * a full 40-character commit SHA. Skips comments and local actions.
  */
 export function extractUnpinnedActions(filePath: string): UnpinnedAction[] {
   const content = readUtf8(filePath);
@@ -265,6 +303,10 @@ export function extractUnpinnedActions(filePath: string): UnpinnedAction[] {
 /**
  * Auto-fix unpinned action in a file
  */
+/**
+ * Attempt to resolve `actionRef` to a commit SHA and rewrite the matching
+ * `uses:` line in `filePath` to pin to that SHA. Returns `{ success, newRef }`.
+ */
 export async function fixUnpinnedAction(
   filePath: string,
   actionRef: string,
@@ -301,6 +343,13 @@ export async function fixUnpinnedAction(
 
 /**
  * Main validation logic
+ */
+/**
+ * Validate all workflow files under `workflowsDir`. When `fixMode` is true
+ * the function will attempt to auto-fix unpinned actions by resolving SHAs.
+ *
+ * Returns `0` on success (or when fixes succeeded), or `1` on violations or
+ * unexpected errors. Exported for tests.
  */
 // eslint-disable-next-line sonarjs/cognitive-complexity -- Complex but clear validation logic
 export async function validate(workflowsDir: string, fixMode: boolean): Promise<number> {
@@ -369,6 +418,10 @@ export async function validate(workflowsDir: string, fixMode: boolean): Promise<
 
 /**
  * CLI entry point
+ */
+/**
+ * CLI entrypoint used by the package. Parses args and delegates to
+ * `validate`. Returns the numeric exit code for easier testing.
  */
 export async function main(args: string[]): Promise<number> {
   // Help flag handling

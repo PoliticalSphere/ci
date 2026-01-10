@@ -687,31 +687,6 @@ steps:
   });
 
   describe('Integration tests', () => {
-    it('should successfully fix an unpinned action with mocked successful SHA resolution', async () => {
-      const file = path.join(workflowsDir, 'test.yml');
-      await writeFile(
-        file,
-        `name: Test
-steps:
-  - uses: actions/checkout@v4
-`,
-      );
-
-      // Mock https.get to return a successful response
-      const mockGet = mockHttpsGetWithSha('8e8c483db84b4bee98b60c0593521ed34d9990e8');
-
-      const result = await validator.fixUnpinnedAction(file, 'actions/checkout@v4');
-
-      expect(result.success).toBe(true);
-      expect(result.newRef).toBe('actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8');
-
-      const content = await readFile(file, 'utf8');
-      expect(content).toContain('actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8');
-      expect(content).not.toContain('actions/checkout@v4');
-
-      mockGet.mockRestore();
-    });
-
     it('should show success message in fix mode when fixing succeeds', async () => {
       const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
 

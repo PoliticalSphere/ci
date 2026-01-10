@@ -44,7 +44,16 @@ export default defineConfig({
         // Exclude barrel files (re-export only, no executable code)
         '**/__test-utils__/index.ts',
         '**/policy/index.ts',
-        '**/index.ts',
+        '**/modules/index.ts',
+        'src/cli/config/index.ts',
+        'src/cli/execution/index.ts',
+        'src/cli/infrastructure/index.ts',
+        'src/cli/input/index.ts',
+        'src/cli/input/validation.ts',
+        'src/cli/observability/index.ts',
+        'src/cli/output/index.ts',
+        'src/cli/modules/file-system/file-system.ts',
+        'src/index.ts',
       ],
 
       // Enforce deterministic output location

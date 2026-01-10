@@ -324,7 +324,7 @@ Every change will have:
 
 - [src/cli/index.ts](src/cli/index.ts) — CLI entry point
 - [src/cli/executor.ts](src/cli/executor.ts) — Linter execution logic
-- [src/cli/linters.ts](src/cli/linters.ts) — Linter registry
+- [src/cli/config/linter-registry.ts](src/cli/config/linter-registry.ts) — Linter registry
 
 **Workflow & Templates**
 
