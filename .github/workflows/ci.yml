@@ -1,0 +1,233 @@
+# PoliticalSphere CI — Authoritative CI/CD Workflow
+#
+# This is the canonical enforcement workflow for the Political Sphere platform.
+# Downstream repositories consume this workflow via SHA pinning.
+#
+# Execution model:
+# - Triggered on pull_request events and manual dispatch
+# - Aggregates failures (default), fail-fast for trust violations
+# - Restrictive permissions by default, explicit grants per job
+
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+  workflow_call:
+    inputs:
+      skip-policy:
+        description: 'Skip policy evaluation (for testing only)'
+        type: boolean
+        default: false
+        required: false
+
+# Cancel in-progress runs for same PR/branch
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Trust Boundary Checks — fail-fast on violations
+  secrets-detection:
+    name: Secrets Detection
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          fetch-depth: 0  # Full history for gitleaks
+
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7  # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_SUMMARY: true
+
+  action-pinning:
+    name: Action Pinning Validation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Validate action pinning
+        run: npx --no-install tsx ./scripts/validate-action-pinning/validate-action-pinning.ts
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # Lint & Quality Checks — aggregate failures
+  lint-format:
+    name: Lint & Format (Biome)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run Biome
+        run: npm run lint:biome
+
+  lint-eslint:
+    name: Static Analysis (ESLint)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run ESLint
+        run: npm run lint:eslint
+
+  typecheck:
+    name: Type Checking (TypeScript)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run TypeScript compiler
+        run: npm run lint:types
+
+  dead-code:
+    name: Dead Code Detection (knip)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run knip
+        run: npm run lint:knip
+
+  duplication:
+    name: Duplication Detection (jscpd)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run jscpd (duplication detection)
+        run: npm run lint:dup
+
+      - name: Upload duplication report
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: jscpd-report
+          path: reports/jscpd-report/jscpd-report.md
+          if-no-files-found: warn
+          retention-days: 7
+
+  tests:
+    name: Tests (vitest + coverage)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run tests with coverage
+        run: npm run test:coverage
+
+  # Policy Evaluation — risk classification and attestation validation
+  policy:
+    name: Policy Evaluation
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read  # Read PR body for attestation
+    if: ${{ !inputs.skip-policy }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          fetch-depth: 0  # Full history for diff analysis
+
+      - name: Run policy engine
+        run: npx --no-install tsx ./scripts/policy-evaluate.ts
+
+      - name: Upload policy results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: policy-results
+          path: |
+            policy.decision.json
+            policy.summary.md
+          if-no-files-found: warn
+          retention-days: 30
+
+  # Aggregate Status Check
+  ci-status:
+    name: CI Status
+    runs-on: ubuntu-latest
+    needs:
+      - secrets-detection
+      - action-pinning
+      - lint-format
+      - lint-eslint
+      - typecheck
+      - dead-code
+      - duplication
+      - tests
+      - policy
+    if: always()
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Check CI status
+        run: |
+          npx --no-install tsx ./scripts/check-ci-status/check-ci-status.ts \
+            "${{ needs.secrets-detection.result }}" \
+            "${{ needs.action-pinning.result }}" \
+            "${{ needs.lint-format.result }}" \
+            "${{ needs.lint-eslint.result }}" \
+            "${{ needs.typecheck.result }}" \
+            "${{ needs.dead-code.result }}" \
+            "${{ needs.duplication.result }}" \
+            "${{ needs.tests.result }}" \
+            "${{ needs.policy.result }}"

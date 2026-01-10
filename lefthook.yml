@@ -1,0 +1,58 @@
+# ==============================================================================
+# Political Sphere — Lefthook Configuration
+# Purpose:
+#   Pre-commit validation to catch issues before CI execution.
+#   Fail-closed model: block commits that violate trust boundaries or quality gates.
+#
+# Philosophy:
+#   - Fast feedback: catch errors locally before pushing
+#   - Deterministic: same checks as CI, just earlier
+#   - Trust boundary enforcement: secrets, type errors, security violations
+#   - Quality gates: formatting, linting, unused code
+#
+# Authority:
+#   - Pre-commit hooks: developer-local enforcement
+#   - CI pipeline: authoritative, canonical enforcement
+# ==============================================================================
+
+# Lefthook configuration
+# Docs: https://github.com/evilmartians/lefthook/blob/master/docs/configuration.md
+
+pre-commit:
+  parallel: true
+  commands:
+    # -------------------------------------------------------------------------
+    # Comprehensive Lint + Coverage (requested)
+    # -------------------------------------------------------------------------
+    lint-all:
+      run: npm run lint:all
+      stage_fixed: false
+
+    test-coverage:
+      run: npm run test:coverage
+      stage_fixed: false
+
+    # -------------------------------------------------------------------------
+    # Code Quality: Fast Formatting & Basic Linting
+    # -------------------------------------------------------------------------
+    format:
+      glob: "*.{ts,tsx,js,jsx,json,jsonc,md}"
+      run: npm run lint:format
+      stage_fixed: true
+
+pre-push:
+  parallel: true
+  commands:
+    # -------------------------------------------------------------------------
+    # Full Validation (all linters, comprehensive check)
+    # -------------------------------------------------------------------------
+    lint-all:
+      run: npm run lint:all
+      stage_fixed: false
+
+    # -------------------------------------------------------------------------
+    # Test Suite (ensure no regressions)
+    # -------------------------------------------------------------------------
+    test:
+      run: npm test
+      stage_fixed: false

@@ -1,0 +1,126 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.3.11/schema.json",
+
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {}
+        }
+      }
+    }
+  },
+
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 100,
+    "lineEnding": "lf"
+  },
+
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "noUnusedFunctionParameters": "warn"
+      },
+
+      "style": {
+        "noNonNullAssertion": "warn",
+        "useBlockStatements": "error",
+        "useCollapsedElseIf": "error",
+        "useConsistentArrayType": {
+          "level": "error",
+          "options": { "syntax": "shorthand" }
+        },
+        "useConst": "error",
+        "useExportType": "error",
+        "useImportType": "off",
+        "useNodejsImportProtocol": "error",
+        "useNumberNamespace": "error",
+        "useSingleVarDeclarator": "error",
+        "useTemplate": "error"
+      },
+
+      "suspicious": {
+        "noConsole": "off",
+        "noDebugger": "error",
+        "noDoubleEquals": "error",
+        "noExplicitAny": "error",
+        "noNonNullAssertedOptionalChain": "error",
+        "noPrototypeBuiltins": "warn"
+      },
+
+      "complexity": {
+        "noBannedTypes": "error",
+        "noForEach": "warn",
+        "noUselessTypeConstraint": "error",
+        "useLiteralKeys": "error",
+        "useOptionalChain": "error"
+      },
+
+      "performance": {
+        "noAccumulatingSpread": "error",
+        "noDelete": "warn"
+      }
+    }
+  },
+
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "semicolons": "always",
+      "arrowParentheses": "always"
+    }
+  },
+
+  "json": {
+    "formatter": {
+      "trailingCommas": "none"
+    }
+  },
+
+  "files": {
+    "includes": ["**"],
+    "ignoreUnknown": true
+  },
+
+  "overrides": [
+    {
+      "includes": [
+        "**/*.test.ts",
+        "**/*.test.tsx",
+        "**/*.test.js",
+        "**/*.test.jsx",
+        "**/*.spec.ts",
+        "**/*.spec.tsx",
+        "**/*.spec.js",
+        "**/*.spec.jsx",
+        "**/__tests__/**"
+      ],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noConsole": "warn"
+          },
+          "style": {
+            "useImportType": "off"
+          }
+        }
+      }
+    }
+  ],
+
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  }
+}

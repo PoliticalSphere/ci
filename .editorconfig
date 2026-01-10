@@ -1,0 +1,93 @@
+# ==============================================================================
+# Political Sphere — EditorConfig
+# Purpose:
+#   Provide a minimal, editor-level baseline for consistency across contributors
+#   and AI-assisted tooling. This file is intentionally conservative.
+#
+# Authority:
+#   - EditorConfig: editor defaults only
+#   - Biome: formatting + linting (authoritative)
+#   - CI: final enforcement (authoritative)
+#
+# Editors MUST NOT override Biome or CI behaviour.
+# https://editorconfig.org
+# ==============================================================================
+
+root = true
+
+
+# ------------------------------------------------------------------------------
+# Global defaults (apply to all files)
+# ------------------------------------------------------------------------------
+[*]
+charset = utf-8
+end_of_line = lf
+insert_final_newline = true
+trim_trailing_whitespace = true
+
+indent_style = space
+indent_size = 2
+
+
+# ------------------------------------------------------------------------------
+# JavaScript / TypeScript
+# Note: Biome is authoritative for formatting.
+# EditorConfig exists only to prevent accidental editor divergence.
+# ------------------------------------------------------------------------------
+[*.{js,mjs,cjs,ts,mts,cts,jsx,tsx}]
+indent_size = 2
+
+
+# ------------------------------------------------------------------------------
+# JSON / JSONC
+# ------------------------------------------------------------------------------
+[*.{json,jsonc}]
+indent_size = 2
+
+
+# ------------------------------------------------------------------------------
+# YAML (including GitHub Actions)
+# ------------------------------------------------------------------------------
+[*.{yml,yaml}]
+indent_size = 2
+
+
+# ------------------------------------------------------------------------------
+# Markdown
+# Allow trailing whitespace for intentional line breaks.
+# markdownlint + CI enforce structure and correctness.
+# ------------------------------------------------------------------------------
+[*.md]
+trim_trailing_whitespace = false
+
+
+# ------------------------------------------------------------------------------
+# Shell scripts
+# shellcheck + CI enforce semantics.
+# ------------------------------------------------------------------------------
+[*.sh]
+indent_size = 2
+
+
+# ------------------------------------------------------------------------------
+# Makefiles (tabs are required by spec)
+# ------------------------------------------------------------------------------
+[Makefile]
+indent_style = tab
+
+
+# ------------------------------------------------------------------------------
+# Git configuration files
+# Use wider indentation for readability.
+# ------------------------------------------------------------------------------
+[.git*]
+indent_size = 4
+
+
+# ------------------------------------------------------------------------------
+# Dockerfiles
+# Slightly wider indentation improves instruction readability.
+# hadolint is authoritative.
+# ------------------------------------------------------------------------------
+[Dockerfile*]
+indent_size = 4

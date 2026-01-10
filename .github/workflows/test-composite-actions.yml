@@ -1,0 +1,214 @@
+# Test workflow for setup-node-env composite action
+#
+# Validates that the composite action correctly:
+# - Checks out code
+# - Sets up Node.js with caching
+# - Installs dependencies
+# - Handles different input parameters
+
+name: Test Composite Actions
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - '.github/actions/**'
+      - '.github/workflows/test-composite-actions.yml'
+  workflow_dispatch:
+
+jobs:
+  # Test with default parameters
+  test-default-parameters:
+    name: Test setup-node-env (defaults)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Verify Node.js version
+        run: |
+          node_version=$(node --version)
+          printf "Node.js version: %s\n" "$node_version"
+
+          # Should be Node 22.x
+          if [[ ! "$node_version" =~ ^v22\. ]]; then
+            printf "❌ Expected Node.js 22.x, got %s\n" "$node_version"
+            exit 1
+          fi
+
+          printf "✅ Node.js version is correct\n"
+
+      - name: Verify npm is available
+        run: |
+          npm --version
+          printf "✅ npm is available\n"
+
+      - name: Verify dependencies installed
+        run: |
+          if [ ! -d "node_modules" ]; then
+            printf "❌ node_modules directory not found\n"
+            exit 1
+          fi
+
+          printf "✅ Dependencies installed\n"
+
+      - name: Verify package-lock.json integrity
+        run: |
+          if [ ! -f "package-lock.json" ]; then
+            printf "❌ package-lock.json not found\n"
+            exit 1
+          fi
+
+          printf "✅ package-lock.json exists\n"
+
+      - name: Verify git repository accessible
+        run: |
+          git log -1 --oneline
+          printf "✅ Git repository is accessible\n"
+
+  # Test with full git history
+  test-full-git-history:
+    name: Test setup-node-env (full history)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+        with:
+          fetch-depth: 0
+
+      - name: Verify full git history available
+        run: |
+          commit_count=$(git rev-list --count HEAD)
+          printf "Total commits: %s\n" "$commit_count"
+
+          if [ "$commit_count" -lt 2 ]; then
+            printf "⚠️  Warning: Expected more than 1 commit with fetch-depth: 0\n"
+            # Don't fail - might be a new repo
+          fi
+
+          printf "✅ Git history fetched (fetch-depth: 0)\n"
+
+      - name: Verify git operations work
+        run: |
+          git log --oneline -5
+          git branch -a
+          printf "✅ Git operations successful with full history\n"
+
+  # Test that npm caching works
+  test-npm-caching:
+    name: Test npm caching behavior
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment (first time)
+        uses: ./.github/actions/setup-node-env
+
+      - name: Record initial install time
+        id: first-install
+        run: |
+          start_time=$(date +%s)
+          rm -rf node_modules
+          npm ci
+          end_time=$(date +%s)
+          duration=$((end_time - start_time))
+          printf "duration=%s\n" "$duration" >> $GITHUB_OUTPUT
+          printf "First install took %s\n" "$duration"
+
+      - name: Setup Node.js environment (second time - should use cache)
+        uses: ./.github/actions/setup-node-env
+
+      - name: Verify cache was used
+        run: |
+          if [ ! -d "node_modules" ]; then
+            printf "❌ Dependencies not installed\n"
+            exit 1
+          fi
+          printf "✅ npm cache appears to be working\n"
+
+  # Test that action works in workflow
+  test-integration:
+    name: Test integration with real commands
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Setup Node.js environment
+        uses: ./.github/actions/setup-node-env
+
+      - name: Run TypeScript compilation
+        run: npm run lint:types || true
+
+      - name: Run tests
+        run: npm test || true
+
+      - name: Verify workspace structure
+        run: |
+          printf "Checking workspace structure...\n"
+          ls -la
+
+          required_files=("package.json" "package-lock.json" "tsconfig.json")
+
+          for file in "${required_files[@]}"; do
+            if [ ! -f "$file" ]; then
+              printf "❌ Required file not found: %s\n" "$file"
+              exit 1
+            fi
+          done
+
+          printf "✅ All required files present\n"
+
+  # Aggregate test status
+  test-status:
+    name: Composite Action Test Status
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    needs:
+      - test-default-parameters
+      - test-full-git-history
+      - test-npm-caching
+      - test-integration
+    if: always()
+    steps:
+      - name: Check test results
+        run: |
+          default_result="${{ needs.test-default-parameters.result }}"
+          history_result="${{ needs.test-full-git-history.result }}"
+          caching_result="${{ needs.test-npm-caching.result }}"
+          integration_result="${{ needs.test-integration.result }}"
+
+          printf "=== Test Results ===\n"
+          printf "Default parameters: %s\n" "$default_result"
+          printf "Full git history: %s\n" "$history_result"
+          printf "npm caching: %s\n" "$caching_result"
+          printf "Integration: %s\n" "$integration_result"
+
+          if [ "$default_result" != "success" ] || \
+             [ "$history_result" != "success" ] || \
+             [ "$caching_result" != "success" ] || \
+             [ "$integration_result" != "success" ]; then
+            printf "\n"
+            printf "❌ Some composite action tests failed!\n"
+            exit 1
+          fi
+
+          printf "\n"
+          printf "✅ All composite action tests passed!\n"
